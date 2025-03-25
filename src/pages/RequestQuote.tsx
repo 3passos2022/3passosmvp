@@ -8,24 +8,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const RequestQuote: React.FC = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
-
   // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
-  if (!user) {
-    return null; // Don't render anything while redirecting
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

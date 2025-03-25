@@ -1,317 +1,244 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { User, Lock, Mail, Phone, UserCircle, Briefcase } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserRole } from '@/lib/types';
+import { motion } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+import { UserRole } from "@/lib/types";
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
-const Login: React.FC = () => {
-  const { signIn, signUp, user } = useAuth();
+// Schemas for validation
+const loginSchema = z.object({
+  email: z.string().email({ message: "E-mail inválido" }),
+  password: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
+});
+
+const registerSchema = z.object({
+  name: z.string().min(2, { message: "Nome deve ter pelo menos 2 caracteres" }),
+  email: z.string().email({ message: "E-mail inválido" }),
+  password: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
+  phone: z.string().optional(),
+  role: z.enum(["client", "provider"]),
+});
+
+const Login = () => {
+  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>('login');
+  const location = useLocation();
 
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  // Get the return path from location state if exists
+  const returnTo = location.state?.returnTo || '/';
 
-  // Register form state
-  const [registerName, setRegisterName] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
-  const [registerPhone, setRegisterPhone] = useState('');
-  const [registerRole, setRegisterRole] = useState<UserRole>(UserRole.CLIENT);
-
-  // If user is already logged in, redirect to profile
+  // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      navigate('/profile');
+      navigate(returnTo, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, returnTo]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  // Login form
+  const {
+    register: loginRegister,
+    handleSubmit: handleLoginSubmit,
+    formState: { errors: loginErrors, isSubmitting: isLoginSubmitting },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+  });
+
+  // Register form
+  const {
+    register: registerRegister,
+    handleSubmit: handleRegisterSubmit,
+    formState: { errors: registerErrors, isSubmitting: isRegisterSubmitting },
+  } = useForm({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      role: "client",
+    },
+  });
+
+  const onLogin = async (data) => {
     try {
-      await signIn(loginEmail, loginPassword);
-      navigate('/profile');
+      await signIn(data.email, data.password);
+      // Will automatically redirect via the useEffect above
     } catch (error) {
-      console.error('Login error:', error);
-    } finally {
-      setIsLoading(false);
+      toast.error("Falha ao fazer login. Verifique suas credenciais.");
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const onRegister = async (data) => {
     try {
-      await signUp(registerEmail, registerPassword, {
-        name: registerName,
-        email: registerEmail,
-        phone: registerPhone,
-        role: registerRole,
+      await signUp(data.email, data.password, {
+        name: data.name,
+        role: data.role,
+        phone: data.phone || "",
       });
-      
-      // Auto login after registration
-      await signIn(registerEmail, registerPassword);
-      navigate('/profile');
+      toast.success("Conta criada com sucesso! Por favor, faça login.");
+      setActiveTab("login");
     } catch (error) {
-      console.error('Registration error:', error);
-    } finally {
-      setIsLoading(false);
+      toast.error("Erro ao criar conta. Este e-mail já está em uso ou houve um problema com o servidor.");
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      
-      <main className="flex-1 py-20">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-md mx-auto"
-          >
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8">
+      <main className="flex-1 flex items-center justify-center p-4 md:p-8 bg-gray-50">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h1 className="text-2xl font-bold text-center mb-6">Bem-vindo(a)</h1>
+            
+            <Tabs defaultValue={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "register")}>
+              <TabsList className="grid grid-cols-2 mb-6">
                 <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Cadastro</TabsTrigger>
+                <TabsTrigger value="register">Criar Conta</TabsTrigger>
               </TabsList>
-
-              <AnimatePresence mode="wait">
-                <TabsContent value="login" asChild>
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
+              
+              <TabsContent value="login">
+                <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="seu@email.com" 
+                      {...loginRegister("email")} 
+                    />
+                    {loginErrors.email && (
+                      <p className="text-sm text-red-500">{loginErrors.email.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      placeholder="******" 
+                      {...loginRegister("password")} 
+                    />
+                    {loginErrors.password && (
+                      <p className="text-sm text-red-500">{loginErrors.password.message}</p>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    type="submit" 
+                    disabled={isLoginSubmitting}
                   >
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Login</CardTitle>
-                        <CardDescription>
-                          Entre na sua conta para acessar seus orçamentos e serviços.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <form onSubmit={handleLogin} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="login-email">E-mail</Label>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                              <Input
-                                id="login-email"
-                                type="email"
-                                placeholder="seu@email.com"
-                                className="pl-10"
-                                value={loginEmail}
-                                onChange={(e) => setLoginEmail(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label htmlFor="login-password">Senha</Label>
-                              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                                Esqueceu a senha?
-                              </Link>
-                            </div>
-                            <div className="relative">
-                              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                              <Input
-                                id="login-password"
-                                type="password"
-                                placeholder="••••••••"
-                                className="pl-10"
-                                value={loginPassword}
-                                onChange={(e) => setLoginPassword(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? 'Entrando...' : 'Entrar'}
-                          </Button>
-                        </form>
-                      </CardContent>
-                      <CardFooter className="flex justify-center">
-                        <p className="text-center text-sm text-gray-600">
-                          Ainda não tem uma conta?{' '}
-                          <button
-                            onClick={() => setActiveTab('register')}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            Cadastre-se
-                          </button>
-                        </p>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
-
-                <TabsContent value="register" asChild>
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
+                    {isLoginSubmitting ? "Entrando..." : "Entrar"}
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="register">
+                <form onSubmit={handleRegisterSubmit(onRegister)} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome completo</Label>
+                    <Input 
+                      id="name" 
+                      placeholder="Seu nome" 
+                      {...registerRegister("name")} 
+                    />
+                    {registerErrors.name && (
+                      <p className="text-sm text-red-500">{registerErrors.name.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">E-mail</Label>
+                    <Input 
+                      id="register-email" 
+                      type="email" 
+                      placeholder="seu@email.com" 
+                      {...registerRegister("email")} 
+                    />
+                    {registerErrors.email && (
+                      <p className="text-sm text-red-500">{registerErrors.email.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone (opcional)</Label>
+                    <Input 
+                      id="phone" 
+                      placeholder="(00) 00000-0000" 
+                      {...registerRegister("phone")} 
+                    />
+                    {registerErrors.phone && (
+                      <p className="text-sm text-red-500">{registerErrors.phone.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">Senha</Label>
+                    <Input 
+                      id="register-password" 
+                      type="password" 
+                      placeholder="******" 
+                      {...registerRegister("password")} 
+                    />
+                    {registerErrors.password && (
+                      <p className="text-sm text-red-500">{registerErrors.password.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Você é:</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
+                        <input 
+                          type="radio" 
+                          value="client" 
+                          {...registerRegister("role")} 
+                          className="rounded-full text-primary" 
+                        />
+                        <span>Cliente</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
+                        <input 
+                          type="radio" 
+                          value="provider" 
+                          {...registerRegister("role")} 
+                          className="rounded-full text-primary" 
+                        />
+                        <span>Prestador</span>
+                      </label>
+                    </div>
+                    {registerErrors.role && (
+                      <p className="text-sm text-red-500">{registerErrors.role.message}</p>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    type="submit" 
+                    disabled={isRegisterSubmitting}
                   >
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Cadastro</CardTitle>
-                        <CardDescription>
-                          Crie sua conta para solicitar orçamentos ou oferecer serviços.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <form onSubmit={handleRegister} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="register-name">Nome completo</Label>
-                            <div className="relative">
-                              <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                              <Input
-                                id="register-name"
-                                placeholder="Seu nome completo"
-                                className="pl-10"
-                                value={registerName}
-                                onChange={(e) => setRegisterName(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="register-email">E-mail</Label>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                              <Input
-                                id="register-email"
-                                type="email"
-                                placeholder="seu@email.com"
-                                className="pl-10"
-                                value={registerEmail}
-                                onChange={(e) => setRegisterEmail(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="register-phone">Telefone</Label>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                              <Input
-                                id="register-phone"
-                                placeholder="(00) 00000-0000"
-                                className="pl-10"
-                                value={registerPhone}
-                                onChange={(e) => setRegisterPhone(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="register-password">Senha</Label>
-                            <div className="relative">
-                              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                              <Input
-                                id="register-password"
-                                type="password"
-                                placeholder="••••••••"
-                                className="pl-10"
-                                value={registerPassword}
-                                onChange={(e) => setRegisterPassword(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Tipo de conta</Label>
-                            <div className="flex gap-4">
-                              <div
-                                className={`flex-1 p-4 border rounded-lg cursor-pointer transition-all ${
-                                  registerRole === UserRole.CLIENT
-                                    ? 'border-primary bg-primary/5'
-                                    : 'border-gray-200 hover:border-primary/50'
-                                }`}
-                                onClick={() => setRegisterRole(UserRole.CLIENT)}
-                              >
-                                <div className="flex flex-col items-center text-center">
-                                  <UserCircle className={`h-8 w-8 mb-2 ${
-                                    registerRole === UserRole.CLIENT ? 'text-primary' : 'text-gray-400'
-                                  }`} />
-                                  <span className="font-medium">Cliente</span>
-                                  <span className="text-xs text-gray-500">Solicitar serviços</span>
-                                </div>
-                              </div>
-                              
-                              <div
-                                className={`flex-1 p-4 border rounded-lg cursor-pointer transition-all ${
-                                  registerRole === UserRole.PROVIDER
-                                    ? 'border-primary bg-primary/5'
-                                    : 'border-gray-200 hover:border-primary/50'
-                                }`}
-                                onClick={() => setRegisterRole(UserRole.PROVIDER)}
-                              >
-                                <div className="flex flex-col items-center text-center">
-                                  <Briefcase className={`h-8 w-8 mb-2 ${
-                                    registerRole === UserRole.PROVIDER ? 'text-primary' : 'text-gray-400'
-                                  }`} />
-                                  <span className="font-medium">Prestador</span>
-                                  <span className="text-xs text-gray-500">Oferecer serviços</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? 'Criando conta...' : 'Criar conta'}
-                          </Button>
-                        </form>
-                      </CardContent>
-                      <CardFooter className="flex justify-center">
-                        <p className="text-center text-sm text-gray-600">
-                          Já tem uma conta?{' '}
-                          <button
-                            onClick={() => setActiveTab('login')}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            Faça login
-                          </button>
-                        </p>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
-              </AnimatePresence>
+                    {isRegisterSubmitting ? "Criando conta..." : "Criar conta"}
+                  </Button>
+                </form>
+              </TabsContent>
             </Tabs>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
       </main>
-      
       <Footer />
     </div>
   );

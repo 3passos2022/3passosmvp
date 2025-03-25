@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -28,6 +27,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Rua é obrigatória'),
@@ -148,7 +157,6 @@ const ServiceStep: React.FC<{
   const [selectedSubService, setSelectedSubService] = useState<string>(formData.subServiceId || '');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>(formData.specialtyId || '');
   
-  // Get current subservices and specialties based on selections
   const subServices = services.find(s => s.id === selectedService)?.subServices || [];
   const specialties = subServices.find(s => s.id === selectedSubService)?.specialties || [];
 
@@ -191,7 +199,6 @@ const ServiceStep: React.FC<{
       return;
     }
     
-    // Get the names for display
     const serviceName = services.find(s => s.id === selectedService)?.name;
     const subServiceName = subServices.find(s => s.id === selectedSubService)?.name;
     const specialtyName = specialties.find(s => s.id === selectedSpecialty)?.name;
@@ -327,14 +334,12 @@ const ServiceDetailsStep: React.FC<{
     async function loadServiceDetails() {
       setLoading(true);
       try {
-        // Load questions from service, subservice, and specialty
         const serviceQuestions = await getQuestions(formData.serviceId);
         const subServiceQuestions = await getQuestions(undefined, formData.subServiceId);
         const specialtyQuestions = await getQuestions(undefined, undefined, formData.specialtyId);
         
         setQuestions([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
         
-        // Load service items
         const serviceItems = await getServiceItems(formData.serviceId);
         const subServiceItems = await getServiceItems(undefined, formData.subServiceId);
         const specialtyItems = await getServiceItems(undefined, undefined, formData.specialtyId);
@@ -342,11 +347,9 @@ const ServiceDetailsStep: React.FC<{
         const allItems = [...serviceItems, ...subServiceItems, ...specialtyItems];
         setItems(allItems);
         
-        // Check if we have square meter or linear meter items
         setHasSquareMeterItems(allItems.some(item => item.type === 'square_meter'));
         setHasLinearMeterItems(allItems.some(item => item.type === 'linear_meter'));
         
-        // Determine which tab to show first
         if (questions.length > 0) {
           setActiveTab('quiz');
         } else if (allItems.length > 0) {
@@ -669,24 +672,74 @@ const ReviewStep: React.FC<{
   );
 };
 
+// Login Dialog Component
+const LoginDialog: React.FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onLogin: () => void;
+}> = ({ isOpen, onOpenChange, onLogin }) => {
+  const navigate = useNavigate();
+  
+  const handleLoginRedirect = () => {
+    onOpenChange(false);
+    navigate('/login', { state: { returnTo: '/request-quote' } });
+  };
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Login necessário</DialogTitle>
+          <DialogDescription>
+            Para enviar seu pedido de orçamento, é necessário fazer login ou criar uma conta.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col space-y-4">
+          <p className="text-sm text-gray-500">
+            Você precisa ter uma conta para receber cotações dos prestadores de serviço.
+            As informações do seu orçamento serão salvas.
+          </p>
+        </div>
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Voltar
+            </Button>
+          </DialogClose>
+          <Button type="button" onClick={handleLoginRedirect}>
+            Fazer login ou criar conta
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Main component
 const QuoteRequestForm: React.FC = () => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!user) {
-      toast.error('Você precisa estar logado para solicitar orçamentos');
-      navigate('/login');
+    const savedFormData = localStorage.getItem('quoteFormData');
+    if (savedFormData) {
+      try {
+        const parsedData = JSON.parse(savedFormData);
+        setFormData(parsedData);
+      } catch (error) {
+        console.error('Error parsing saved form data:', error);
+      }
     }
-  }, [user, navigate]);
+  }, []);
 
   const updateFormData = (data: any) => {
-    setFormData(prev => ({ ...prev, ...data }));
+    const updatedData = { ...formData, ...data };
+    setFormData(updatedData);
+    localStorage.setItem('quoteFormData', JSON.stringify(updatedData));
   };
 
   const handleStepChange = (newStep: number) => {
@@ -696,14 +749,12 @@ const QuoteRequestForm: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!user) {
-      toast.error('Você precisa estar logado para solicitar orçamentos');
-      navigate('/login');
+      setShowLoginDialog(true);
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Insert quote
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .insert({
@@ -725,7 +776,6 @@ const QuoteRequestForm: React.FC = () => {
       
       if (quoteError) throw quoteError;
       
-      // Insert answers
       if (formData.answers) {
         const answerRows = Object.entries(formData.answers).map(([questionId, optionId]) => ({
           quote_id: quote.id,
@@ -742,10 +792,9 @@ const QuoteRequestForm: React.FC = () => {
         }
       }
       
-      // Insert item quantities
       if (formData.itemQuantities) {
         const itemRows = Object.entries(formData.itemQuantities)
-          .filter(([_, quantity]) => quantity > 0) // Only insert items with quantity > 0
+          .filter(([_, quantity]) => quantity > 0)
           .map(([itemId, quantity]) => ({
             quote_id: quote.id,
             item_id: itemId,
@@ -761,7 +810,6 @@ const QuoteRequestForm: React.FC = () => {
         }
       }
       
-      // Insert measurements
       if (formData.measurements && formData.measurements.length > 0) {
         const measurementRows = formData.measurements.map((m) => ({
           quote_id: quote.id,
@@ -778,14 +826,20 @@ const QuoteRequestForm: React.FC = () => {
         if (measurementsError) throw measurementsError;
       }
       
+      localStorage.removeItem('quoteFormData');
+      
       toast.success('Orçamento solicitado com sucesso!');
-      navigate('/profile'); // Redirect to profile page to see the quote
+      navigate('/profile');
     } catch (error) {
       console.error('Error submitting quote:', error);
       toast.error('Erro ao enviar orçamento. Por favor, tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const proceedAfterLogin = () => {
+    handleSubmit();
   };
 
   return (
@@ -795,10 +849,8 @@ const QuoteRequestForm: React.FC = () => {
           <h2 className="text-2xl font-bold text-center mb-6">Solicitar Orçamento</h2>
           
           <div className="flex justify-between relative mb-6">
-            {/* Progress line */}
             <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
             
-            {/* Step indicators */}
             {[1, 2, 3, 4].map((s) => (
               <div key={s} className="relative z-10">
                 <div 
@@ -861,6 +913,12 @@ const QuoteRequestForm: React.FC = () => {
           )}
         </motion.div>
       </div>
+
+      <LoginDialog 
+        isOpen={showLoginDialog} 
+        onOpenChange={setShowLoginDialog} 
+        onLogin={proceedAfterLogin} 
+      />
     </div>
   );
 };
