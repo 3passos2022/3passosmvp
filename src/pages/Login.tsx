@@ -34,7 +34,7 @@ const registerSchema = z.object({
   email: z.string().email({ message: "E-mail inválido" }),
   password: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
   phone: z.string().optional(),
-  role: z.enum(["client", "provider"]),
+  role: z.enum([UserRole.CLIENT, UserRole.PROVIDER]),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -73,7 +73,7 @@ const Login = () => {
       email: "",
       phone: "",
       password: "",
-      role: "client",
+      role: UserRole.CLIENT,
     },
   });
 
@@ -230,9 +230,9 @@ const Login = () => {
                             <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
                               <input 
                                 type="radio" 
-                                value="client" 
-                                checked={field.value === "client"}
-                                onChange={() => field.onChange("client")}
+                                value={UserRole.CLIENT} 
+                                checked={field.value === UserRole.CLIENT}
+                                onChange={() => field.onChange(UserRole.CLIENT)}
                                 className="rounded-full text-primary" 
                               />
                               <span>Cliente</span>
@@ -241,9 +241,9 @@ const Login = () => {
                             <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
                               <input 
                                 type="radio" 
-                                value="provider" 
-                                checked={field.value === "provider"}
-                                onChange={() => field.onChange("provider")}
+                                value={UserRole.PROVIDER} 
+                                checked={field.value === UserRole.PROVIDER}
+                                onChange={() => field.onChange(UserRole.PROVIDER)}
                                 className="rounded-full text-primary" 
                               />
                               <span>Prestador</span>

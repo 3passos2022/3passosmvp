@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -17,6 +16,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { UserRole, Service, SubService, Specialty } from '@/lib/types';
 import { getAllServices } from '@/lib/api/services';
 import { Plus, Trash2, Edit, Save } from 'lucide-react';
+
+// Define simple type for select options to avoid deep nesting
+type SelectOption = {
+  id: string;
+  name: string;
+};
 
 // Admin Services Component
 const AdminServices: React.FC = () => {
@@ -391,6 +396,9 @@ const AdminQuestions: React.FC = () => {
   const [questionOptions, setQuestionOptions] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   
+  const [subServiceOptions, setSubServiceOptions] = useState<SelectOption[]>([]);
+  const [specialtyOptions, setSpecialtyOptions] = useState<SelectOption[]>([]);
+  
   useEffect(() => {
     loadServices();
   }, []);
@@ -401,15 +409,38 @@ const AdminQuestions: React.FC = () => {
       setSelectedSubService('');
       setSelectedSpecialty('');
       loadQuestions('service', selectedService);
+      
+      // Update subservice options
+      const service = services.find(s => s.id === selectedService);
+      if (service) {
+        setSubServiceOptions(
+          service.subServices.map(s => ({ id: s.id, name: s.name }))
+        );
+      } else {
+        setSubServiceOptions([]);
+      }
     }
-  }, [selectedService]);
+  }, [selectedService, services]);
   
   useEffect(() => {
     if (selectedSubService) {
       setSelectedSpecialty('');
       loadQuestions('sub_service', selectedSubService);
+      
+      // Update specialty options
+      const service = services.find(s => s.id === selectedService);
+      if (service) {
+        const subService = service.subServices.find(ss => ss.id === selectedSubService);
+        if (subService) {
+          setSpecialtyOptions(
+            subService.specialties.map(s => ({ id: s.id, name: s.name }))
+          );
+        } else {
+          setSpecialtyOptions([]);
+        }
+      }
     }
-  }, [selectedSubService]);
+  }, [selectedSubService, selectedService, services]);
   
   useEffect(() => {
     if (selectedSpecialty) {
@@ -647,13 +678,11 @@ const AdminQuestions: React.FC = () => {
                       <SelectValue placeholder="Selecione um tipo de serviço" />
                     </SelectTrigger>
                     <SelectContent>
-                      {services
-                        .find(s => s.id === selectedService)?.subServices
-                        .map((subService) => (
-                          <SelectItem key={subService.id} value={subService.id}>
-                            {subService.name}
-                          </SelectItem>
-                        ))}
+                      {subServiceOptions.map((subService) => (
+                        <SelectItem key={subService.id} value={subService.id}>
+                          {subService.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -667,14 +696,11 @@ const AdminQuestions: React.FC = () => {
                       <SelectValue placeholder="Selecione uma especialidade" />
                     </SelectTrigger>
                     <SelectContent>
-                      {services
-                        .find(s => s.id === selectedService)?.subServices
-                        .find(ss => ss.id === selectedSubService)?.specialties
-                        .map((specialty) => (
-                          <SelectItem key={specialty.id} value={specialty.id}>
-                            {specialty.name}
-                          </SelectItem>
-                        ))}
+                      {specialtyOptions.map((specialty) => (
+                        <SelectItem key={specialty.id} value={specialty.id}>
+                          {specialty.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -810,6 +836,9 @@ const AdminItems: React.FC = () => {
   const [newItemType, setNewItemType] = useState<'quantity' | 'square_meter' | 'linear_meter'>('quantity');
   const [saving, setSaving] = useState(false);
   
+  const [subServiceOptions, setSubServiceOptions] = useState<SelectOption[]>([]);
+  const [specialtyOptions, setSpecialtyOptions] = useState<SelectOption[]>([]);
+  
   useEffect(() => {
     loadServices();
   }, []);
@@ -820,15 +849,38 @@ const AdminItems: React.FC = () => {
       setSelectedSubService('');
       setSelectedSpecialty('');
       loadItems('service', selectedService);
+      
+      // Update subservice options
+      const service = services.find(s => s.id === selectedService);
+      if (service) {
+        setSubServiceOptions(
+          service.subServices.map(s => ({ id: s.id, name: s.name }))
+        );
+      } else {
+        setSubServiceOptions([]);
+      }
     }
-  }, [selectedService]);
+  }, [selectedService, services]);
   
   useEffect(() => {
     if (selectedSubService) {
       setSelectedSpecialty('');
       loadItems('sub_service', selectedSubService);
+      
+      // Update specialty options
+      const service = services.find(s => s.id === selectedService);
+      if (service) {
+        const subService = service.subServices.find(ss => ss.id === selectedSubService);
+        if (subService) {
+          setSpecialtyOptions(
+            subService.specialties.map(s => ({ id: s.id, name: s.name }))
+          );
+        } else {
+          setSpecialtyOptions([]);
+        }
+      }
     }
-  }, [selectedSubService]);
+  }, [selectedSubService, selectedService, services]);
   
   useEffect(() => {
     if (selectedSpecialty) {
@@ -988,13 +1040,11 @@ const AdminItems: React.FC = () => {
                       <SelectValue placeholder="Selecione um tipo de serviço" />
                     </SelectTrigger>
                     <SelectContent>
-                      {services
-                        .find(s => s.id === selectedService)?.subServices
-                        .map((subService) => (
-                          <SelectItem key={subService.id} value={subService.id}>
-                            {subService.name}
-                          </SelectItem>
-                        ))}
+                      {subServiceOptions.map((subService) => (
+                        <SelectItem key={subService.id} value={subService.id}>
+                          {subService.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1008,14 +1058,11 @@ const AdminItems: React.FC = () => {
                       <SelectValue placeholder="Selecione uma especialidade" />
                     </SelectTrigger>
                     <SelectContent>
-                      {services
-                        .find(s => s.id === selectedService)?.subServices
-                        .find(ss => ss.id === selectedSubService)?.specialties
-                        .map((specialty) => (
-                          <SelectItem key={specialty.id} value={specialty.id}>
-                            {specialty.name}
-                          </SelectItem>
-                        ))}
+                      {specialtyOptions.map((specialty) => (
+                        <SelectItem key={specialty.id} value={specialty.id}>
+                          {specialty.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
