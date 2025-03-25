@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { supabase, getCurrentUser } from '../lib/supabase';
-import { User } from '../lib/types';
+import { supabase } from '@/integrations/supabase/client';
+import { User } from '@/lib/types';
 import { toast } from 'sonner';
 
 interface AuthContextProps {
@@ -21,8 +21,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = async () => {
     try {
-      const userData = await getCurrentUser();
-      setUser(userData);
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (!authUser) {
+        setUser(null);
+        return;
+      }
+      
+      // Fetch additional user data from profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      
+      if (profile) {
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: profile.name || '',
+          phone: profile.phone || '',
+          role: profile.role,
+          createdAt: profile.created_at || authUser.created_at,
+        });
+      } else {
+        // If no profile exists yet, use basic auth data
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: authUser.user_metadata?.name || '',
+          phone: authUser.user_metadata?.phone || '',
+          role: authUser.user_metadata?.role || 'client',
+          createdAt: authUser.created_at,
+        });
+      }
     } catch (error) {
       console.error('Error refreshing user:', error);
       setUser(null);
@@ -76,25 +108,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSignUp = async (email: string, password: string, userData: Partial<User>) => {
     setLoading(true);
     try {
-      await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name: userData.name,
             role: userData.role,
+            phone: userData.phone,
           },
         },
       });
       
-      // Create profile entry (normally would be handled by a database trigger in production)
-      if (user) {
-        await supabase.from('profiles').insert({
-          id: user.id,
+      if (error) throw error;
+      
+      // Create profile entry
+      if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
           name: userData.name,
           role: userData.role,
           phone: userData.phone || '',
         });
+        
+        if (profileError) throw profileError;
       }
       
       toast.success('Conta criada com sucesso');

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Lock, Mail, Phone, UserCircle, Briefcase } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -21,7 +21,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 const Login: React.FC = () => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('login');
@@ -37,12 +37,19 @@ const Login: React.FC = () => {
   const [registerPhone, setRegisterPhone] = useState('');
   const [registerRole, setRegisterRole] = useState<UserRole>(UserRole.CLIENT);
 
+  // If user is already logged in, redirect to profile
+  useEffect(() => {
+    if (user) {
+      navigate('/profile');
+    }
+  }, [user, navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       await signIn(loginEmail, loginPassword);
-      navigate('/');
+      navigate('/profile');
     } catch (error) {
       console.error('Login error:', error);
     } finally {
@@ -63,7 +70,7 @@ const Login: React.FC = () => {
       
       // Auto login after registration
       await signIn(registerEmail, registerPassword);
-      navigate('/');
+      navigate('/profile');
     } catch (error) {
       console.error('Registration error:', error);
     } finally {
