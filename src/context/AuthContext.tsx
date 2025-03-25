@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@/lib/types';
+import { User, UserRole } from '@/lib/types';
 import { toast } from 'sonner';
 
 interface AuthContextProps {
@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: authUser.email || '',
           name: profile.name || '',
           phone: profile.phone || '',
-          role: profile.role,
+          role: profile.role as UserRole,
           createdAt: profile.created_at || authUser.created_at,
         });
       } else {
@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: authUser.email || '',
           name: authUser.user_metadata?.name || '',
           phone: authUser.user_metadata?.phone || '',
-          role: authUser.user_metadata?.role || 'client',
+          role: (authUser.user_metadata?.role as UserRole) || UserRole.CLIENT,
           createdAt: authUser.created_at,
         });
       }
