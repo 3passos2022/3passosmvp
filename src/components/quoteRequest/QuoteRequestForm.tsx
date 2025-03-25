@@ -38,6 +38,15 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Rua é obrigatória'),
@@ -88,9 +97,10 @@ interface FormData {
 // Component for address form
 const AddressStep: React.FC<{
   onNext: () => void;
+  onBack: () => void;
   formData: FormData;
   updateFormData: (data: Partial<FormData>) => void;
-}> = ({ onNext, formData, updateFormData }) => {
+}> = ({ onNext, onBack, formData, updateFormData }) => {
   const {
     register,
     handleSubmit,
@@ -174,8 +184,11 @@ const AddressStep: React.FC<{
         </div>
       </div>
 
-      <div className="pt-4 text-right">
-        <Button type="submit">Próximo</Button>
+      <div className="pt-4 flex justify-between">
+        <Button type="button" variant="outline" onClick={onBack}>
+          <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+        </Button>
+        <Button type="submit">Solicitar Orçamentos</Button>
       </div>
     </form>
   );
@@ -184,10 +197,9 @@ const AddressStep: React.FC<{
 // Component for service selection
 const ServiceStep: React.FC<{
   onNext: () => void;
-  onBack: () => void;
   formData: FormData;
   updateFormData: (data: Partial<FormData>) => void;
-}> = ({ onNext, onBack, formData, updateFormData }) => {
+}> = ({ onNext, formData, updateFormData }) => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState<string>(formData.serviceId || '');
@@ -332,10 +344,7 @@ const ServiceStep: React.FC<{
         />
       </div>
 
-      <div className="flex justify-between pt-4">
-        <Button type="button" variant="outline" onClick={onBack}>
-          <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
-        </Button>
+      <div className="flex justify-end pt-4">
         <Button type="submit">
           Próximo <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
@@ -366,6 +375,7 @@ const ServiceDetailsStep: React.FC<{
   const [loading, setLoading] = useState(true);
   const [hasSquareMeterItems, setHasSquareMeterItems] = useState(false);
   const [hasLinearMeterItems, setHasLinearMeterItems] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
     async function loadServiceDetails() {
@@ -373,7 +383,7 @@ const ServiceDetailsStep: React.FC<{
       try {
         if (!formData.serviceId) return;
         
-        const serviceQuestions = await getQuestions(formData.serviceId);
+        const serviceQuestions = formData.serviceId ? await getQuestions(formData.serviceId) : [];
         const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
         const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
         
@@ -439,9 +449,19 @@ const ServiceDetailsStep: React.FC<{
     setMeasurements(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleToReview = (e: React.FormEvent) => {
     e.preventDefault();
     
+    updateFormData({
+      answers,
+      itemQuantities,
+      measurements
+    });
+    
+    setShowReview(true);
+  };
+
+  const handleSubmit = () => {
     updateFormData({
       answers,
       itemQuantities,
@@ -455,8 +475,72 @@ const ServiceDetailsStep: React.FC<{
     return <div className="text-center py-8">Carregando detalhes do serviço...</div>;
   }
 
+  if (showReview) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Revise seu pedido de orçamento</h3>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Serviço Solicitado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Serviço:</span>
+                  <span className="font-medium">{formData.serviceName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tipo de serviço:</span>
+                  <span className="font-medium">{formData.subServiceName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Especialidade:</span>
+                  <span className="font-medium">{formData.specialtyName}</span>
+                </div>
+                {formData.description && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-gray-500">Descrição:</p>
+                      <p className="mt-1">{formData.description}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Endereço</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <p>{formData.street}, {formData.number}</p>
+                {formData.complement && <p>{formData.complement}</p>}
+                <p>{formData.neighborhood}, {formData.city} - {formData.state}</p>
+                <p>CEP: {formData.zipCode}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex justify-between pt-4">
+          <Button type="button" variant="outline" onClick={() => setShowReview(false)}>
+            <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+          </Button>
+          <Button onClick={handleSubmit}>
+            Solicitar Orçamentos
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleToReview} className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-3">
           {questions.length > 0 && (
@@ -642,81 +726,13 @@ const ServiceDetailsStep: React.FC<{
   );
 };
 
-// Component for quote review
-const ReviewStep: React.FC<{
-  onSubmit: () => void;
-  onBack: () => void;
-  formData: FormData;
-}> = ({ onSubmit, onBack, formData }) => {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Revise seu pedido de orçamento</h3>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Serviço Solicitado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Serviço:</span>
-                <span className="font-medium">{formData.serviceName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Tipo de serviço:</span>
-                <span className="font-medium">{formData.subServiceName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Especialidade:</span>
-                <span className="font-medium">{formData.specialtyName}</span>
-              </div>
-              {formData.description && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-gray-500">Descrição:</p>
-                    <p className="mt-1">{formData.description}</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Endereço</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              <p>{formData.street}, {formData.number}</p>
-              {formData.complement && <p>{formData.complement}</p>}
-              <p>{formData.neighborhood}, {formData.city} - {formData.state}</p>
-              <p>CEP: {formData.zipCode}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex justify-between pt-4">
-        <Button type="button" variant="outline" onClick={onBack}>
-          <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
-        </Button>
-        <Button onClick={onSubmit}>
-          Solicitar Orçamentos
-        </Button>
-      </div>
-    </div>
-  );
-};
-
 // Login Dialog Component
 const LoginDialog: React.FC<{
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onLogin: () => void;
-}> = ({ isOpen, onOpenChange, onLogin }) => {
+  formData: FormData;
+}> = ({ isOpen, onOpenChange, onLogin, formData }) => {
   const navigate = useNavigate();
   
   const handleLoginRedirect = () => {
@@ -798,17 +814,17 @@ const QuoteRequestForm: React.FC = () => {
         .from('quotes')
         .insert({
           client_id: user.id,
-          service_id: formData.serviceId,
-          sub_service_id: formData.subServiceId,
-          specialty_id: formData.specialtyId,
-          description: formData.description,
-          street: formData.street,
-          number: formData.number,
-          complement: formData.complement,
-          neighborhood: formData.neighborhood,
-          city: formData.city, 
-          state: formData.state,
-          zip_code: formData.zipCode
+          service_id: formData.serviceId || '',
+          sub_service_id: formData.subServiceId || '',
+          specialty_id: formData.specialtyId || '',
+          description: formData.description || '',
+          street: formData.street || '',
+          number: formData.number || '',
+          complement: formData.complement || '',
+          neighborhood: formData.neighborhood || '',
+          city: formData.city || '', 
+          state: formData.state || '',
+          zip_code: formData.zipCode || ''
         })
         .select()
         .single();
@@ -833,7 +849,7 @@ const QuoteRequestForm: React.FC = () => {
       
       if (formData.itemQuantities) {
         const itemRows = Object.entries(formData.itemQuantities)
-          .filter(([_, quantity]) => quantity > 0)
+          .filter(([_, quantity]) => quantity && quantity > 0)
           .map(([itemId, quantity]) => ({
             quote_id: quote.id,
             item_id: itemId,
@@ -890,7 +906,7 @@ const QuoteRequestForm: React.FC = () => {
           <div className="flex justify-between relative mb-6">
             <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
             
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div key={s} className="relative z-10">
                 <div 
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -900,10 +916,9 @@ const QuoteRequestForm: React.FC = () => {
                   {s}
                 </div>
                 <div className="text-xs text-center mt-1">
-                  {s === 1 && 'Endereço'}
-                  {s === 2 && 'Serviço'}
-                  {s === 3 && 'Detalhes'}
-                  {s === 4 && 'Revisar'}
+                  {s === 1 && 'Serviço'}
+                  {s === 2 && 'Detalhes'}
+                  {s === 3 && 'Endereço'}
                 </div>
               </div>
             ))}
@@ -918,7 +933,7 @@ const QuoteRequestForm: React.FC = () => {
           transition={{ duration: 0.3 }}
         >
           {step === 1 && (
-            <AddressStep 
+            <ServiceStep 
               onNext={() => handleStepChange(2)} 
               formData={formData} 
               updateFormData={updateFormData} 
@@ -926,7 +941,7 @@ const QuoteRequestForm: React.FC = () => {
           )}
           
           {step === 2 && (
-            <ServiceStep 
+            <ServiceDetailsStep 
               onNext={() => handleStepChange(3)} 
               onBack={() => handleStepChange(1)} 
               formData={formData} 
@@ -935,19 +950,11 @@ const QuoteRequestForm: React.FC = () => {
           )}
           
           {step === 3 && (
-            <ServiceDetailsStep 
-              onNext={() => handleStepChange(4)} 
+            <AddressStep 
+              onNext={handleSubmit} 
               onBack={() => handleStepChange(2)} 
               formData={formData} 
               updateFormData={updateFormData} 
-            />
-          )}
-          
-          {step === 4 && (
-            <ReviewStep 
-              onSubmit={handleSubmit} 
-              onBack={() => handleStepChange(3)} 
-              formData={formData} 
             />
           )}
         </motion.div>
@@ -956,7 +963,8 @@ const QuoteRequestForm: React.FC = () => {
       <LoginDialog 
         isOpen={showLoginDialog} 
         onOpenChange={setShowLoginDialog} 
-        onLogin={proceedAfterLogin} 
+        onLogin={proceedAfterLogin}
+        formData={formData}
       />
     </div>
   );

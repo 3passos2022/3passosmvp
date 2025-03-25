@@ -16,13 +16,17 @@ const RequestQuote: React.FC = () => {
       <Navbar />
       
       <main className="flex-1">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <QuoteRequestForm />
-        </motion.div>
+        <div className="container mx-auto px-4 py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="max-w-3xl mx-auto">
+              <QuoteRequestForm />
+            </div>
+          </motion.div>
+        </div>
       </main>
       
       <Footer />
