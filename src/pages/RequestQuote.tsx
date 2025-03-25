@@ -4,8 +4,6 @@ import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import QuoteRequestForm from '@/components/quoteRequest/QuoteRequestForm';
-import { useAuth } from '@/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 const RequestQuote: React.FC = () => {
   // Scroll to top on component mount

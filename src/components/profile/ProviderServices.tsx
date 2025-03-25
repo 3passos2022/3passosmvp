@@ -23,6 +23,9 @@ const ProviderServices: React.FC = () => {
   const [providerItems, setProviderItems] = useState<{[key: string]: number}>({});
   const [activeTab, setActiveTab] = useState<string>('services');
   const [expandedServices, setExpandedServices] = useState<{[key: string]: boolean}>({});
+  const [serviceItems, setServiceItems] = useState<{[key: string]: ServiceItem[]}>({});
+  const [subServiceItems, setSubServiceItems] = useState<{[key: string]: ServiceItem[]}>({});
+  const [specialtyItems, setSpecialtyItems] = useState<{[key: string]: ServiceItem[]}>({});
 
   useEffect(() => {
     async function loadData() {
@@ -63,6 +66,22 @@ const ProviderServices: React.FC = () => {
           itemsMap[item.item_id] = item.price_per_unit;
         });
         setProviderItems(itemsMap);
+        
+        // Pre-load all service items
+        for (const service of servicesData) {
+          const items = await getServiceItems(service.id);
+          setServiceItems(prev => ({ ...prev, [service.id]: items }));
+          
+          for (const subService of service.subServices) {
+            const subItems = await getServiceItems(undefined, subService.id);
+            setSubServiceItems(prev => ({ ...prev, [subService.id]: subItems }));
+            
+            for (const specialty of subService.specialties) {
+              const specialtyItems = await getServiceItems(undefined, undefined, specialty.id);
+              setSpecialtyItems(prev => ({ ...prev, [specialty.id]: specialtyItems }));
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading provider services:', error);
         toast.error('Erro ao carregar serviços');
@@ -175,16 +194,39 @@ const ProviderServices: React.FC = () => {
     }
   };
 
-  const renderServiceItems = async (serviceId?: string, subServiceId?: string, specialtyId?: string) => {
-    if (!user) return [];
+  const renderServiceItemsList = (items: ServiceItem[]) => {
+    if (!items || items.length === 0) return null;
     
-    try {
-      const items = await getServiceItems(serviceId, subServiceId, specialtyId);
-      return items;
-    } catch (error) {
-      console.error('Error fetching service items:', error);
-      return [];
-    }
+    return (
+      <div className="space-y-3 ml-4">
+        {items.map(item => (
+          <div key={item.id} className="flex items-center border p-3 rounded-md">
+            <div className="flex-1">
+              <p>{item.name}</p>
+              <p className="text-sm text-gray-500">
+                {item.type === 'quantity' ? 'Preço por unidade' : 
+                 item.type === 'square_meter' ? 'Preço por m²' : 'Preço por m linear'}
+              </p>
+            </div>
+            <div className="relative w-32">
+              <DollarSign className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
+              <Input 
+                type="number" 
+                min="0" 
+                step="0.01"
+                className="pl-9"
+                placeholder="0,00"
+                value={providerItems[item.id] || ''}
+                onChange={(e) => handleItemPriceChange(
+                  item.id, 
+                  parseFloat(e.target.value) || 0
+                )}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -277,128 +319,29 @@ const ProviderServices: React.FC = () => {
                 Configure os preços unitários para os itens e materiais que você utiliza em seus serviços.
               </p>
               
-              {services.map(async service => {
-                const serviceItems = await renderServiceItems(service.id);
-                
-                return (
-                  <div key={service.id} className="space-y-4">
-                    <h3 className="text-lg font-medium">{service.name}</h3>
-                    
-                    {serviceItems.length > 0 && (
-                      <div className="space-y-3 ml-4">
-                        {serviceItems.map(item => (
-                          <div key={item.id} className="flex items-center border p-3 rounded-md">
-                            <div className="flex-1">
-                              <p>{item.name}</p>
-                              <p className="text-sm text-gray-500">
-                                {item.type === 'quantity' ? 'Preço por unidade' : 
-                                 item.type === 'square_meter' ? 'Preço por m²' : 'Preço por m linear'}
-                              </p>
-                            </div>
-                            <div className="relative w-32">
-                              <DollarSign className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                step="0.01"
-                                className="pl-9"
-                                placeholder="0,00"
-                                value={providerItems[item.id] || ''}
-                                onChange={(e) => handleItemPriceChange(
-                                  item.id, 
-                                  parseFloat(e.target.value) || 0
-                                )}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {service.subServices.map(async subService => {
-                      const subServiceItems = await renderServiceItems(undefined, subService.id);
+              {services.map(service => (
+                <div key={service.id} className="space-y-4">
+                  <h3 className="text-lg font-medium">{service.name}</h3>
+                  
+                  {renderServiceItemsList(serviceItems[service.id] || [])}
+                  
+                  {service.subServices.map(subService => (
+                    <div key={subService.id} className="space-y-3 ml-4">
+                      <h4 className="font-medium text-gray-700">{subService.name}</h4>
                       
-                      return (
-                        <div key={subService.id} className="space-y-3 ml-4">
-                          <h4 className="font-medium text-gray-700">{subService.name}</h4>
+                      {renderServiceItemsList(subServiceItems[subService.id] || [])}
+                      
+                      {subService.specialties.map(specialty => (
+                        <div key={specialty.id} className="space-y-3 ml-4">
+                          <h5 className="font-medium text-gray-600">{specialty.name}</h5>
                           
-                          {subServiceItems.length > 0 && (
-                            <div className="space-y-3 ml-4">
-                              {subServiceItems.map(item => (
-                                <div key={item.id} className="flex items-center border p-3 rounded-md">
-                                  <div className="flex-1">
-                                    <p>{item.name}</p>
-                                    <p className="text-sm text-gray-500">
-                                      {item.type === 'quantity' ? 'Preço por unidade' : 
-                                       item.type === 'square_meter' ? 'Preço por m²' : 'Preço por m linear'}
-                                    </p>
-                                  </div>
-                                  <div className="relative w-32">
-                                    <DollarSign className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
-                                    <Input 
-                                      type="number" 
-                                      min="0" 
-                                      step="0.01"
-                                      className="pl-9"
-                                      placeholder="0,00"
-                                      value={providerItems[item.id] || ''}
-                                      onChange={(e) => handleItemPriceChange(
-                                        item.id, 
-                                        parseFloat(e.target.value) || 0
-                                      )}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          
-                          {subService.specialties.map(async specialty => {
-                            const specialtyItems = await renderServiceItems(undefined, undefined, specialty.id);
-                            
-                            return (
-                              <div key={specialty.id} className="space-y-3 ml-4">
-                                <h5 className="font-medium text-gray-600">{specialty.name}</h5>
-                                
-                                {specialtyItems.length > 0 && (
-                                  <div className="space-y-3 ml-4">
-                                    {specialtyItems.map(item => (
-                                      <div key={item.id} className="flex items-center border p-3 rounded-md">
-                                        <div className="flex-1">
-                                          <p>{item.name}</p>
-                                          <p className="text-sm text-gray-500">
-                                            {item.type === 'quantity' ? 'Preço por unidade' : 
-                                             item.type === 'square_meter' ? 'Preço por m²' : 'Preço por m linear'}
-                                          </p>
-                                        </div>
-                                        <div className="relative w-32">
-                                          <DollarSign className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
-                                          <Input 
-                                            type="number" 
-                                            min="0" 
-                                            step="0.01"
-                                            className="pl-9"
-                                            placeholder="0,00"
-                                            value={providerItems[item.id] || ''}
-                                            onChange={(e) => handleItemPriceChange(
-                                              item.id, 
-                                              parseFloat(e.target.value) || 0
-                                            )}
-                                          />
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                          {renderServiceItemsList(specialtyItems[specialty.id] || [])}
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
               
               <div className="mt-4 flex justify-end">
                 <Button onClick={saveItems} disabled={saving}>

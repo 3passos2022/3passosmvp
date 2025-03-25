@@ -14,6 +14,14 @@ import { toast } from "sonner";
 import { UserRole } from "@/lib/types";
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 // Schemas for validation
 const loginSchema = z.object({
@@ -28,6 +36,9 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   role: z.enum(["client", "provider"]),
 });
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Login = () => {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
@@ -46,27 +57,27 @@ const Login = () => {
   }, [user, navigate, returnTo]);
 
   // Login form
-  const {
-    register: loginRegister,
-    handleSubmit: handleLoginSubmit,
-    formState: { errors: loginErrors, isSubmitting: isLoginSubmitting },
-  } = useForm({
+  const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
   });
 
   // Register form
-  const {
-    register: registerRegister,
-    handleSubmit: handleRegisterSubmit,
-    formState: { errors: registerErrors, isSubmitting: isRegisterSubmitting },
-  } = useForm({
+  const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
       role: "client",
     },
   });
 
-  const onLogin = async (data) => {
+  const onLogin = async (data: LoginFormValues) => {
     try {
       await signIn(data.email, data.password);
       // Will automatically redirect via the useEffect above
@@ -75,7 +86,7 @@ const Login = () => {
     }
   };
 
-  const onRegister = async (data) => {
+  const onRegister = async (data: RegisterFormValues) => {
     try {
       await signUp(data.email, data.password, {
         name: data.name,
@@ -109,131 +120,149 @@ const Login = () => {
               </TabsList>
               
               <TabsContent value="login">
-                <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="seu@email.com" 
-                      {...loginRegister("email")} 
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
+                    <FormField
+                      control={loginForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail</FormLabel>
+                          <FormControl>
+                            <Input placeholder="seu@email.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {loginErrors.email && (
-                      <p className="text-sm text-red-500">{loginErrors.email.message}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
-                    <Input 
-                      id="password" 
-                      type="password" 
-                      placeholder="******" 
-                      {...loginRegister("password")} 
+                    
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Senha</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="******" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {loginErrors.password && (
-                      <p className="text-sm text-red-500">{loginErrors.password.message}</p>
-                    )}
-                  </div>
-                  
-                  <Button 
-                    className="w-full" 
-                    type="submit" 
-                    disabled={isLoginSubmitting}
-                  >
-                    {isLoginSubmitting ? "Entrando..." : "Entrar"}
-                  </Button>
-                </form>
+                    
+                    <Button 
+                      className="w-full" 
+                      type="submit" 
+                      disabled={loginForm.formState.isSubmitting}
+                    >
+                      {loginForm.formState.isSubmitting ? "Entrando..." : "Entrar"}
+                    </Button>
+                  </form>
+                </Form>
               </TabsContent>
               
               <TabsContent value="register">
-                <form onSubmit={handleRegisterSubmit(onRegister)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome completo</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="Seu nome" 
-                      {...registerRegister("name")} 
+                <Form {...registerForm}>
+                  <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
+                    <FormField
+                      control={registerForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome completo</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Seu nome" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {registerErrors.name && (
-                      <p className="text-sm text-red-500">{registerErrors.name.message}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">E-mail</Label>
-                    <Input 
-                      id="register-email" 
-                      type="email" 
-                      placeholder="seu@email.com" 
-                      {...registerRegister("email")} 
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>E-mail</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="seu@email.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {registerErrors.email && (
-                      <p className="text-sm text-red-500">{registerErrors.email.message}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone (opcional)</Label>
-                    <Input 
-                      id="phone" 
-                      placeholder="(00) 00000-0000" 
-                      {...registerRegister("phone")} 
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefone (opcional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(00) 00000-0000" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {registerErrors.phone && (
-                      <p className="text-sm text-red-500">{registerErrors.phone.message}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Senha</Label>
-                    <Input 
-                      id="register-password" 
-                      type="password" 
-                      placeholder="******" 
-                      {...registerRegister("password")} 
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Senha</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="******" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    {registerErrors.password && (
-                      <p className="text-sm text-red-500">{registerErrors.password.message}</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Você é:</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
-                        <input 
-                          type="radio" 
-                          value="client" 
-                          {...registerRegister("role")} 
-                          className="rounded-full text-primary" 
-                        />
-                        <span>Cliente</span>
-                      </label>
-                      
-                      <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
-                        <input 
-                          type="radio" 
-                          value="provider" 
-                          {...registerRegister("role")} 
-                          className="rounded-full text-primary" 
-                        />
-                        <span>Prestador</span>
-                      </label>
-                    </div>
-                    {registerErrors.role && (
-                      <p className="text-sm text-red-500">{registerErrors.role.message}</p>
-                    )}
-                  </div>
-                  
-                  <Button 
-                    className="w-full" 
-                    type="submit" 
-                    disabled={isRegisterSubmitting}
-                  >
-                    {isRegisterSubmitting ? "Criando conta..." : "Criar conta"}
-                  </Button>
-                </form>
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Você é:</FormLabel>
+                          <div className="grid grid-cols-2 gap-4">
+                            <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
+                              <input 
+                                type="radio" 
+                                value="client" 
+                                checked={field.value === "client"}
+                                onChange={() => field.onChange("client")}
+                                className="rounded-full text-primary" 
+                              />
+                              <span>Cliente</span>
+                            </label>
+                            
+                            <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
+                              <input 
+                                type="radio" 
+                                value="provider" 
+                                checked={field.value === "provider"}
+                                onChange={() => field.onChange("provider")}
+                                className="rounded-full text-primary" 
+                              />
+                              <span>Prestador</span>
+                            </label>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button 
+                      className="w-full" 
+                      type="submit" 
+                      disabled={registerForm.formState.isSubmitting}
+                    >
+                      {registerForm.formState.isSubmitting ? "Criando conta..." : "Criar conta"}
+                    </Button>
+                  </form>
+                </Form>
               </TabsContent>
             </Tabs>
           </div>

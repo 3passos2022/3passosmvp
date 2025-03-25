@@ -154,7 +154,7 @@ export async function getServiceItems(
   return data.map(item => ({
     id: item.id,
     name: item.name,
-    type: item.type,
+    type: item.type as "quantity" | "square_meter" | "linear_meter",
     serviceId: item.service_id,
     subServiceId: item.sub_service_id,
     specialtyId: item.specialty_id

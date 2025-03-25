@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -48,17 +49,53 @@ const addressSchema = z.object({
   zipCode: z.string().min(8, 'CEP é obrigatório'),
 });
 
+interface AddressFormData {
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+}
+
+interface FormData {
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  serviceId?: string;
+  subServiceId?: string;
+  specialtyId?: string;
+  serviceName?: string;
+  subServiceName?: string;
+  specialtyName?: string;
+  description?: string;
+  answers?: {[key: string]: string};
+  itemQuantities?: {[key: string]: number};
+  measurements?: {
+    id: string;
+    roomName: string;
+    width: number;
+    length: number;
+    height?: number;
+  }[];
+}
+
 // Component for address form
 const AddressStep: React.FC<{
   onNext: () => void;
-  formData: any;
-  updateFormData: (data: any) => void;
+  formData: FormData;
+  updateFormData: (data: Partial<FormData>) => void;
 }> = ({ onNext, formData, updateFormData }) => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({
+  } = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
       street: formData.street || '',
@@ -71,7 +108,7 @@ const AddressStep: React.FC<{
     },
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: AddressFormData) => {
     updateFormData(data);
     onNext();
   };
@@ -148,8 +185,8 @@ const AddressStep: React.FC<{
 const ServiceStep: React.FC<{
   onNext: () => void;
   onBack: () => void;
-  formData: any;
-  updateFormData: (data: any) => void;
+  formData: FormData;
+  updateFormData: (data: Partial<FormData>) => void;
 }> = ({ onNext, onBack, formData, updateFormData }) => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -311,8 +348,8 @@ const ServiceStep: React.FC<{
 const ServiceDetailsStep: React.FC<{
   onNext: () => void;
   onBack: () => void;
-  formData: any;
-  updateFormData: (data: any) => void;
+  formData: FormData;
+  updateFormData: (data: Partial<FormData>) => void;
 }> = ({ onNext, onBack, formData, updateFormData }) => {
   const [activeTab, setActiveTab] = useState('quiz');
   const [questions, setQuestions] = useState<ServiceQuestion[]>([]);
@@ -334,15 +371,17 @@ const ServiceDetailsStep: React.FC<{
     async function loadServiceDetails() {
       setLoading(true);
       try {
+        if (!formData.serviceId) return;
+        
         const serviceQuestions = await getQuestions(formData.serviceId);
-        const subServiceQuestions = await getQuestions(undefined, formData.subServiceId);
-        const specialtyQuestions = await getQuestions(undefined, undefined, formData.specialtyId);
+        const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
+        const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
         
         setQuestions([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
         
-        const serviceItems = await getServiceItems(formData.serviceId);
-        const subServiceItems = await getServiceItems(undefined, formData.subServiceId);
-        const specialtyItems = await getServiceItems(undefined, undefined, formData.specialtyId);
+        const serviceItems = formData.serviceId ? await getServiceItems(formData.serviceId) : [];
+        const subServiceItems = formData.subServiceId ? await getServiceItems(undefined, formData.subServiceId) : [];
+        const specialtyItems = formData.specialtyId ? await getServiceItems(undefined, undefined, formData.specialtyId) : [];
         
         const allItems = [...serviceItems, ...subServiceItems, ...specialtyItems];
         setItems(allItems);
@@ -607,7 +646,7 @@ const ServiceDetailsStep: React.FC<{
 const ReviewStep: React.FC<{
   onSubmit: () => void;
   onBack: () => void;
-  formData: any;
+  formData: FormData;
 }> = ({ onSubmit, onBack, formData }) => {
   return (
     <div className="space-y-6">
@@ -718,7 +757,7 @@ const LoginDialog: React.FC<{
 // Main component
 const QuoteRequestForm: React.FC = () => {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const { user } = useAuth();
@@ -736,7 +775,7 @@ const QuoteRequestForm: React.FC = () => {
     }
   }, []);
 
-  const updateFormData = (data: any) => {
+  const updateFormData = (data: Partial<FormData>) => {
     const updatedData = { ...formData, ...data };
     setFormData(updatedData);
     localStorage.setItem('quoteFormData', JSON.stringify(updatedData));
@@ -780,7 +819,7 @@ const QuoteRequestForm: React.FC = () => {
         const answerRows = Object.entries(formData.answers).map(([questionId, optionId]) => ({
           quote_id: quote.id,
           question_id: questionId,
-          option_id: optionId as string
+          option_id: optionId
         }));
         
         if (answerRows.length > 0) {
@@ -798,7 +837,7 @@ const QuoteRequestForm: React.FC = () => {
           .map(([itemId, quantity]) => ({
             quote_id: quote.id,
             item_id: itemId,
-            quantity: quantity as number
+            quantity: quantity
           }));
         
         if (itemRows.length > 0) {
