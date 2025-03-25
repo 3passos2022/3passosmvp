@@ -34,7 +34,7 @@ const registerSchema = z.object({
   email: z.string().email({ message: "E-mail inválido" }),
   password: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
   phone: z.string().optional(),
-  role: z.enum([UserRole.CLIENT, UserRole.PROVIDER]),
+  role: z.nativeEnum(UserRole),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -52,6 +52,7 @@ const Login = () => {
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
+      console.log("User is logged in, redirecting to:", returnTo);
       navigate(returnTo, { replace: true });
     }
   }, [user, navigate, returnTo]);
@@ -82,7 +83,8 @@ const Login = () => {
       await signIn(data.email, data.password);
       // Will automatically redirect via the useEffect above
     } catch (error) {
-      toast.error("Falha ao fazer login. Verifique suas credenciais.");
+      console.error("Login error:", error);
+      // Error toast is handled in the AuthContext
     }
   };
 
@@ -96,7 +98,8 @@ const Login = () => {
       toast.success("Conta criada com sucesso! Por favor, faça login.");
       setActiveTab("login");
     } catch (error) {
-      toast.error("Erro ao criar conta. Este e-mail já está em uso ou houve um problema com o servidor.");
+      console.error("Register error:", error);
+      // Error toast is handled in the AuthContext
     }
   };
 

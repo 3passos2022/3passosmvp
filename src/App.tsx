@@ -12,6 +12,7 @@ import { lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import MakeAndreAdmin from "./pages/makeAndreAdmin";
 
 // Lazy loaded pages for better performance
 const RequestQuote = lazy(() => import("./pages/RequestQuote"));
@@ -20,7 +21,14 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
 
 // Create React Query client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30000, // 30 seconds
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -41,6 +49,7 @@ const App = () => (
                 <Route path="/profile/*" element={<Profile />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/admin/*" element={<Admin />} />
+                <Route path="/make-andre-admin" element={<MakeAndreAdmin />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -2,70 +2,90 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, ServiceItem } from '@/lib/types';
 
+// Cache for service data to improve performance
+let servicesCache: Service[] | null = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 // Fetch all services with their sub-services and specialties
 export async function getAllServices(): Promise<Service[]> {
-  const { data: servicesData, error: servicesError } = await supabase
-    .from('services')
-    .select('*')
-    .order('name');
-  
-  if (servicesError) {
-    console.error('Error fetching services:', servicesError);
-    return [];
+  // Use cached data if available and recent
+  const now = Date.now();
+  if (servicesCache && now - lastFetchTime < CACHE_TTL) {
+    return servicesCache;
   }
 
-  const services: Service[] = [];
-  
-  for (const service of servicesData) {
-    // Get sub-services for this service
-    const { data: subServicesData, error: subServicesError } = await supabase
-      .from('sub_services')
+  try {
+    // Get services
+    const { data: servicesData, error: servicesError } = await supabase
+      .from('services')
       .select('*')
-      .eq('service_id', service.id)
       .order('name');
     
-    if (subServicesError) {
-      console.error('Error fetching sub-services:', subServicesError);
-      continue;
-    }
+    if (servicesError) throw servicesError;
 
-    const subServices: SubService[] = [];
+    // Get all subservices in one query
+    const { data: allSubServices, error: subServicesError } = await supabase
+      .from('sub_services')
+      .select('*')
+      .order('name');
     
-    for (const subService of subServicesData) {
-      // Get specialties for this sub-service
-      const { data: specialtiesData, error: specialtiesError } = await supabase
-        .from('specialties')
-        .select('*')
-        .eq('sub_service_id', subService.id)
-        .order('name');
-      
-      if (specialtiesError) {
-        console.error('Error fetching specialties:', specialtiesError);
-        continue;
-      }
+    if (subServicesError) throw subServicesError;
 
-      const specialties: Specialty[] = specialtiesData.map(specialty => ({
-        id: specialty.id,
-        name: specialty.name,
-        subServiceId: specialty.sub_service_id
-      }));
+    // Get all specialties in one query
+    const { data: allSpecialties, error: specialtiesError } = await supabase
+      .from('specialties')
+      .select('*')
+      .order('name');
+    
+    if (specialtiesError) throw specialtiesError;
 
-      subServices.push({
-        id: subService.id,
-        name: subService.name,
-        serviceId: subService.service_id,
-        specialties
-      });
-    }
+    // Build the services structure
+    const services: Service[] = servicesData.map(service => {
+      // Filter subservices for this service
+      const serviceSubServices = allSubServices
+        .filter(subService => subService.service_id === service.id)
+        .map(subService => {
+          // Filter specialties for this subservice
+          const subServiceSpecialties = allSpecialties
+            .filter(specialty => specialty.sub_service_id === subService.id)
+            .map(specialty => ({
+              id: specialty.id,
+              name: specialty.name,
+              subServiceId: specialty.sub_service_id
+            }));
 
-    services.push({
-      id: service.id,
-      name: service.name,
-      subServices
+          return {
+            id: subService.id,
+            name: subService.name,
+            serviceId: subService.service_id,
+            specialties: subServiceSpecialties
+          };
+        });
+
+      return {
+        id: service.id,
+        name: service.name,
+        subServices: serviceSubServices
+      };
     });
-  }
 
-  return services;
+    // Update cache
+    servicesCache = services;
+    lastFetchTime = now;
+    
+    return services;
+  } catch (error) {
+    console.error('Error fetching services:', error);
+    // If there's an error, return cached data if available, otherwise empty array
+    return servicesCache || [];
+  }
+}
+
+// Clear the services cache
+export function clearServicesCache() {
+  servicesCache = null;
+  lastFetchTime = 0;
 }
 
 // Get questions for a service, sub-service, or specialty
@@ -93,35 +113,43 @@ export async function getQuestions(
     return [];
   }
   
-  const questions: ServiceQuestion[] = [];
+  if (questionsData.length === 0) {
+    return [];
+  }
   
-  for (const question of questionsData) {
-    // Get options for this question
-    const { data: optionsData, error: optionsError } = await supabase
-      .from('question_options')
-      .select('*')
-      .eq('question_id', question.id);
+  // Get all question IDs
+  const questionIds = questionsData.map(q => q.id);
+  
+  // Fetch all options in a single query
+  const { data: allOptions, error: optionsError } = await supabase
+    .from('question_options')
+    .select('*')
+    .in('question_id', questionIds);
+  
+  if (optionsError) {
+    console.error('Error fetching question options:', optionsError);
+    return [];
+  }
+  
+  // Map questions with their options
+  const questions: ServiceQuestion[] = questionsData.map(question => {
+    const options: QuestionOption[] = allOptions
+      .filter(option => option.question_id === question.id)
+      .map(option => ({
+        id: option.id,
+        questionId: option.question_id,
+        optionText: option.option_text
+      }));
     
-    if (optionsError) {
-      console.error('Error fetching question options:', optionsError);
-      continue;
-    }
-    
-    const options: QuestionOption[] = optionsData.map(option => ({
-      id: option.id,
-      questionId: option.question_id,
-      optionText: option.option_text
-    }));
-    
-    questions.push({
+    return {
       id: question.id,
       question: question.question,
       serviceId: question.service_id,
       subServiceId: question.sub_service_id,
       specialtyId: question.specialty_id,
       options
-    });
-  }
+    };
+  });
   
   return questions;
 }

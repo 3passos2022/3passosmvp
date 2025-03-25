@@ -1,355 +1,489 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Service, SubService, Specialty, ServiceItem } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
-import { getAllServices, getServiceItems } from '@/lib/api/services';
-import { motion } from 'framer-motion';
-import { DollarSign, Plus, Save, CheckCircle } from 'lucide-react';
+import { Specialty, Service, SubService } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Trash2, Plus, PenLine } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { getAllServices } from '@/lib/api/services';
 
-const ProviderServices: React.FC = () => {
+// Basic type definitions to avoid deep types
+interface SpecialtyItem {
+  id: string;
+  name: string;
+  subServiceId: string;
+  price?: number;
+}
+
+interface ProviderServiceItem {
+  id: string;
+  specialtyId: string;
+  specialtyName: string;
+  serviceName: string;
+  subServiceName: string;
+  basePrice: number;
+}
+
+const ProviderServices = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
-  const [providerServices, setProviderServices] = useState<{[key: string]: number}>({});
-  const [providerItems, setProviderItems] = useState<{[key: string]: number}>({});
-  const [activeTab, setActiveTab] = useState<string>('services');
-  const [expandedServices, setExpandedServices] = useState<{[key: string]: boolean}>({});
-  const [serviceItems, setServiceItems] = useState<{[key: string]: ServiceItem[]}>({});
-  const [subServiceItems, setSubServiceItems] = useState<{[key: string]: ServiceItem[]}>({});
-  const [specialtyItems, setSpecialtyItems] = useState<{[key: string]: ServiceItem[]}>({});
-
+  const [loading, setLoading] = useState(true);
+  const [addingService, setAddingService] = useState(false);
+  const [savingPrice, setSavingPrice] = useState(false);
+  const [selectedService, setSelectedService] = useState<string>('');
+  const [selectedSubService, setSelectedSubService] = useState<string>('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
+  const [basePrice, setBasePrice] = useState<string>('');
+  const [providerServices, setProviderServices] = useState<ProviderServiceItem[]>([]);
+  
+  // Load all available services
   useEffect(() => {
-    async function loadData() {
-      if (!user) return;
-      
-      setLoading(true);
+    const loadServices = async () => {
       try {
-        // Load all services
+        setLoading(true);
         const servicesData = await getAllServices();
         setServices(servicesData);
-        
-        // Load provider services
-        const { data: providerServicesData, error: providerError } = await supabase
-          .from('provider_services')
-          .select('*')
-          .eq('provider_id', user.id);
-        
-        if (providerError) throw providerError;
-        
-        // Create a map of specialty ID to price
-        const servicesMap: {[key: string]: number} = {};
-        providerServicesData?.forEach(item => {
-          servicesMap[item.specialty_id] = item.base_price;
-        });
-        setProviderServices(servicesMap);
-        
-        // Load provider item prices
-        const { data: providerItemsData, error: itemsError } = await supabase
-          .from('provider_item_prices')
-          .select('*')
-          .eq('provider_id', user.id);
-        
-        if (itemsError) throw itemsError;
-        
-        // Create a map of item ID to price
-        const itemsMap: {[key: string]: number} = {};
-        providerItemsData?.forEach(item => {
-          itemsMap[item.item_id] = item.price_per_unit;
-        });
-        setProviderItems(itemsMap);
-        
-        // Pre-load all service items
-        for (const service of servicesData) {
-          const items = await getServiceItems(service.id);
-          setServiceItems(prev => ({ ...prev, [service.id]: items }));
-          
-          for (const subService of service.subServices) {
-            const subItems = await getServiceItems(undefined, subService.id);
-            setSubServiceItems(prev => ({ ...prev, [subService.id]: subItems }));
-            
-            for (const specialty of subService.specialties) {
-              const specialtyItems = await getServiceItems(undefined, undefined, specialty.id);
-              setSpecialtyItems(prev => ({ ...prev, [specialty.id]: specialtyItems }));
-            }
-          }
-        }
       } catch (error) {
-        console.error('Error loading provider services:', error);
-        toast.error('Erro ao carregar serviços');
+        console.error('Error loading services:', error);
+        toast.error('Erro ao carregar serviços disponíveis');
       } finally {
         setLoading(false);
       }
-    }
+    };
     
-    loadData();
-  }, [user]);
-
-  const toggleServiceExpanded = (serviceId: string) => {
-    setExpandedServices(prev => ({
-      ...prev,
-      [serviceId]: !prev[serviceId]
-    }));
+    loadServices();
+  }, []);
+  
+  // Load provider's services
+  useEffect(() => {
+    const loadProviderServices = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('provider_services')
+          .select('*')
+          .eq('provider_id', user.id);
+        
+        if (error) throw error;
+        
+        // Enrich with specialty details
+        const providerServicesWithDetails: ProviderServiceItem[] = [];
+        
+        for (const providerService of data) {
+          // Find the specialty in our services data
+          let serviceName = '';
+          let subServiceName = '';
+          let specialtyName = '';
+          
+          for (const service of services) {
+            for (const subService of service.subServices) {
+              const specialty = subService.specialties.find(
+                spec => spec.id === providerService.specialty_id
+              );
+              
+              if (specialty) {
+                serviceName = service.name;
+                subServiceName = subService.name;
+                specialtyName = specialty.name;
+                break;
+              }
+            }
+            
+            if (serviceName) break;
+          }
+          
+          // If we couldn't find in our data, fetch directly
+          if (!specialtyName) {
+            const { data: specialtyData } = await supabase
+              .from('specialties')
+              .select('name')
+              .eq('id', providerService.specialty_id)
+              .single();
+            
+            if (specialtyData) {
+              specialtyName = specialtyData.name;
+            }
+          }
+          
+          providerServicesWithDetails.push({
+            id: providerService.id,
+            specialtyId: providerService.specialty_id,
+            specialtyName,
+            serviceName,
+            subServiceName,
+            basePrice: providerService.base_price,
+          });
+        }
+        
+        setProviderServices(providerServicesWithDetails);
+      } catch (error) {
+        console.error('Error loading provider services:', error);
+        toast.error('Erro ao carregar seus serviços');
+      }
+    };
+    
+    if (services.length > 0) {
+      loadProviderServices();
+    }
+  }, [user, services]);
+  
+  const handleAddService = async () => {
+    if (!user || !selectedSpecialty || !basePrice) return;
+    
+    setAddingService(true);
+    try {
+      // Check if already exists
+      const { data: existingService, error: checkError } = await supabase
+        .from('provider_services')
+        .select('id')
+        .eq('provider_id', user.id)
+        .eq('specialty_id', selectedSpecialty)
+        .maybeSingle();
+      
+      if (checkError) throw checkError;
+      
+      if (existingService) {
+        toast.error('Você já oferece este serviço');
+        return;
+      }
+      
+      // Insert new service
+      const { data, error } = await supabase
+        .from('provider_services')
+        .insert({
+          provider_id: user.id,
+          specialty_id: selectedSpecialty,
+          base_price: parseFloat(basePrice),
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      toast.success('Serviço adicionado com sucesso');
+      
+      // Reset form and reload services
+      setSelectedService('');
+      setSelectedSubService('');
+      setSelectedSpecialty('');
+      setBasePrice('');
+      
+      // Add to the list without reloading
+      let serviceName = '';
+      let subServiceName = '';
+      let specialtyName = '';
+      
+      for (const service of services) {
+        for (const subService of service.subServices) {
+          const specialty = subService.specialties.find(
+            spec => spec.id === selectedSpecialty
+          );
+          
+          if (specialty) {
+            serviceName = service.name;
+            subServiceName = subService.name;
+            specialtyName = specialty.name;
+            break;
+          }
+        }
+        
+        if (serviceName) break;
+      }
+      
+      setProviderServices([
+        ...providerServices,
+        {
+          id: data.id,
+          specialtyId: selectedSpecialty,
+          specialtyName,
+          serviceName,
+          subServiceName,
+          basePrice: parseFloat(basePrice),
+        },
+      ]);
+    } catch (error: any) {
+      console.error('Error adding provider service:', error);
+      toast.error(error.message || 'Erro ao adicionar serviço');
+    } finally {
+      setAddingService(false);
+    }
   };
-
-  const handleServicePriceChange = (specialtyId: string, price: number) => {
-    setProviderServices(prev => ({
-      ...prev,
-      [specialtyId]: price
-    }));
-  };
-
-  const handleItemPriceChange = (itemId: string, price: number) => {
-    setProviderItems(prev => ({
-      ...prev,
-      [itemId]: price
-    }));
-  };
-
-  const saveServices = async () => {
+  
+  const updatePrice = async (serviceId: string, newPrice: number) => {
     if (!user) return;
     
-    setSaving(true);
+    setSavingPrice(true);
     try {
-      // Save provider services
-      const servicesToSave = Object.entries(providerServices)
-        .filter(([_, price]) => price > 0)
-        .map(([specialtyId, price]) => ({
-          provider_id: user.id,
-          specialty_id: specialtyId,
-          base_price: price
-        }));
+      const { error } = await supabase
+        .from('provider_services')
+        .update({ base_price: newPrice })
+        .eq('id', serviceId);
       
-      // First, remove existing services
-      const { error: deleteError } = await supabase
+      if (error) throw error;
+      
+      // Update in the state
+      setProviderServices(
+        providerServices.map(service => 
+          service.id === serviceId 
+            ? { ...service, basePrice: newPrice }
+            : service
+        )
+      );
+      
+      toast.success('Preço atualizado com sucesso');
+    } catch (error) {
+      console.error('Error updating price:', error);
+      toast.error('Erro ao atualizar preço');
+    } finally {
+      setSavingPrice(false);
+    }
+  };
+  
+  const deleteService = async (serviceId: string) => {
+    if (!user || !confirm('Tem certeza que deseja remover este serviço?')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
         .from('provider_services')
         .delete()
-        .eq('provider_id', user.id);
+        .eq('id', serviceId);
       
-      if (deleteError) throw deleteError;
+      if (error) throw error;
       
-      // Then insert new services
-      if (servicesToSave.length > 0) {
-        const { error: insertError } = await supabase
-          .from('provider_services')
-          .insert(servicesToSave);
-        
-        if (insertError) throw insertError;
-      }
+      setProviderServices(
+        providerServices.filter(service => service.id !== serviceId)
+      );
       
-      toast.success('Serviços salvos com sucesso');
+      toast.success('Serviço removido com sucesso');
     } catch (error) {
-      console.error('Error saving provider services:', error);
-      toast.error('Erro ao salvar serviços');
-    } finally {
-      setSaving(false);
+      console.error('Error deleting service:', error);
+      toast.error('Erro ao remover serviço');
     }
   };
-
-  const saveItems = async () => {
-    if (!user) return;
-    
-    setSaving(true);
-    try {
-      // Save provider item prices
-      const itemsToSave = Object.entries(providerItems)
-        .filter(([_, price]) => price > 0)
-        .map(([itemId, price]) => ({
-          provider_id: user.id,
-          item_id: itemId,
-          price_per_unit: price
-        }));
-      
-      // First, remove existing item prices
-      const { error: deleteError } = await supabase
-        .from('provider_item_prices')
-        .delete()
-        .eq('provider_id', user.id);
-      
-      if (deleteError) throw deleteError;
-      
-      // Then insert new item prices
-      if (itemsToSave.length > 0) {
-        const { error: insertError } = await supabase
-          .from('provider_item_prices')
-          .insert(itemsToSave);
-        
-        if (insertError) throw insertError;
-      }
-      
-      toast.success('Preços de itens salvos com sucesso');
-    } catch (error) {
-      console.error('Error saving provider item prices:', error);
-      toast.error('Erro ao salvar preços de itens');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const renderServiceItemsList = (items: ServiceItem[]) => {
-    if (!items || items.length === 0) return null;
-    
+  
+  // Get sub-services for the selected service
+  const filteredSubServices = selectedService
+    ? services.find(s => s.id === selectedService)?.subServices || []
+    : [];
+  
+  // Get specialties for the selected sub-service
+  const filteredSpecialties = selectedSubService
+    ? filteredSubServices.find(s => s.id === selectedSubService)?.specialties || []
+    : [];
+  
+  if (loading) {
     return (
-      <div className="space-y-3 ml-4">
-        {items.map(item => (
-          <div key={item.id} className="flex items-center border p-3 rounded-md">
-            <div className="flex-1">
-              <p>{item.name}</p>
-              <p className="text-sm text-gray-500">
-                {item.type === 'quantity' ? 'Preço por unidade' : 
-                 item.type === 'square_meter' ? 'Preço por m²' : 'Preço por m linear'}
-              </p>
-            </div>
-            <div className="relative w-32">
-              <DollarSign className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
-              <Input 
-                type="number" 
-                min="0" 
-                step="0.01"
-                className="pl-9"
-                placeholder="0,00"
-                value={providerItems[item.id] || ''}
-                onChange={(e) => handleItemPriceChange(
-                  item.id, 
-                  parseFloat(e.target.value) || 0
-                )}
-              />
-            </div>
-          </div>
-        ))}
+      <div className="text-center p-8">
+        <p>Carregando serviços...</p>
       </div>
     );
-  };
-
-  if (loading) {
-    return <div className="p-4 text-center">Carregando serviços...</div>;
   }
-
+  
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Meus Serviços e Preços</CardTitle>
+          <CardTitle>Serviços que você presta</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full mb-6">
-              <TabsTrigger value="services">Serviços</TabsTrigger>
-              <TabsTrigger value="items">Itens e Materiais</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="services" className="space-y-6">
-              <p className="text-sm text-gray-500 mb-4">
-                Configure os preços base para os serviços que você oferece. 
-                Você pode definir preços para qualquer especialidade disponível.
-              </p>
-              
-              {services.map(service => (
-                <div key={service.id} className="space-y-4">
-                  <div 
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer"
-                    onClick={() => toggleServiceExpanded(service.id)}
-                  >
-                    <h3 className="text-lg font-medium">{service.name}</h3>
-                    <Button variant="ghost" size="sm">
-                      {expandedServices[service.id] ? 'Esconder' : 'Expandir'}
-                    </Button>
+          {providerServices.length === 0 ? (
+            <div className="text-center p-4 border border-dashed rounded-md">
+              <p className="text-gray-500">Você ainda não oferece nenhum serviço</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {providerServices.map((service) => (
+                <div 
+                  key={service.id}
+                  className="p-4 border rounded-md flex flex-col md:flex-row justify-between gap-4"
+                >
+                  <div>
+                    <h3 className="font-medium">{service.specialtyName}</h3>
+                    <p className="text-sm text-gray-500">
+                      {service.serviceName} &gt; {service.subServiceName}
+                    </p>
                   </div>
                   
-                  {expandedServices[service.id] && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="pl-4 space-y-4"
-                    >
-                      {service.subServices.map(subService => (
-                        <div key={subService.id} className="space-y-3">
-                          <h4 className="font-medium text-gray-700">{subService.name}</h4>
-                          
-                          <div className="space-y-3">
-                            {subService.specialties.map(specialty => (
-                              <div key={specialty.id} className="flex items-center border p-3 rounded-md">
-                                <div className="flex-1">
-                                  <p>{specialty.name}</p>
-                                </div>
-                                <div className="relative w-32">
-                                  <DollarSign className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
-                                  <Input 
-                                    type="number" 
-                                    min="0" 
-                                    step="0.01"
-                                    className="pl-9"
-                                    placeholder="0,00"
-                                    value={providerServices[specialty.id] || ''}
-                                    onChange={(e) => handleServicePriceChange(
-                                      specialty.id, 
-                                      parseFloat(e.target.value) || 0
-                                    )}
-                                  />
-                                </div>
-                              </div>
-                            ))}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span>R$ {service.basePrice.toFixed(2)}</span>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <PenLine className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Alterar preço</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <Label>Serviço</Label>
+                              <p>{service.specialtyName}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`price-${service.id}`}>Preço (R$)</Label>
+                              <Input 
+                                id={`price-${service.id}`}
+                                type="number" 
+                                step="0.01"
+                                min="0"
+                                defaultValue={service.basePrice.toString()}
+                                onChange={(e) => {
+                                  // Handle price update
+                                  const newPrice = parseFloat(e.target.value);
+                                  if (!isNaN(newPrice) && newPrice >= 0) {
+                                    updatePrice(service.id, newPrice);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <Button 
+                              className="w-full"
+                              disabled={savingPrice}
+                              onClick={() => {
+                                const input = document.getElementById(`price-${service.id}`) as HTMLInputElement;
+                                const newPrice = parseFloat(input.value);
+                                if (!isNaN(newPrice) && newPrice >= 0) {
+                                  updatePrice(service.id, newPrice);
+                                }
+                              }}
+                            >
+                              {savingPrice ? 'Salvando...' : 'Salvar preço'}
+                            </Button>
                           </div>
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </div>
-              ))}
-              
-              <div className="mt-4 flex justify-end">
-                <Button onClick={saveServices} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Salvar Serviços'}
-                </Button>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="items" className="space-y-6">
-              <p className="text-sm text-gray-500 mb-4">
-                Configure os preços unitários para os itens e materiais que você utiliza em seus serviços.
-              </p>
-              
-              {services.map(service => (
-                <div key={service.id} className="space-y-4">
-                  <h3 className="text-lg font-medium">{service.name}</h3>
-                  
-                  {renderServiceItemsList(serviceItems[service.id] || [])}
-                  
-                  {service.subServices.map(subService => (
-                    <div key={subService.id} className="space-y-3 ml-4">
-                      <h4 className="font-medium text-gray-700">{subService.name}</h4>
-                      
-                      {renderServiceItemsList(subServiceItems[subService.id] || [])}
-                      
-                      {subService.specialties.map(specialty => (
-                        <div key={specialty.id} className="space-y-3 ml-4">
-                          <h5 className="font-medium text-gray-600">{specialty.name}</h5>
-                          
-                          {renderServiceItemsList(specialtyItems[specialty.id] || [])}
-                        </div>
-                      ))}
+                        </DialogContent>
+                      </Dialog>
                     </div>
-                  ))}
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8 text-red-500"
+                      onClick={() => deleteService(service.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
-              
-              <div className="mt-4 flex justify-end">
-                <Button onClick={saveItems} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Salvar Preços de Itens'}
-                </Button>
+            </div>
+          )}
+          
+          <Separator className="my-6" />
+          
+          <div className="space-y-6">
+            <h3 className="font-medium">Adicionar novo serviço</h3>
+            
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="service">Serviço</Label>
+                <Select value={selectedService} onValueChange={setSelectedService}>
+                  <SelectTrigger id="service">
+                    <SelectValue placeholder="Selecione um serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {services.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </TabsContent>
-          </Tabs>
+              
+              {selectedService && (
+                <div className="space-y-2">
+                  <Label htmlFor="sub-service">Tipo de serviço</Label>
+                  <Select 
+                    value={selectedSubService} 
+                    onValueChange={setSelectedSubService}
+                    disabled={filteredSubServices.length === 0}
+                  >
+                    <SelectTrigger id="sub-service">
+                      <SelectValue placeholder={
+                        filteredSubServices.length === 0 
+                          ? "Nenhum tipo de serviço disponível" 
+                          : "Selecione um tipo de serviço"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSubServices.map((subService) => (
+                        <SelectItem key={subService.id} value={subService.id}>
+                          {subService.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {selectedSubService && (
+                <div className="space-y-2">
+                  <Label htmlFor="specialty">Especialidade</Label>
+                  <Select 
+                    value={selectedSpecialty} 
+                    onValueChange={setSelectedSpecialty}
+                    disabled={filteredSpecialties.length === 0}
+                  >
+                    <SelectTrigger id="specialty">
+                      <SelectValue placeholder={
+                        filteredSpecialties.length === 0 
+                          ? "Nenhuma especialidade disponível" 
+                          : "Selecione uma especialidade"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSpecialties.map((specialty) => (
+                        <SelectItem key={specialty.id} value={specialty.id}>
+                          {specialty.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {selectedSpecialty && (
+                <div className="space-y-2">
+                  <Label htmlFor="price">Preço base (R$)</Label>
+                  <Input 
+                    id="price" 
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={basePrice}
+                    onChange={(e) => setBasePrice(e.target.value)}
+                    placeholder="Ex: 100.00"
+                  />
+                </div>
+              )}
+              
+              <Button 
+                onClick={handleAddService}
+                disabled={
+                  addingService || 
+                  !selectedService || 
+                  !selectedSubService || 
+                  !selectedSpecialty || 
+                  !basePrice ||
+                  parseFloat(basePrice) <= 0
+                }
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {addingService ? 'Adicionando...' : 'Adicionar serviço'}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
