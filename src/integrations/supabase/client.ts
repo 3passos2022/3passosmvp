@@ -13,7 +13,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     storageKey: '3passos-auth',
-    storage: localStorage,
+    storage: typeof window !== 'undefined' ? localStorage : undefined,
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
@@ -22,6 +22,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     headers: {
       'x-application-name': '3passos'
     }
+  },
+  db: {
+    schema: 'public'
   }
 });
 

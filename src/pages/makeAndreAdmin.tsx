@@ -11,7 +11,7 @@ import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client';
 
 const MakeAndreAdmin: React.FC = () => {
-  const { user, makeAdmin } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -21,22 +21,14 @@ const MakeAndreAdmin: React.FC = () => {
       // André's user ID
       const andreId = 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866';
       
-      // Verificar se o usuário já é admin
-      const { data, error } = await supabase
+      // Directly update the user's role in the profiles table
+      const { error } = await supabase
         .from('profiles')
-        .select('role')
-        .eq('id', andreId)
-        .single();
+        .update({ role: UserRole.ADMIN })
+        .eq('id', andreId);
       
       if (error) throw error;
       
-      if (data.role === UserRole.ADMIN) {
-        toast.info('André já é administrador!');
-        setSuccess(true);
-        return;
-      }
-      
-      await makeAdmin(andreId);
       toast.success('André promovido a administrador com sucesso!');
       setSuccess(true);
     } catch (error) {
