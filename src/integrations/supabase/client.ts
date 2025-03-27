@@ -32,14 +32,14 @@ if (typeof window !== 'undefined') {
   
   // Get existing session from storage
   const existingToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token');
-  const existingRefreshToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token-refresh');
+  const existingRefreshToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-refresh-token');
   
   if (existingToken && existingRefreshToken) {
     try {
       const parsedToken = JSON.parse(existingToken);
       const parsedRefreshToken = JSON.parse(existingRefreshToken);
       
-      // In newer versions of Supabase, setSession is used instead of setAuth
+      // Use setSession in newer versions of Supabase instead of setAuth
       supabase.auth.setSession({
         access_token: parsedToken,
         refresh_token: parsedRefreshToken,

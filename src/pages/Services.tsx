@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -8,51 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, ArrowRight, Briefcase, Star, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { getAllServices } from '@/lib/api/services';
-
-interface ServiceWithMeta {
-  id: string;
-  name: string;
-  description: string;
-  icon_url: string;
-  tags: string[];
-  subServices: {
-    id: string;
-    name: string;
-  }[];
-}
+import { getServicesWithMeta, ServiceWithMeta } from '@/lib/api/services';
 
 const Services: React.FC = () => {
-  const { serviceId } = useParams();
+  const { serviceId } = useParams<{ serviceId?: string }>();
   const [searchTerm, setSearchTerm] = useState('');
   
   // Use React Query to fetch services
-  const { data: servicesData, isLoading, error } = useQuery({
+  const { data: services = [], isLoading, error } = useQuery({
     queryKey: ['services-with-meta'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('services')
-        .select('id, name, description, icon_url, tags, sub_services(id, name)')
-        .order('name');
-        
-      if (error) throw error;
-      
-      // Map the data to the expected format
-      return data.map((service: any) => ({
-        id: service.id,
-        name: service.name,
-        description: service.description || 'Sem descrição disponível',
-        icon_url: service.icon_url,
-        tags: service.tags || [],
-        subServices: service.sub_services || []
-      })) as ServiceWithMeta[];
-    },
+    queryFn: getServicesWithMeta,
     staleTime: 5 * 60 * 1000 // 5 minutes cache
   });
-  
-  const services = servicesData || [];
   
   // Filter services based on search term
   const filteredServices = services.filter(service => 
@@ -263,7 +231,17 @@ const Services: React.FC = () => {
               <div className="flex flex-col lg:flex-row gap-12">
                 <div className="flex-1">
                   <div className="mb-8">
-                    <div className="text-5xl mb-4">{selectedService.icon}</div>
+                    <div className="w-20 h-20 mb-4 flex items-center justify-center">
+                      {selectedService.icon_url ? (
+                        <img 
+                          src={selectedService.icon_url} 
+                          alt={selectedService.name} 
+                          className="max-w-full max-h-full"
+                        />
+                      ) : (
+                        <Briefcase className="h-16 w-16 text-gray-400" />
+                      )}
+                    </div>
                     <h1 className="text-3xl md:text-4xl font-bold mb-4">{selectedService.name}</h1>
                     <p className="text-lg text-gray-600">{selectedService.description}</p>
                   </div>
@@ -274,11 +252,11 @@ const Services: React.FC = () => {
                       {selectedService.subServices.map((subService, i) => (
                         <Card key={i}>
                           <CardHeader>
-                            <CardTitle className="text-xl">{subService}</CardTitle>
+                            <CardTitle className="text-xl">{subService.name}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <p className="text-gray-600">
-                              Contrate profissionais especializados em {subService.toLowerCase()} 
+                              Contrate profissionais especializados em {subService.name.toLowerCase()} 
                               para o seu projeto.
                             </p>
                           </CardContent>

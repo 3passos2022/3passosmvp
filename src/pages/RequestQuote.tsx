@@ -1,16 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import QuoteRequestForm from '@/components/quoteRequest/QuoteRequestForm';
-import { Service } from '@/lib/types';
-import { getAllServices } from '@/lib/api/services';
 import { useQuery } from '@tanstack/react-query';
+import { getAllServices } from '@/lib/api/services';
 
 const RequestQuote: React.FC = () => {
-  const [step, setStep] = useState(1);
-  
   // Use React Query for fetching services with caching
   const { data: services, isLoading, error } = useQuery({
     queryKey: ['services'],
@@ -23,12 +20,6 @@ const RequestQuote: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
-  // Create a function to handle quote submission 
-  const handleSubmitQuote = (formData: any) => {
-    console.log('Quote submitted:', formData);
-    // Here you would typically send the data to your backend
-  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -60,9 +51,7 @@ const RequestQuote: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <QuoteRequestForm 
-                  services={services || []} 
-                />
+                <QuoteRequestForm />
               )}
             </div>
           </motion.div>
