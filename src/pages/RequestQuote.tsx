@@ -65,7 +65,8 @@ const RequestQuote: React.FC = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <QuoteRequestForm initialServices={services} />
+                // Pass services as prop instead of initialServices
+                <QuoteRequestForm services={services} />
               )}
             </div>
           </motion.div>

@@ -27,26 +27,24 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Set site URL for Supabase redirects
 if (typeof window !== 'undefined') {
-  // Update these URLs for redirects
-  supabase.auth.setAuth({
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  });
-  
   // Set site URL to support proper redirection
-  supabase.auth.setConfig({
-    siteUrl: 'https://3passos.com.br',
-  });
+  const redirectUrls = ['https://3passos.com.br', 'https://3passos.com'];
   
-  // Get existing session
+  // Get existing session from storage
   const existingToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token');
   const existingRefreshToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token-refresh');
   
   if (existingToken && existingRefreshToken) {
-    supabase.auth.setSession({
-      access_token: existingToken,
-      refresh_token: existingRefreshToken,
-    });
+    try {
+      const parsedToken = JSON.parse(existingToken);
+      const parsedRefreshToken = JSON.parse(existingRefreshToken);
+      
+      supabase.auth.setSession({
+        access_token: parsedToken,
+        refresh_token: parsedRefreshToken,
+      });
+    } catch (error) {
+      console.error('Error parsing stored tokens:', error);
+    }
   }
 }

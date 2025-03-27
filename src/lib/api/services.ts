@@ -4,29 +4,34 @@ import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, Servic
 // Cache for service data to improve performance
 let servicesCache: Service[] | null = null;
 let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // Fetch all services with their sub-services and specialties
 export async function getAllServices(): Promise<Service[]> {
   // Use cached data if available and recent
   const now = Date.now();
   if (servicesCache && now - lastFetchTime < CACHE_TTL) {
+    console.log('Returning cached services data');
     return servicesCache;
   }
 
   try {
     console.log('Fetching services from database...');
     
-    // Get services
-    const { data: servicesData, error: servicesError } = await supabase
-      .from('services')
-      .select('*')
-      .order('name');
+    // Fetch all data in parallel for better performance
+    const [servicesResult, subServicesResult, specialtiesResult] = await Promise.all([
+      supabase.from('services').select('*').order('name'),
+      supabase.from('sub_services').select('*').order('name'),
+      supabase.from('specialties').select('*').order('name')
+    ]);
     
-    if (servicesError) {
-      console.error('Error fetching services:', servicesError);
-      throw servicesError;
-    }
+    if (servicesResult.error) throw servicesResult.error;
+    if (subServicesResult.error) throw subServicesResult.error;
+    if (specialtiesResult.error) throw specialtiesResult.error;
+
+    const servicesData = servicesResult.data;
+    const allSubServices = subServicesResult.data;
+    const allSpecialties = specialtiesResult.data;
 
     if (!servicesData || servicesData.length === 0) {
       console.log('No services found in database');
@@ -35,28 +40,6 @@ export async function getAllServices(): Promise<Service[]> {
 
     console.log(`Found ${servicesData.length} services`);
     
-    // Get all subservices in one query
-    const { data: allSubServices, error: subServicesError } = await supabase
-      .from('sub_services')
-      .select('*')
-      .order('name');
-    
-    if (subServicesError) {
-      console.error('Error fetching subservices:', subServicesError);
-      throw subServicesError;
-    }
-
-    // Get all specialties in one query
-    const { data: allSpecialties, error: specialtiesError } = await supabase
-      .from('specialties')
-      .select('*')
-      .order('name');
-    
-    if (specialtiesError) {
-      console.error('Error fetching specialties:', specialtiesError);
-      throw specialtiesError;
-    }
-
     // Build the services structure
     const services: Service[] = servicesData.map(service => {
       // Filter subservices for this service
