@@ -1,72 +1,68 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import QuoteRequestForm from '@/components/quoteRequest/QuoteRequestForm';
-import { getAllServices } from '@/lib/api/services';
 import { Service } from '@/lib/types';
-import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getAllServices } from '@/lib/api/services';
+import { useQuery } from '@tanstack/react-query';
 
 const RequestQuote: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
-
-  // Fetch services on component mount
+  const [step, setStep] = useState(1);
+  
+  // Use React Query for fetching services with caching
+  const { data: services, isLoading, error } = useQuery({
+    queryKey: ['services'],
+    queryFn: getAllServices,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    retry: 2,
+  });
+  
+  // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    const fetchServices = async () => {
-      try {
-        setLoading(true);
-        const data = await getAllServices();
-        if (data.length === 0) {
-          setError('Nenhum serviço encontrado. Por favor, tente novamente mais tarde.');
-        } else {
-          setServices(data);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Error fetching services:', err);
-        setError('Erro ao carregar serviços. Por favor, tente novamente mais tarde.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchServices();
   }, []);
 
+  // Create a function to handle quote submission 
+  const handleSubmitQuote = (formData: any) => {
+    console.log('Quote submitted:', formData);
+    // Here you would typically send the data to your backend
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col">
       <Navbar />
       
-      <main className="flex-1">
+      <main className="flex-1 bg-gray-50">
         <div className="container mx-auto px-4 py-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="max-w-3xl mx-auto">
-              {loading ? (
-                <div className="p-8 flex flex-col items-center justify-center space-y-4">
-                  <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-lg text-gray-600">Carregando serviços...</p>
+            <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-sm p-6">
+              <h1 className="text-2xl font-bold mb-6 text-center">Solicite um Orçamento</h1>
+              
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                  <p>Carregando serviços...</p>
                 </div>
               ) : error ? (
-                <Alert variant="destructive" className="mb-6">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Erro</AlertTitle>
-                  <AlertDescription>
-                    {error}
-                  </AlertDescription>
-                </Alert>
+                <div className="text-center text-red-500 py-12">
+                  <p>Erro ao carregar serviços. Por favor, tente novamente mais tarde.</p>
+                  <button 
+                    className="mt-4 px-4 py-2 bg-primary text-white rounded-md"
+                    onClick={() => window.location.reload()}
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
               ) : (
-                // Pass services as prop instead of initialServices
-                <QuoteRequestForm services={services} />
+                <QuoteRequestForm 
+                  services={services || []} 
+                />
               )}
             </div>
           </motion.div>
