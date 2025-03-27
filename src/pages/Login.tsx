@@ -1,19 +1,24 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
+import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@/context/AuthContext";
-import { toast } from "sonner";
-import { UserRole } from "@/lib/types";
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -22,43 +27,54 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { toast } from "sonner";
+import { UserRole } from '@/lib/types';
+import { User, UserCircle, Briefcase } from 'lucide-react';
 
-// Schemas for validation
 const loginSchema = z.object({
-  email: z.string().email({ message: "E-mail inválido" }),
-  password: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
+  email: z.string().email({
+    message: "Por favor, insira um e-mail válido",
+  }),
+  password: z.string().min(6, {
+    message: "A senha deve ter pelo menos 6 caracteres",
+  }),
 });
 
-const registerSchema = z.object({
-  name: z.string().min(2, { message: "Nome deve ter pelo menos 2 caracteres" }),
-  email: z.string().email({ message: "E-mail inválido" }),
-  password: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
-  phone: z.string().optional(),
-  role: z.nativeEnum(UserRole),
+const signupSchema = z.object({
+  name: z.string().min(2, {
+    message: "O nome deve ter pelo menos 2 caracteres",
+  }),
+  email: z.string().email({
+    message: "Por favor, insira um e-mail válido",
+  }),
+  phone: z.string().min(10, {
+    message: "Por favor, insira um telefone válido",
+  }).optional(),
+  password: z.string().min(6, {
+    message: "A senha deve ter pelo menos 6 caracteres",
+  }),
+  role: z.enum([UserRole.CLIENT, UserRole.PROVIDER], {
+    message: "Selecione o tipo de conta",
+  }),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
+type LoginFormData = z.infer<typeof loginSchema>;
+type SignupFormData = z.infer<typeof signupSchema>;
 
-const Login = () => {
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+const Login: React.FC = () => {
   const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<string>("login");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Get the return path from location state if exists
-  const returnTo = location.state?.returnTo || '/';
-
-  // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      console.log("User is logged in, redirecting to:", returnTo);
-      navigate(returnTo, { replace: true });
+      console.log("User is logged in, redirecting to:", "/");
+      navigate("/");
     }
-  }, [user, navigate, returnTo]);
+  }, [user, navigate]);
 
-  // Login form
-  const loginForm = useForm<LoginFormValues>({
+  const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -66,9 +82,8 @@ const Login = () => {
     },
   });
 
-  // Register form
-  const registerForm = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+  const signupForm = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -78,200 +93,300 @@ const Login = () => {
     },
   });
 
-  const onLogin = async (data: LoginFormValues) => {
+  const onLoginSubmit = async (data: LoginFormData) => {
+    setIsLoading(true);
     try {
       await signIn(data.email, data.password);
-      // Will automatically redirect via the useEffect above
+      toast.success("Login realizado com sucesso!");
+      navigate("/");
     } catch (error) {
-      console.error("Login error:", error);
-      // Error toast is handled in the AuthContext
+      console.error("Error signing in:", error);
+      setIsLoading(false);
     }
   };
 
-  const onRegister = async (data: RegisterFormValues) => {
+  const onSignupSubmit = async (data: SignupFormData) => {
+    setIsLoading(true);
     try {
       await signUp(data.email, data.password, {
         name: data.name,
-        role: data.role,
         phone: data.phone || "",
+        role: data.role,
       });
-      toast.success("Conta criada com sucesso! Por favor, faça login.");
+
+      toast.success(
+        "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
+      );
+      
+      // Automatically switch to login tab
       setActiveTab("login");
+      
+      // Pre-fill login form with the email
+      loginForm.setValue("email", data.email);
+      signupForm.reset();
     } catch (error) {
-      console.error("Register error:", error);
-      // Error toast is handled in the AuthContext
+      console.error("Error signing up:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1 flex items-center justify-center p-4 md:p-8 bg-gray-50">
+      <main className="flex-1 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md"
+          className="max-w-md w-full"
         >
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h1 className="text-2xl font-bold text-center mb-6">Bem-vindo(a)</h1>
-            
-            <Tabs defaultValue={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "register")}>
-              <TabsList className="grid grid-cols-2 mb-6">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Criar Conta</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="login">
-                <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
-                    <FormField
-                      control={loginForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>E-mail</FormLabel>
-                          <FormControl>
-                            <Input placeholder="seu@email.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={loginForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Senha</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="******" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button 
-                      className="w-full" 
-                      type="submit" 
-                      disabled={loginForm.formState.isSubmitting}
-                    >
-                      {loginForm.formState.isSubmitting ? "Entrando..." : "Entrar"}
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-              
-              <TabsContent value="register">
-                <Form {...registerForm}>
-                  <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                    <FormField
-                      control={registerForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nome completo</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Seu nome" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={registerForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>E-mail</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="seu@email.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={registerForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Telefone (opcional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="(00) 00000-0000" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={registerForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Senha</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="******" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={registerForm.control}
-                      name="role"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Você é:</FormLabel>
-                          <div className="grid grid-cols-2 gap-4">
-                            <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
-                              <input 
-                                type="radio" 
-                                value={UserRole.CLIENT} 
-                                checked={field.value === UserRole.CLIENT}
-                                onChange={() => field.onChange(UserRole.CLIENT)}
-                                className="rounded-full text-primary" 
-                              />
-                              <span>Cliente</span>
-                            </label>
-                            
-                            <label className="flex items-center space-x-2 border rounded-md p-3 cursor-pointer hover:border-primary transition-colors">
-                              <input 
-                                type="radio" 
-                                value={UserRole.PROVIDER} 
-                                checked={field.value === UserRole.PROVIDER}
-                                onChange={() => field.onChange(UserRole.PROVIDER)}
-                                className="rounded-full text-primary" 
-                              />
-                              <span>Prestador</span>
-                            </label>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button 
-                      className="w-full" 
-                      type="submit" 
-                      disabled={registerForm.formState.isSubmitting}
-                    >
-                      {registerForm.formState.isSubmitting ? "Criando conta..." : "Criar conta"}
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-            </Tabs>
+          <div className="text-center mb-8">
+            <Link to="/" className="inline-block">
+              <h1 className="text-2xl font-bold">
+                <span className="text-primary">3</span>
+                <span>passos</span>
+              </h1>
+            </Link>
           </div>
+
+          <Tabs
+            defaultValue="login"
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Entrar</CardTitle>
+                  <CardDescription>
+                    Entre com sua conta para acessar o sistema
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...loginForm}>
+                    <form
+                      onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                      className="space-y-4"
+                    >
+                      <FormField
+                        control={loginForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>E-mail</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="seu@email.com"
+                                type="email"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={loginForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Senha</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Sua senha"
+                                type="password"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Entrando..." : "Entrar"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+                <CardFooter className="flex justify-center">
+                  <Button
+                    variant="link"
+                    onClick={() => setActiveTab("signup")}
+                    className="text-sm"
+                  >
+                    Não tem uma conta? Crie agora
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Criar Conta</CardTitle>
+                  <CardDescription>
+                    Preencha os dados para criar sua conta
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...signupForm}>
+                    <form
+                      onSubmit={signupForm.handleSubmit(onSignupSubmit)}
+                      className="space-y-4"
+                    >
+                      <FormField
+                        control={signupForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Seu nome completo"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={signupForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>E-mail</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="seu@email.com"
+                                type="email"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={signupForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="(00) 00000-0000"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={signupForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Senha</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Sua senha"
+                                type="password"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={signupForm.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem className="space-y-2">
+                            <FormLabel>Tipo de Conta</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="grid grid-cols-2 gap-4"
+                              >
+                                <div>
+                                  <RadioGroupItem
+                                    value={UserRole.CLIENT}
+                                    id="client"
+                                    className="peer sr-only"
+                                  />
+                                  <Label
+                                    htmlFor="client"
+                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                  >
+                                    <User className="mb-2 h-6 w-6" />
+                                    Cliente
+                                  </Label>
+                                </div>
+                                <div>
+                                  <RadioGroupItem
+                                    value={UserRole.PROVIDER}
+                                    id="provider"
+                                    className="peer sr-only"
+                                  />
+                                  <Label
+                                    htmlFor="provider"
+                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                  >
+                                    <Briefcase className="mb-2 h-6 w-6" />
+                                    Prestador
+                                  </Label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Criando conta..." : "Criar Conta"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+                <CardFooter className="flex justify-center">
+                  <Button
+                    variant="link"
+                    onClick={() => setActiveTab("login")}
+                    className="text-sm"
+                  >
+                    Já tem uma conta? Entre agora
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </motion.div>
       </main>
-      <Footer />
     </div>
   );
 };

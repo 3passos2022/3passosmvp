@@ -1,55 +1,27 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { UserRole } from '@/lib/types';
 import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserCircle } from 'lucide-react';
 
 const MakeAndreAdmin: React.FC = () => {
   const { makeAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [adminUser, setAdminUser] = useState<{ id: string; email: string } | null>(null);
-
-  useEffect(() => {
-    const findAndreUser = async () => {
-      try {
-        // Search for Andre's account
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, email:id')
-          .eq('id', 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866')
-          .single();
-
-        if (error) {
-          console.error('Error finding Andre:', error);
-          return;
-        }
-
-        if (data) {
-          setAdminUser({
-            id: data.id,
-            email: 'pro.andresouza@gmail.com' // Hardcoded since we know this is Andre's email
-          });
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
-
-    findAndreUser();
-  }, []);
 
   const handleMakeAdmin = async () => {
-    if (!adminUser) return;
-    
     setLoading(true);
     try {
-      await makeAdmin(adminUser.id);
-      toast.success(`Usuário ${adminUser.email} promovido a administrador com sucesso!`);
+      // André's user ID
+      const andreId = 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866';
+      
+      await makeAdmin(andreId);
+      toast.success('André promovido a administrador com sucesso!');
     } catch (error) {
       console.error('Error making admin:', error);
-      toast.error('Erro ao promover usuário a administrador.');
+      toast.error('Erro ao promover a administrador.');
     } finally {
       setLoading(false);
     }
@@ -60,24 +32,28 @@ const MakeAndreAdmin: React.FC = () => {
       <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
         <h1 className="text-2xl font-bold mb-6 text-center">Promoção de Administrador</h1>
         
-        {adminUser ? (
-          <div className="space-y-6">
-            <div className="p-4 border rounded-md bg-gray-50">
-              <p className="font-medium">Email: {adminUser.email}</p>
-              <p className="text-sm text-gray-500">ID: {adminUser.id}</p>
-            </div>
-            
-            <Button 
-              onClick={handleMakeAdmin} 
-              disabled={loading} 
-              className="w-full"
-            >
-              {loading ? 'Processando...' : 'Promover a Administrador'}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-center text-gray-500">Buscando usuário...</p>
-        )}
+        <div className="space-y-6">
+          <Card className="p-4 bg-gray-50">
+            <CardHeader className="p-0 pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <UserCircle className="h-6 w-6 text-primary" />
+                Usuário para promover
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <p className="font-medium">Email: pro.andresouza@gmail.com</p>
+              <p className="text-sm text-gray-500">ID: ad9e2a2a-0a39-4e49-80b6-a5699ca6a866</p>
+            </CardContent>
+          </Card>
+          
+          <Button 
+            onClick={handleMakeAdmin} 
+            disabled={loading} 
+            className="w-full"
+          >
+            {loading ? 'Processando...' : 'Promover a Administrador'}
+          </Button>
+        </div>
       </div>
     </div>
   );

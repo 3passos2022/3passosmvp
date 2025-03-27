@@ -6,63 +6,59 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, ArrowRight, Briefcase, Star } from 'lucide-react';
+import { Search, ArrowRight, Briefcase, Star, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { getAllServices } from '@/lib/api/services';
+
+interface ServiceWithMeta {
+  id: string;
+  name: string;
+  description: string;
+  icon_url: string;
+  tags: string[];
+  subServices: {
+    id: string;
+    name: string;
+  }[];
+}
 
 const Services: React.FC = () => {
   const { serviceId } = useParams();
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Placeholder data for services
-  const services = [
-    {
-      id: 'pedreiro',
-      name: 'Pedreiro',
-      description: 'Profissionais especializados em construção e reformas',
-      icon: '🧱',
-      subServices: ['Alvenaria', 'Revestimento', 'Acabamento'],
+  // Use React Query to fetch services
+  const { data: servicesData, isLoading, error } = useQuery({
+    queryKey: ['services-with-meta'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('id, name, description, icon_url, tags, sub_services(id, name)')
+        .order('name');
+        
+      if (error) throw error;
+      
+      // Map the data to the expected format
+      return data.map((service: any) => ({
+        id: service.id,
+        name: service.name,
+        description: service.description || 'Sem descrição disponível',
+        icon_url: service.icon_url,
+        tags: service.tags || [],
+        subServices: service.sub_services || []
+      })) as ServiceWithMeta[];
     },
-    {
-      id: 'eletricista',
-      name: 'Eletricista',
-      description: 'Instalação e manutenção de sistemas elétricos',
-      icon: '⚡',
-      subServices: ['Instalação', 'Manutenção', 'Reparo'],
-    },
-    {
-      id: 'encanador',
-      name: 'Encanador',
-      description: 'Serviços relacionados a sistemas hidráulicos',
-      icon: '🚿',
-      subServices: ['Instalação', 'Manutenção', 'Reparo'],
-    },
-    {
-      id: 'pintor',
-      name: 'Pintor',
-      description: 'Pintura residencial e comercial',
-      icon: '🎨',
-      subServices: ['Interna', 'Externa', 'Decorativa'],
-    },
-    {
-      id: 'jardineiro',
-      name: 'Jardineiro',
-      description: 'Cuidados com jardins e áreas verdes',
-      icon: '🌱',
-      subServices: ['Paisagismo', 'Manutenção', 'Poda'],
-    },
-    {
-      id: 'limpeza',
-      name: 'Limpeza',
-      description: 'Serviços de limpeza residencial e comercial',
-      icon: '🧹',
-      subServices: ['Residencial', 'Comercial', 'Pós-obra'],
-    },
-  ];
+    staleTime: 5 * 60 * 1000 // 5 minutes cache
+  });
+  
+  const services = servicesData || [];
   
   // Filter services based on search term
   const filteredServices = services.filter(service => 
     service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    service.description.toLowerCase().includes(searchTerm.toLowerCase())
+    service.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (service.tags && service.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
   );
   
   // Find the selected service if serviceId is provided
@@ -110,91 +106,146 @@ const Services: React.FC = () => {
                 </div>
               </motion.div>
               
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-              >
-                {filteredServices.map((service, index) => (
-                  <motion.div
-                    key={service.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                  >
-                    <Link to={`/services/${service.id}`}>
-                      <Card className="h-full hover:shadow-lg transition-shadow hover:scale-[1.02] transition-all duration-300">
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <div className="text-3xl">{service.icon}</div>
-                            <Briefcase className="h-5 w-5 text-gray-400" />
-                          </div>
-                          <CardTitle className="mt-2">{service.name}</CardTitle>
-                          <CardDescription>{service.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            {service.subServices.map((subService, i) => (
-                              <span 
-                                key={i} 
-                                className="inline-block py-1 px-2 rounded-full bg-primary/10 text-primary text-sm"
-                              >
-                                {subService}
-                              </span>
-                            ))}
-                          </div>
-                        </CardContent>
-                        <CardFooter>
-                          <Button variant="ghost" className="w-full justify-between">
-                            Ver detalhes
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                ))}
-              </motion.div>
+              {isLoading ? (
+                <div className="flex justify-center items-center py-20">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                  <span className="ml-3">Carregando serviços...</span>
+                </div>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-xl mx-auto">
+                    <Info className="h-10 w-10 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold mb-2">Erro ao carregar serviços</h2>
+                    <p className="text-gray-600 mb-4">Ocorreu um erro ao tentar carregar os serviços. Por favor, tente novamente mais tarde.</p>
+                    <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
+                  </div>
+                </div>
+              ) : filteredServices.length === 0 ? (
+                <div className="text-center py-12">
+                  {services.length === 0 ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-xl mx-auto">
+                      <Info className="h-10 w-10 text-blue-500 mx-auto mb-4" />
+                      <h2 className="text-xl font-semibold mb-2">Nenhum serviço cadastrado</h2>
+                      <p className="text-gray-600 mb-4">Ainda não há serviços cadastrados no sistema. Um administrador precisa cadastrar os serviços disponíveis.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xl mb-4">Nenhum serviço corresponde à sua busca</p>
+                      <Button onClick={() => setSearchTerm('')} variant="outline">Limpar busca</Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
+                  {filteredServices.map((service, index) => (
+                    <motion.div
+                      key={service.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                    >
+                      <Link to={`/services/${service.id}`}>
+                        <Card className="h-full hover:shadow-lg transition-shadow hover:scale-[1.02] transition-all duration-300">
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <div className="w-12 h-12 flex items-center justify-center">
+                                {service.icon_url ? (
+                                  <img 
+                                    src={service.icon_url} 
+                                    alt={service.name}
+                                    className="max-w-full max-h-full"
+                                  />
+                                ) : (
+                                  <Briefcase className="h-10 w-10 text-gray-400" />
+                                )}
+                              </div>
+                              <Briefcase className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <CardTitle className="mt-2">{service.name}</CardTitle>
+                            <CardDescription>{service.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {service.tags && service.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {service.tags.map((tag, i) => (
+                                  <span 
+                                    key={i} 
+                                    className="inline-block py-1 px-2 rounded-full bg-gray-100 text-gray-600 text-xs"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                              {service.subServices && service.subServices.map((subService, i) => (
+                                <span 
+                                  key={i} 
+                                  className="inline-block py-1 px-2 rounded-full bg-primary/10 text-primary text-sm"
+                                >
+                                  {subService.name}
+                                </span>
+                              ))}
+                            </div>
+                          </CardContent>
+                          <CardFooter>
+                            <Button variant="ghost" className="w-full justify-between">
+                              Ver detalhes
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
               
               {/* Top providers section */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className="mt-24"
-              >
-                <h2 className="text-2xl font-bold mb-8 text-center">Profissionais em destaque</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {topProviders.map((provider, index) => (
-                    <Card key={provider.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="font-bold text-primary">
-                              {provider.name.charAt(0)}
-                            </span>
+              {services.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                  className="mt-24"
+                >
+                  <h2 className="text-2xl font-bold mb-8 text-center">Profissionais em destaque</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {topProviders.map((provider, index) => (
+                      <Card key={provider.id} className="hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                          <div className="flex items-center space-x-4">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="font-bold text-primary">
+                                {provider.name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">{provider.name}</CardTitle>
+                              <CardDescription>{provider.service}</CardDescription>
+                            </div>
                           </div>
-                          <div>
-                            <CardTitle className="text-xl">{provider.name}</CardTitle>
-                            <CardDescription>{provider.service}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                            <span className="font-medium">{provider.rating}</span>
                           </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                          <span className="font-medium">{provider.rating}</span>
-                        </div>
-                        <p className="text-sm text-gray-600">{provider.jobs} trabalhos realizados</p>
-                      </CardContent>
-                      <CardFooter>
-                        <Button variant="outline" className="w-full">Ver perfil</Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              </motion.div>
+                          <p className="text-sm text-gray-600">{provider.jobs} trabalhos realizados</p>
+                        </CardContent>
+                        <CardFooter>
+                          <Button variant="outline" className="w-full">Ver perfil</Button>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
             </>
           ) : (
             // Service detail view

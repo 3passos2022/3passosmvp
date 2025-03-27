@@ -39,9 +39,12 @@ if (typeof window !== 'undefined') {
       const parsedToken = JSON.parse(existingToken);
       const parsedRefreshToken = JSON.parse(existingRefreshToken);
       
+      // In newer versions of Supabase, setSession is used instead of setAuth
       supabase.auth.setSession({
         access_token: parsedToken,
         refresh_token: parsedRefreshToken,
+      }).catch(err => {
+        console.error('Error setting session:', err);
       });
     } catch (error) {
       console.error('Error parsing stored tokens:', error);

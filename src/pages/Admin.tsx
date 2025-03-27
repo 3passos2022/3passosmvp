@@ -16,13 +16,17 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole } from '@/lib/types';
 import { getAllServices, clearServicesCache } from '@/lib/api/services';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, X, Image as ImageIcon, Tag } from 'lucide-react';
 import UserManagement from '@/components/admin/UserManagement';
+import { Textarea } from '@/components/ui/textarea';
 
 // Define simple types for admin components to avoid deep nesting
 interface ServiceBasic {
   id: string;
   name: string;
+  description?: string;
+  icon_url?: string;
+  tags?: string[];
 }
 
 interface SubServiceBasic {
@@ -35,22 +39,6 @@ interface SpecialtyBasic {
   name: string;
 }
 
-interface QuestionBasic {
-  id: string;
-  question: string;
-}
-
-interface QuestionOptionBasic {
-  id: string;
-  option_text: string;
-}
-
-interface ServiceItemBasic {
-  id: string;
-  name: string;
-  type: 'quantity' | 'square_meter' | 'linear_meter';
-}
-
 // Admin Services Component
 const AdminServices: React.FC = () => {
   const [services, setServices] = useState<ServiceBasic[]>([]);
@@ -58,11 +46,16 @@ const AdminServices: React.FC = () => {
   const [specialties, setSpecialties] = useState<SpecialtyBasic[]>([]);
   const [loading, setLoading] = useState(true);
   const [newService, setNewService] = useState('');
+  const [newServiceDesc, setNewServiceDesc] = useState('');
+  const [newServiceTags, setNewServiceTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
   const [newSubService, setNewSubService] = useState('');
   const [newSpecialty, setNewSpecialty] = useState('');
   const [selectedService, setSelectedService] = useState<string>('');
   const [selectedSubService, setSelectedSubService] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
   
   useEffect(() => {
     loadServices();
@@ -92,7 +85,7 @@ const AdminServices: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('services')
-        .select('id, name')
+        .select('id, name, description, icon_url, tags')
         .order('name');
       
       if (error) throw error;
@@ -139,15 +132,94 @@ const AdminServices: React.FC = () => {
       toast.error('Erro ao carregar especialidades');
     }
   };
+
+  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Check file size (500KB = 512000 bytes)
+      if (file.size > 512000) {
+        toast.error('O arquivo deve ter no máximo 500KB');
+        return;
+      }
+      
+      // Check file type
+      if (!['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'].includes(file.type)) {
+        toast.error('Apenas arquivos PNG, JPG e SVG são permitidos');
+        return;
+      }
+      
+      setIconFile(file);
+      
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setIconPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddTag = () => {
+    if (newTagInput.trim() && !newServiceTags.includes(newTagInput.trim())) {
+      setNewServiceTags([...newServiceTags, newTagInput.trim()]);
+      setNewTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    setNewServiceTags(newServiceTags.filter(t => t !== tag));
+  };
   
+  const uploadIcon = async (): Promise<string | null> => {
+    if (!iconFile) return null;
+    
+    try {
+      // Create a unique filename with timestamp and original extension
+      const fileExt = iconFile.name.split('.').pop();
+      const fileName = `service-icons/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      
+      // Upload the file to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('service-assets')
+        .upload(fileName, iconFile, {
+          contentType: iconFile.type,
+          upsert: true,
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('service-assets')
+        .getPublicUrl(fileName);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading icon:', error);
+      throw error;
+    }
+  };
+
   const handleAddService = async () => {
     if (!newService.trim()) return;
     
     setSaving(true);
     try {
+      // Upload icon if one is selected
+      let iconUrl = null;
+      if (iconFile) {
+        iconUrl = await uploadIcon();
+      }
+      
       const { data, error } = await supabase
         .from('services')
-        .insert({ name: newService.trim() })
+        .insert({ 
+          name: newService.trim(),
+          description: newServiceDesc.trim() || null,
+          icon_url: iconUrl,
+          tags: newServiceTags.length > 0 ? newServiceTags : null
+        })
         .select()
         .single();
       
@@ -155,6 +227,10 @@ const AdminServices: React.FC = () => {
       
       toast.success('Serviço adicionado com sucesso');
       setNewService('');
+      setNewServiceDesc('');
+      setNewServiceTags([]);
+      setIconFile(null);
+      setIconPreview(null);
       clearServicesCache(); // Clear cache to force refresh
       await loadServices();
     } catch (error) {
@@ -311,18 +387,110 @@ const AdminServices: React.FC = () => {
           <div className="space-y-6">
             <div className="space-y-4">
               <h3 className="font-medium">Adicionar Serviço</h3>
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
+              <div className="space-y-4">
+                <div>
                   <Label htmlFor="new-service">Nome do Serviço</Label>
                   <Input 
                     id="new-service" 
                     value={newService} 
                     onChange={(e) => setNewService(e.target.value)}
                     placeholder="Ex: Eletricista"
+                    className="mt-1"
                   />
                 </div>
-                <Button onClick={handleAddService} disabled={saving || !newService.trim()}>
-                  <Plus className="h-4 w-4 mr-1" /> Adicionar
+                
+                <div>
+                  <Label htmlFor="new-service-desc">Descrição</Label>
+                  <Textarea 
+                    id="new-service-desc" 
+                    value={newServiceDesc} 
+                    onChange={(e) => setNewServiceDesc(e.target.value)}
+                    placeholder="Breve descrição do serviço"
+                    className="mt-1 resize-none"
+                    rows={3}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="service-icon">Ícone do Serviço (PNG, JPG, SVG até 500KB)</Label>
+                  <div className="mt-1 flex items-start gap-4">
+                    <div className="flex-1">
+                      <Input 
+                        id="service-icon" 
+                        type="file" 
+                        accept=".png,.jpg,.jpeg,.svg"
+                        onChange={handleIconChange}
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Formatos permitidos: PNG, JPG, SVG. Tamanho máximo: 500KB
+                      </p>
+                    </div>
+                    
+                    {iconPreview && (
+                      <div className="w-16 h-16 border rounded-md flex items-center justify-center overflow-hidden relative">
+                        <img src={iconPreview} alt="Preview" className="max-w-full max-h-full object-contain" />
+                        <button 
+                          className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5"
+                          onClick={() => {
+                            setIconFile(null);
+                            setIconPreview(null);
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="new-service-tags">Tags</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input 
+                      id="new-service-tags" 
+                      value={newTagInput} 
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      placeholder="Adicione tags para o serviço"
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                    />
+                    <Button onClick={handleAddTag} type="button">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {newServiceTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {newServiceTags.map((tag, index) => (
+                        <span 
+                          key={index} 
+                          className="inline-flex items-center px-2 py-1 rounded-full bg-primary/10 text-primary text-sm"
+                        >
+                          {tag}
+                          <button 
+                            className="ml-1 text-primary hover:text-primary-dark"
+                            onClick={() => handleRemoveTag(tag)}
+                          >
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <Button 
+                  onClick={handleAddService} 
+                  disabled={saving || !newService.trim()} 
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar Serviço
                 </Button>
               </div>
             </div>
@@ -430,7 +598,35 @@ const AdminServices: React.FC = () => {
                 {services.map((service) => (
                   <div key={service.id} className="space-y-3">
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                      <h4 className="font-medium">{service.name}</h4>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 flex items-center justify-center">
+                          {service.icon_url ? (
+                            <img 
+                              src={service.icon_url} 
+                              alt={service.name}
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          ) : (
+                            <ImageIcon className="h-5 w-5 text-gray-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{service.name}</h4>
+                          {service.description && (
+                            <p className="text-sm text-gray-500">{service.description}</p>
+                          )}
+                          {service.tags && service.tags.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Tag className="h-3 w-3 text-gray-400" />
+                              <div className="flex flex-wrap gap-1">
+                                {service.tags.map((tag, idx) => (
+                                  <span key={idx} className="text-xs text-gray-500">{tag}{idx < service.tags!.length - 1 ? ',' : ''}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <Button 
                         variant="ghost" 
                         size="icon"

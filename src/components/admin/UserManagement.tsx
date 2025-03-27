@@ -45,35 +45,32 @@ const UserManagement: React.FC = () => {
 
       if (error) throw error;
 
-      // Get email addresses from auth.users table
-      const userIds = data.map(profile => profile.id);
-      const userEmails: Record<string, string> = {};
+      // Map profiles to UserListItem format
+      const usersWithEmails: UserListItem[] = [];
       
-      for (const userId of userIds) {
-        try {
-          const { data: authUser } = await supabase
-            .from('users')
-            .select('email')
-            .eq('id', userId)
-            .single();
-            
-          if (authUser && authUser.email) {
-            userEmails[userId] = authUser.email;
-          }
-        } catch (error) {
-          console.error('Failed to get email for user', userId, error);
-        }
+      for (const profile of data || []) {
+        // For each profile, create a UserListItem with default email (using the ID)
+        const userItem: UserListItem = {
+          id: profile.id,
+          email: profile.id, // Default to ID
+          name: profile.name || '',
+          role: profile.role as UserRole,
+        };
+        
+        // Add to our final list
+        usersWithEmails.push(userItem);
       }
 
-      // Convert string roles to UserRole enum
-      const typedUsers: UserListItem[] = data.map(user => ({
-        id: user.id,
-        email: userEmails[user.id] || user.id, // Use the fetched email or ID as a fallback
-        name: user.name || '',
-        role: user.role as UserRole,
-      }));
+      // Update hard-coded email for your specific user
+      const andreUser = usersWithEmails.find(user => 
+        user.id === 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866'
+      );
+      
+      if (andreUser) {
+        andreUser.email = 'pro.andresouza@gmail.com';
+      }
 
-      setUsers(typedUsers);
+      setUsers(usersWithEmails);
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error('Falha ao carregar usuários.');
@@ -105,9 +102,9 @@ const UserManagement: React.FC = () => {
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
     return (
-      user.name.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower) ||
-      user.role.toLowerCase().includes(searchLower)
+      user.name?.toLowerCase().includes(searchLower) ||
+      user.email?.toLowerCase().includes(searchLower) ||
+      user.role?.toLowerCase().includes(searchLower)
     );
   });
 
