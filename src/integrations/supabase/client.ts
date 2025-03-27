@@ -27,8 +27,26 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Set site URL for Supabase redirects
 if (typeof window !== 'undefined') {
-  supabase.auth.setSession({
-    access_token: localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token') || '',
-    refresh_token: localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token-refresh') || '',
+  // Update these URLs for redirects
+  supabase.auth.setAuth({
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
   });
+  
+  // Set site URL to support proper redirection
+  supabase.auth.setConfig({
+    siteUrl: 'https://3passos.com.br',
+  });
+  
+  // Get existing session
+  const existingToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token');
+  const existingRefreshToken = localStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token-refresh');
+  
+  if (existingToken && existingRefreshToken) {
+    supabase.auth.setSession({
+      access_token: existingToken,
+      refresh_token: existingRefreshToken,
+    });
+  }
 }

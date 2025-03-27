@@ -73,39 +73,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth listener FIRST
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id);
+      
+      // Update session state synchronously
       setSession(session);
       
       if (session) {
-        try {
-          // Fetch profile data
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (profile) {
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              name: profile.name || '',
-              phone: profile.phone || '',
-              role: profile.role as UserRole,
-              createdAt: profile.created_at || session.user.created_at,
-            });
-          } else {
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              name: session.user.user_metadata?.name || '',
-              phone: session.user.user_metadata?.phone || '',
-              role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-              createdAt: session.user.created_at,
-            });
+        // Use setTimeout to prevent potential deadlocks with Supabase client
+        setTimeout(async () => {
+          try {
+            // Fetch profile data
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (profile) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: profile.name || '',
+                phone: profile.phone || '',
+                role: profile.role as UserRole,
+                createdAt: profile.created_at || session.user.created_at,
+              });
+            } else {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: session.user.user_metadata?.name || '',
+                phone: session.user.user_metadata?.phone || '',
+                role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
+                createdAt: session.user.created_at,
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching profile:', error);
           }
-        } catch (error) {
-          console.error('Error fetching profile:', error);
-        }
+        }, 0);
       } else {
         setUser(null);
       }

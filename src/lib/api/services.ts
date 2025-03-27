@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, ServiceItem } from '@/lib/types';
 
@@ -16,21 +15,36 @@ export async function getAllServices(): Promise<Service[]> {
   }
 
   try {
+    console.log('Fetching services from database...');
+    
     // Get services
     const { data: servicesData, error: servicesError } = await supabase
       .from('services')
       .select('*')
       .order('name');
     
-    if (servicesError) throw servicesError;
+    if (servicesError) {
+      console.error('Error fetching services:', servicesError);
+      throw servicesError;
+    }
 
+    if (!servicesData || servicesData.length === 0) {
+      console.log('No services found in database');
+      return [];
+    }
+
+    console.log(`Found ${servicesData.length} services`);
+    
     // Get all subservices in one query
     const { data: allSubServices, error: subServicesError } = await supabase
       .from('sub_services')
       .select('*')
       .order('name');
     
-    if (subServicesError) throw subServicesError;
+    if (subServicesError) {
+      console.error('Error fetching subservices:', subServicesError);
+      throw subServicesError;
+    }
 
     // Get all specialties in one query
     const { data: allSpecialties, error: specialtiesError } = await supabase
@@ -38,16 +52,19 @@ export async function getAllServices(): Promise<Service[]> {
       .select('*')
       .order('name');
     
-    if (specialtiesError) throw specialtiesError;
+    if (specialtiesError) {
+      console.error('Error fetching specialties:', specialtiesError);
+      throw specialtiesError;
+    }
 
     // Build the services structure
     const services: Service[] = servicesData.map(service => {
       // Filter subservices for this service
-      const serviceSubServices = allSubServices
+      const serviceSubServices = (allSubServices || [])
         .filter(subService => subService.service_id === service.id)
         .map(subService => {
           // Filter specialties for this subservice
-          const subServiceSpecialties = allSpecialties
+          const subServiceSpecialties = (allSpecialties || [])
             .filter(specialty => specialty.sub_service_id === subService.id)
             .map(specialty => ({
               id: specialty.id,
@@ -73,6 +90,7 @@ export async function getAllServices(): Promise<Service[]> {
     // Update cache
     servicesCache = services;
     lastFetchTime = now;
+    console.log('Services fetched and cached successfully');
     
     return services;
   } catch (error) {
@@ -86,6 +104,7 @@ export async function getAllServices(): Promise<Service[]> {
 export function clearServicesCache() {
   servicesCache = null;
   lastFetchTime = 0;
+  console.log('Services cache cleared');
 }
 
 // Get questions for a service, sub-service, or specialty
