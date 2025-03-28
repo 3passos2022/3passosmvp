@@ -9,21 +9,33 @@ import UserManagement from '@/components/admin/UserManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, LayoutGrid } from 'lucide-react';
 import ServiceManagement from '@/components/admin/ServiceManagement';
+import { toast } from 'sonner';
 
 const Admin: React.FC = () => {
   const { user, refreshUser } = useAuth();
 
   // Atualizar dados do usuário ao carregar a página
   useEffect(() => {
-    refreshUser();
+    const updateUserData = async () => {
+      await refreshUser();
+    };
+    
+    updateUserData();
+    
+    // Log para depuração
+    console.log("Admin page - Current user:", user);
   }, [refreshUser]);
 
-  // Redirect to homepage if not an admin
+  // Redirect to login if not logged in
   if (!user) {
+    toast.error("Você precisa estar logado para acessar esta página");
     return <Navigate to="/login" replace />;
   }
   
+  // Redirect to homepage if not an admin
   if (user.role !== UserRole.ADMIN) {
+    console.log("Access denied - User role:", user.role);
+    toast.error("Você não tem permissão para acessar esta página");
     return <Navigate to="/" replace />;
   }
 

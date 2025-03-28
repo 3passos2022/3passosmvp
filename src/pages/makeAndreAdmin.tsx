@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { UserRole } from '@/lib/types';
@@ -11,14 +11,42 @@ import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client';
 
 const MakeAndreAdmin: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
 
   // The user ID to promote to admin
   const userIdToPromote = '3fd93f8d-06a4-41db-98da-e84801a6bee8';
   const userName = 'Usuário Especificado';
   const userEmail = 'usuário solicitado';
+
+  // Verificar o papel atual do usuário ao carregar o componente
+  useEffect(() => {
+    async function checkCurrentRole() {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userIdToPromote)
+          .single();
+        
+        if (error) {
+          console.error('Erro ao verificar papel:', error);
+          return;
+        }
+        
+        setCurrentRole(data.role);
+        if (data.role === UserRole.ADMIN) {
+          setSuccess(true);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar papel do usuário:', error);
+      }
+    }
+    
+    checkCurrentRole();
+  }, [userIdToPromote]);
 
   const handleMakeAdmin = async () => {
     setLoading(true);
@@ -33,6 +61,12 @@ const MakeAndreAdmin: React.FC = () => {
       
       toast.success('Usuário promovido a administrador com sucesso!');
       setSuccess(true);
+      setCurrentRole(UserRole.ADMIN);
+      
+      // Atualize também o contexto de autenticação se o usuário atual for o promovido
+      if (user && user.id === userIdToPromote) {
+        await refreshUser();
+      }
     } catch (error) {
       console.error('Error making admin:', error);
       toast.error('Erro ao promover a administrador. Tente novamente.');
@@ -77,6 +111,11 @@ const MakeAndreAdmin: React.FC = () => {
                       <p className="font-medium">{userName}</p>
                       <p className="text-sm">Email: {userEmail}</p>
                       <p className="text-xs text-gray-500">ID: {userIdToPromote}</p>
+                      {currentRole && (
+                        <p className="text-xs bg-gray-200 inline-block px-2 py-1 rounded-full mt-1">
+                          Papel atual: {currentRole}
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -89,10 +128,12 @@ const MakeAndreAdmin: React.FC = () => {
                 
                 <Button 
                   onClick={handleMakeAdmin} 
-                  disabled={loading} 
+                  disabled={loading || currentRole === UserRole.ADMIN} 
                   className="w-full"
                 >
-                  {loading ? 'Processando...' : 'Promover a Administrador'}
+                  {loading ? 'Processando...' : 
+                   currentRole === UserRole.ADMIN ? 'Usuário já é Administrador' : 
+                   'Promover a Administrador'}
                 </Button>
               </>
             )}
