@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
 import Navbar from '@/components/Navbar';
@@ -8,12 +8,22 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import UserManagement from '@/components/admin/UserManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, LayoutGrid } from 'lucide-react';
+import ServiceManagement from '@/components/admin/ServiceManagement';
 
 const Admin: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  // Atualizar dados do usuário ao carregar a página
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   // Redirect to homepage if not an admin
-  if (!user || user.role !== UserRole.ADMIN) {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.role !== UserRole.ADMIN) {
     return <Navigate to="/" replace />;
   }
 
@@ -43,12 +53,9 @@ const Admin: React.FC = () => {
           </TabsContent>
           
           <TabsContent value="services">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-medium mb-2">Gerenciamento de Serviços</h3>
-              <p className="text-gray-500">
-                Funcionalidade em desenvolvimento. Em breve você poderá gerenciar os serviços da plataforma aqui.
-              </p>
-            </div>
+            <Routes>
+              <Route index element={<ServiceManagement />} />
+            </Routes>
           </TabsContent>
         </Tabs>
 
