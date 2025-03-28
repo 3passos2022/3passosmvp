@@ -15,21 +15,23 @@ const MakeAndreAdmin: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // The user ID to promote to admin
+  const userIdToPromote = '3fd93f8d-06a4-41db-98da-e84801a6bee8';
+  const userName = 'Usuário Especificado';
+  const userEmail = 'usuário solicitado';
+
   const handleMakeAdmin = async () => {
     setLoading(true);
     try {
-      // André's user ID
-      const andreId = 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866';
-      
-      // Directly update the user's role in the profiles table
+      // Update the user's role in the profiles table
       const { error } = await supabase
         .from('profiles')
         .update({ role: UserRole.ADMIN })
-        .eq('id', andreId);
+        .eq('id', userIdToPromote);
       
       if (error) throw error;
       
-      toast.success('André promovido a administrador com sucesso!');
+      toast.success('Usuário promovido a administrador com sucesso!');
       setSuccess(true);
     } catch (error) {
       console.error('Error making admin:', error);
@@ -58,7 +60,7 @@ const MakeAndreAdmin: React.FC = () => {
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
                 <h3 className="font-medium text-lg">Sucesso!</h3>
                 <p className="text-gray-600">
-                  André foi promovido a administrador e agora tem acesso ao painel administrativo.
+                  O usuário foi promovido a administrador e agora tem acesso ao painel administrativo.
                 </p>
               </div>
             ) : (
@@ -72,9 +74,9 @@ const MakeAndreAdmin: React.FC = () => {
                   </CardHeader>
                   <CardContent className="p-4 pt-0">
                     <div className="space-y-1">
-                      <p className="font-medium">André Souza</p>
-                      <p className="text-sm">Email: pro.andresouza@gmail.com</p>
-                      <p className="text-xs text-gray-500">ID: ad9e2a2a-0a39-4e49-80b6-a5699ca6a866</p>
+                      <p className="font-medium">{userName}</p>
+                      <p className="text-sm">Email: {userEmail}</p>
+                      <p className="text-xs text-gray-500">ID: {userIdToPromote}</p>
                     </div>
                   </CardContent>
                 </Card>
