@@ -19,7 +19,7 @@ const MakeAndreAdmin: React.FC = () => {
     setLoading(true);
     try {
       // André's user ID
-      const andreId = 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866';
+      const andreId = '3fd93f8d-06a4-41db-98da-e84801a6bee8';
       
       // Directly update the user's role in the profiles table
       const { error } = await supabase
@@ -74,7 +74,7 @@ const MakeAndreAdmin: React.FC = () => {
                     <div className="space-y-1">
                       <p className="font-medium">André Souza</p>
                       <p className="text-sm">Email: pro.andresouza@gmail.com</p>
-                      <p className="text-xs text-gray-500">ID: ad9e2a2a-0a39-4e49-80b6-a5699ca6a866</p>
+                      <p className="text-xs text-gray-500">ID:</p>
                     </div>
                   </CardContent>
                 </Card>

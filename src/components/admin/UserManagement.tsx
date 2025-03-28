@@ -63,7 +63,7 @@ const UserManagement: React.FC = () => {
 
       // Update hard-coded email for your specific user
       const andreUser = usersWithEmails.find(user => 
-        user.id === 'ad9e2a2a-0a39-4e49-80b6-a5699ca6a866'
+        user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
       );
       
       if (andreUser) {

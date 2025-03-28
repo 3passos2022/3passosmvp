@@ -53,8 +53,7 @@ const Navbar: React.FC = () => {
             whileTap={{ scale: 0.95 }}
             className="font-bold text-xl"
           >
-            <span className="text-primary">3</span>
-            <span>passos</span>
+            <span className="text-primary">3passos</span>
           </motion.div>
         </Link>
 

@@ -37,7 +37,7 @@ const Hero: React.FC = () => {
               transition={{ delay: 0.3, duration: 0.5 }}
               className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight"
             >
-              Serviços profissionais em <span className="text-gradient">3 passos simples</span>
+              Serviços profissionais em <span className="text-gradient">3passos simples</span>
             </motion.h1>
             
             <motion.p 
