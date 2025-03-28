@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import UserManagement from '@/components/admin/UserManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, LayoutGrid } from 'lucide-react';
@@ -47,15 +47,11 @@ const Admin: React.FC = () => {
           </TabsList>
           
           <TabsContent value="users">
-            <Routes>
-              <Route index element={<UserManagement />} />
-            </Routes>
+            <UserManagement />
           </TabsContent>
           
           <TabsContent value="services">
-            <Routes>
-              <Route index element={<ServiceManagement />} />
-            </Routes>
+            <ServiceManagement />
           </TabsContent>
         </Tabs>
 
