@@ -15,33 +15,43 @@ const MakeAndreAdmin: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // The user ID to promote to admin
+  // O ID do usuário a ser promovido para administrador
   const userIdToPromote = '3fd93f8d-06a4-41db-98da-e84801a6bee8';
-  const userName = 'Usuário Especificado';
-  const userEmail = 'usuário solicitado';
+  const userName = 'André Souza Admin';
+  const userEmail = 'pro.andresouza@gmail.com';
 
   // Verificar o papel atual do usuário ao carregar o componente
   useEffect(() => {
     async function checkCurrentRole() {
       try {
+        // Verificar se o usuário existe na tabela profiles
         const { data, error } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, name, id')
           .eq('id', userIdToPromote)
-          .single();
+          .maybeSingle();
         
         if (error) {
           console.error('Erro ao verificar papel:', error);
+          setError(`Erro ao verificar o papel: ${error.message}`);
           return;
         }
         
+        if (!data) {
+          setError(`Usuário com ID ${userIdToPromote} não encontrado na tabela profiles.`);
+          return;
+        }
+        
+        console.log('Dados do perfil encontrados:', data);
         setCurrentRole(data.role);
         if (data.role === UserRole.ADMIN) {
           setSuccess(true);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao verificar papel do usuário:', error);
+        setError(`Erro inesperado: ${error.message}`);
       }
     }
     
@@ -50,6 +60,7 @@ const MakeAndreAdmin: React.FC = () => {
 
   const handleMakeAdmin = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Update the user's role in the profiles table
       const { error } = await supabase
@@ -66,10 +77,12 @@ const MakeAndreAdmin: React.FC = () => {
       // Atualize também o contexto de autenticação se o usuário atual for o promovido
       if (user && user.id === userIdToPromote) {
         await refreshUser();
+        console.log('Dados do usuário atualizados após promoção:', user);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error making admin:', error);
       toast.error('Erro ao promover a administrador. Tente novamente.');
+      setError(`Falha ao atualizar: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -89,6 +102,12 @@ const MakeAndreAdmin: React.FC = () => {
           </CardHeader>
           
           <CardContent className="space-y-6 pt-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
+                {error}
+              </div>
+            )}
+            
             {success ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />

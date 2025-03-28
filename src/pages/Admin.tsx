@@ -17,7 +17,9 @@ const Admin: React.FC = () => {
   // Atualizar dados do usuário ao carregar a página
   useEffect(() => {
     const updateUserData = async () => {
+      console.log("Admin page - Refreshing user data");
       await refreshUser();
+      console.log("Admin page - User data refreshed");
     };
     
     updateUserData();
@@ -28,6 +30,7 @@ const Admin: React.FC = () => {
 
   // Redirect to login if not logged in
   if (!user) {
+    console.log("Admin page - User not logged in, redirecting to login");
     toast.error("Você precisa estar logado para acessar esta página");
     return <Navigate to="/login" replace />;
   }
