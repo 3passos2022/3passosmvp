@@ -18,17 +18,14 @@ const MakeAndreAdmin: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [profileExists, setProfileExists] = useState<boolean | null>(null);
 
-  // O ID do usuário a ser promovido para administrador
   const userIdToPromote = 'e8bcccb9-d1ba-494f-bfe8-9b9e9c8da5ca';
 
-  // Verificar se o perfil existe e o papel atual do usuário ao carregar o componente
   useEffect(() => {
     async function checkUserProfile() {
       setCheckingProfile(true);
       try {
         console.log('Verificando perfil do usuário:', userIdToPromote);
         
-        // Verificar se o perfil existe na tabela profiles
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role, name, id')
@@ -74,7 +71,6 @@ const MakeAndreAdmin: React.FC = () => {
     try {
       console.log('Criando perfil para usuário:', userIdToPromote);
       
-      // Usar função RPC para criar o perfil (bypass RLS)
       const { data, error } = await supabase.rpc('create_user_profile', { 
         user_id: userIdToPromote,
         user_name: 'André Souza',
@@ -109,7 +105,6 @@ const MakeAndreAdmin: React.FC = () => {
         throw new Error('É necessário criar um perfil primeiro');
       }
       
-      // Use a função RPC para atualizar o perfil para admin
       const { error } = await supabase.rpc('update_user_role', { 
         user_id: userIdToPromote,
         new_role: UserRole.ADMIN
@@ -121,7 +116,6 @@ const MakeAndreAdmin: React.FC = () => {
       setSuccess(true);
       setCurrentRole(UserRole.ADMIN);
       
-      // Atualize também o contexto de autenticação se o usuário atual for o promovido
       if (user && user.id === userIdToPromote) {
         await refreshUser();
         console.log('Dados do usuário atualizados após promoção:', user);
