@@ -22,6 +22,7 @@ interface UserListItem {
   email: string;
   name: string;
   role: UserRole;
+  profileExists: boolean;
 }
 
 const UserManagement: React.FC = () => {
@@ -29,6 +30,7 @@ const UserManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [promoting, setPromoting] = useState<string | null>(null);
+  const [creatingProfile, setCreatingProfile] = useState<string | null>(null);
   const { makeAdmin } = useAuth();
 
   useEffect(() => {
@@ -38,6 +40,7 @@ const UserManagement: React.FC = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
+      console.log('Carregando usuários...');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -55,6 +58,7 @@ const UserManagement: React.FC = () => {
           email: profile.id, // Default to ID
           name: profile.name || '',
           role: profile.role as UserRole,
+          profileExists: true,
         };
         
         // Add to our final list
@@ -70,6 +74,7 @@ const UserManagement: React.FC = () => {
         andreUser.email = 'pro.andresouza@gmail.com';
       }
 
+      console.log('Usuários carregados:', usersWithEmails.length);
       setUsers(usersWithEmails);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -79,9 +84,79 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleCreateProfile = async (userId: string, userName: string = '') => {
+    setCreatingProfile(userId);
+    try {
+      console.log('Criando perfil para usuário:', userId);
+      
+      // Verificar se o perfil já existe
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if (checkError) throw checkError;
+      
+      if (existingProfile) {
+        console.log('Perfil já existe para este usuário');
+        toast.info('Este usuário já possui um perfil');
+        return;
+      }
+      
+      // Inserir um novo perfil
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          name: userName || 'Usuário',
+          role: UserRole.CLIENT, // Função padrão
+          phone: '',
+        });
+      
+      if (error) throw error;
+      
+      toast.success('Perfil criado com sucesso!');
+      
+      // Atualizar a lista local
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? {...user, profileExists: true, role: UserRole.CLIENT} 
+          : user
+      ));
+      
+      // Recarregar a lista após um pequeno atraso
+      setTimeout(() => {
+        loadUsers();
+      }, 500);
+      
+    } catch (error: any) {
+      console.error('Error creating profile:', error);
+      toast.error('Falha ao criar perfil para o usuário.');
+    } finally {
+      setCreatingProfile(null);
+    }
+  };
+
   const handleMakeAdmin = async (userId: string) => {
     setPromoting(userId);
     try {
+      // Verificar se o perfil existe antes de promover
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (profileError) throw profileError;
+      
+      if (!profile) {
+        console.log('Perfil não encontrado, criando um novo...');
+        // Se o perfil não existir, criar um perfil primeiro
+        await handleCreateProfile(userId);
+      }
+      
+      // Agora promova o usuário a administrador
       await makeAdmin(userId);
       toast.success('Usuário promovido a administrador com sucesso!');
       
@@ -160,9 +235,11 @@ const UserManagement: React.FC = () => {
                       variant="outline" 
                       size="sm"
                       onClick={() => handleMakeAdmin(user.id)}
-                      disabled={promoting === user.id}
+                      disabled={promoting === user.id || creatingProfile === user.id}
                     >
-                      {promoting === user.id ? 'Processando...' : 'Promover a Admin'}
+                      {promoting === user.id ? 'Processando...' : 
+                       creatingProfile === user.id ? 'Criando perfil...' : 
+                       'Promover a Admin'}
                     </Button>
                   )}
                 </TableCell>
