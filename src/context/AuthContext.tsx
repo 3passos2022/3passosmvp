@@ -35,47 +35,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setSession(session);
       
-      // Fetch additional user data from profiles table
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle();
+      // Use the RPC function to get the user role safely
+      const { data: userRole, error: roleError } = await supabase.rpc('get_user_role', {
+        user_id: session.user.id
+      });
       
-      if (error) {
-        console.error('Error fetching profile data:', error);
-        // Continue with basic user data if profile fetch fails
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.name || '',
-          phone: session.user.user_metadata?.phone || '',
-          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-          createdAt: session.user.created_at,
-        });
-        return;
-      }
-      
-      if (profile) {
-        console.log('RefreshUser - Profile found with role:', profile.role);
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: profile.name || '',
-          phone: profile.phone || '',
-          role: profile.role as UserRole,
-          createdAt: profile.created_at || session.user.created_at,
-        });
+      if (roleError) {
+        console.error('Error fetching user role:', roleError);
+        // Try to get profile directly if RPC fails
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching profile data:', error);
+          // Continue with basic user data if profile fetch fails
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.name || '',
+            phone: session.user.user_metadata?.phone || '',
+            role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
+            createdAt: session.user.created_at,
+          });
+          return;
+        }
+        
+        if (profile) {
+          console.log('RefreshUser - Profile found with role:', profile.role);
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            name: profile.name || '',
+            phone: profile.phone || '',
+            role: profile.role as UserRole,
+            createdAt: profile.created_at || session.user.created_at,
+          });
+        } else {
+          // If no profile exists yet, use basic auth data
+          console.log('RefreshUser - No profile found, using basic auth data');
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.name || '',
+            phone: session.user.user_metadata?.phone || '',
+            role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
+            createdAt: session.user.created_at,
+          });
+        }
       } else {
-        // If no profile exists yet, use basic auth data
-        console.log('RefreshUser - No profile found, using basic auth data');
+        // We got the role from the RPC function
+        console.log('RefreshUser - Got role from RPC:', userRole);
+        
+        // Get the rest of the profile data
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('name, phone, created_at')
+          .eq('id', session.user.id)
+          .maybeSingle();
+          
         setUser({
           id: session.user.id,
           email: session.user.email || '',
-          name: session.user.user_metadata?.name || '',
-          phone: session.user.user_metadata?.phone || '',
-          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-          createdAt: session.user.created_at,
+          name: profile?.name || session.user.user_metadata?.name || '',
+          phone: profile?.phone || session.user.user_metadata?.phone || '',
+          role: userRole as UserRole,
+          createdAt: profile?.created_at || session.user.created_at,
         });
       }
     } catch (error) {

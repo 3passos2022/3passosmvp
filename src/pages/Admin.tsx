@@ -17,29 +17,33 @@ const Admin: React.FC = () => {
   const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [currentRole, setCurrentRole] = useState<string | null>(null);
 
-  // Atualizar dados do usuário ao carregar a página
+  // Atualizar dados do usuário ao carregar a página e ajustar a sessão se necessário
   useEffect(() => {
     const updateUserData = async () => {
       console.log("Admin page - Refreshing user data");
       try {
-        // Força a atualização do usuário para garantir que temos os dados mais recentes
-        await refreshUser();
-        
+        // Bypass the profiles table RLS by using the RPC function to check role
         if (user?.id) {
-          // Verificar diretamente no banco de dados o papel atual do usuário
-          console.log("Admin page - Checking user role in database for:", user.id);
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-            
+          console.log("Admin page - Checking user role via RPC for:", user.id);
+          
+          // Use the function endpoint that uses SECURITY DEFINER
+          const { data, error } = await supabase.rpc('get_user_role', {
+            user_id: user.id
+          });
+          
           if (error) {
             console.error("Error fetching user role:", error);
+            // Fall back to the user context role
             setCurrentRole(user.role);
-          } else if (profile) {
-            console.log("Admin page - User role from database:", profile.role);
-            setCurrentRole(profile.role);
+          } else {
+            console.log("Admin page - User role from RPC:", data);
+            setCurrentRole(data);
+            
+            // Check if context role is outdated and refresh if needed
+            if (data !== user.role) {
+              console.log("Admin page - Role mismatch, refreshing user context");
+              await refreshUser();
+            }
           }
         } else {
           console.log("Admin page - No user ID available");
@@ -57,7 +61,7 @@ const Admin: React.FC = () => {
     // Log para depuração
     console.log("Admin page - Current user:", user);
     
-  }, [refreshUser, user?.id]);
+  }, [refreshUser, user?.id, user?.role]);
 
   // Show loading state while checking role
   if (isCheckingRole) {
@@ -79,7 +83,7 @@ const Admin: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
   
-  // Check the role we got directly from the database
+  // Check the role we got directly from the RPC function
   const hasAdminAccess = currentRole === UserRole.ADMIN;
   
   // Redirect to homepage if not an admin
