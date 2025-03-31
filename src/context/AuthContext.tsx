@@ -36,11 +36,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       // Fetch additional user data from profiles table
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
         .single();
+      
+      if (error) {
+        console.error('Error fetching profile data:', error);
+        // Continue with basic user data if profile fetch fails
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          name: session.user.user_metadata?.name || '',
+          phone: session.user.user_metadata?.phone || '',
+          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
+          createdAt: session.user.created_at,
+        });
+        return;
+      }
       
       if (profile) {
         setUser({
@@ -82,11 +96,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(async () => {
           try {
             // Fetch profile data
-            const { data: profile } = await supabase
+            const { data: profile, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single();
+            
+            if (error) {
+              console.error('Error fetching profile:', error);
+              // Fall back to basic user data
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: session.user.user_metadata?.name || '',
+                phone: session.user.user_metadata?.phone || '',
+                role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
+                createdAt: session.user.created_at,
+              });
+              return;
+            }
             
             if (profile) {
               setUser({
@@ -219,6 +247,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       toast.success('Usuário promovido a administrador com sucesso');
+      
+      // If the current user is being promoted, refresh their session
+      if (user && user.id === userId) {
+        await refreshUser();
+      }
+      
       return;
     } catch (error: any) {
       console.error('Error making user admin:', error);
