@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, UserRole } from '@/lib/types';
@@ -56,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       if (profile) {
+        console.log('RefreshUser - Profile found with role:', profile.role);
         setUser({
           id: session.user.id,
           email: session.user.email || '',
@@ -66,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       } else {
         // If no profile exists yet, use basic auth data
+        console.log('RefreshUser - No profile found, using basic auth data');
         setUser({
           id: session.user.id,
           email: session.user.email || '',
@@ -116,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             
             if (profile) {
+              console.log('Auth listener - Profile found with role:', profile.role);
               setUser({
                 id: session.user.id,
                 email: session.user.email || '',
@@ -249,7 +253,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // If the current user is being promoted, refresh their session
       if (user && user.id === userId) {
+        // Force reauthorization to get updated claims
+        await supabase.auth.refreshSession();
         await refreshUser();
+        console.log('User promoted to admin, refreshed role:', user?.role);
       }
       
       return;

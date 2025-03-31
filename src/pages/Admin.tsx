@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
 import Navbar from '@/components/Navbar';
@@ -10,23 +10,67 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, LayoutGrid } from 'lucide-react';
 import ServiceManagement from '@/components/admin/ServiceManagement';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const Admin: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
 
   // Atualizar dados do usuário ao carregar a página
   useEffect(() => {
     const updateUserData = async () => {
       console.log("Admin page - Refreshing user data");
-      await refreshUser();
-      console.log("Admin page - User data refreshed");
+      try {
+        // Força a atualização do usuário para garantir que temos os dados mais recentes
+        await refreshUser();
+        
+        if (user?.id) {
+          // Verificar diretamente no banco de dados o papel atual do usuário
+          console.log("Admin page - Checking user role in database for:", user.id);
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+            
+          if (error) {
+            console.error("Error fetching user role:", error);
+            setCurrentRole(user.role);
+          } else if (profile) {
+            console.log("Admin page - User role from database:", profile.role);
+            setCurrentRole(profile.role);
+          }
+        } else {
+          console.log("Admin page - No user ID available");
+          setCurrentRole(null);
+        }
+      } catch (error) {
+        console.error("Error updating user data:", error);
+      } finally {
+        setIsCheckingRole(false);
+      }
     };
     
     updateUserData();
     
     // Log para depuração
     console.log("Admin page - Current user:", user);
-  }, [refreshUser]);
+    
+  }, [refreshUser, user?.id]);
+
+  // Show loading state while checking role
+  if (isCheckingRole) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 container mx-auto py-8 flex items-center justify-center">
+          <p>Verificando permissões de acesso...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   // Redirect to login if not logged in
   if (!user) {
@@ -35,9 +79,12 @@ const Admin: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
   
+  // Check the role we got directly from the database
+  const hasAdminAccess = currentRole === UserRole.ADMIN;
+  
   // Redirect to homepage if not an admin
-  if (user.role !== UserRole.ADMIN) {
-    console.log("Access denied - User role:", user.role);
+  if (!hasAdminAccess) {
+    console.log("Access denied - User role:", currentRole, "Expected:", UserRole.ADMIN);
     toast.error("Você não tem permissão para acessar esta página");
     return <Navigate to="/" replace />;
   }
