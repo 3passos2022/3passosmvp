@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -31,7 +30,7 @@ const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [promoting, setPromoting] = useState<string | null>(null);
   const [creatingProfile, setCreatingProfile] = useState<string | null>(null);
-  const { makeAdmin } = useAuth();
+  const { makeAdmin, user } = useAuth();
 
   useEffect(() => {
     loadUsers();
@@ -89,30 +88,13 @@ const UserManagement: React.FC = () => {
     try {
       console.log('Criando perfil para usuário:', userId);
       
-      // Verificar se o perfil já existe
-      const { data: existingProfile, error: checkError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .maybeSingle();
-        
-      if (checkError) throw checkError;
-      
-      if (existingProfile) {
-        console.log('Perfil já existe para este usuário');
-        toast.info('Este usuário já possui um perfil');
-        return;
-      }
-      
-      // Inserir um novo perfil
-      const { error } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          name: userName || 'Usuário',
-          role: UserRole.CLIENT, // Função padrão
-          phone: '',
-        });
+      // Use a service role function via RPC to create a profile
+      // This bypasses RLS policies by using the service role
+      const { data, error } = await supabase.rpc('create_user_profile', { 
+        user_id: userId,
+        user_name: userName || 'Usuário',
+        user_role: UserRole.CLIENT
+      });
       
       if (error) throw error;
       
@@ -152,8 +134,14 @@ const UserManagement: React.FC = () => {
       
       if (!profile) {
         console.log('Perfil não encontrado, criando um novo...');
-        // Se o perfil não existir, criar um perfil primeiro
-        await handleCreateProfile(userId);
+        // Se o perfil não existir, criar um perfil primeiro usando a RPC
+        const { error: createError } = await supabase.rpc('create_user_profile', { 
+          user_id: userId,
+          user_name: 'Usuário',
+          user_role: UserRole.CLIENT
+        });
+        
+        if (createError) throw createError;
       }
       
       // Agora promova o usuário a administrador

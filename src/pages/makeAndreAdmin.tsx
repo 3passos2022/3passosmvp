@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -28,19 +27,6 @@ const MakeAndreAdmin: React.FC = () => {
       setCheckingProfile(true);
       try {
         console.log('Verificando perfil do usuário:', userIdToPromote);
-        
-        // Verificar se o usuário existe no auth.users
-        const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userIdToPromote);
-        
-        if (authError) {
-          console.error('Erro ao verificar usuário auth:', authError);
-          setError(`Usuário não encontrado na autenticação: ${authError.message}`);
-          setProfileExists(false);
-          setCheckingProfile(false);
-          return;
-        }
-        
-        console.log('Usuário auth encontrado:', authUser);
         
         // Verificar se o perfil existe na tabela profiles
         const { data: profile, error: profileError } = await supabase
@@ -88,15 +74,12 @@ const MakeAndreAdmin: React.FC = () => {
     try {
       console.log('Criando perfil para usuário:', userIdToPromote);
       
-      // Inserir um novo perfil
-      const { error } = await supabase
-        .from('profiles')
-        .insert({
-          id: userIdToPromote,
-          name: 'André Souza',
-          role: UserRole.PROVIDER, // Inicialmente definir como provider
-          phone: '',
-        });
+      // Usar função RPC para criar o perfil (bypass RLS)
+      const { data, error } = await supabase.rpc('create_user_profile', { 
+        user_id: userIdToPromote,
+        user_name: 'André Souza',
+        user_role: UserRole.PROVIDER
+      });
       
       if (error) {
         console.error('Erro ao criar perfil:', error);
@@ -126,11 +109,11 @@ const MakeAndreAdmin: React.FC = () => {
         throw new Error('É necessário criar um perfil primeiro');
       }
       
-      // Directly update the user's role in the profiles table
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: UserRole.ADMIN })
-        .eq('id', userIdToPromote);
+      // Use a função RPC para atualizar o perfil para admin
+      const { error } = await supabase.rpc('update_user_role', { 
+        user_id: userIdToPromote,
+        new_role: UserRole.ADMIN
+      });
       
       if (error) throw error;
       

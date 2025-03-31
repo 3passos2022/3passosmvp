@@ -40,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching profile data:', error);
@@ -238,11 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const makeAdmin = async (userId: string) => {
     try {
-      // Update user role in profiles table
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: UserRole.ADMIN })
-        .eq('id', userId);
+      // Use RPC function to update user role
+      const { error } = await supabase.rpc('update_user_role', { 
+        user_id: userId,
+        new_role: UserRole.ADMIN
+      });
       
       if (error) throw error;
       
