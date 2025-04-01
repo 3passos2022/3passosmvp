@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -40,6 +41,7 @@ const UserManagement: React.FC = () => {
     setLoading(true);
     try {
       console.log('Carregando usuários...');
+      // Usar a função SECURITY DEFINER para garantir que não teremos o erro de recursão infinita
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -47,24 +49,24 @@ const UserManagement: React.FC = () => {
 
       if (error) throw error;
 
-      // Map profiles to UserListItem format
+      // Mapear perfis para formato UserListItem
       const usersWithEmails: UserListItem[] = [];
       
       for (const profile of data || []) {
-        // For each profile, create a UserListItem with default email (using the ID)
+        // Para cada perfil, criar um UserListItem com email padrão (usando o ID)
         const userItem: UserListItem = {
           id: profile.id,
-          email: profile.id, // Default to ID
+          email: profile.id, // Padrão para ID
           name: profile.name || '',
           role: profile.role as UserRole,
           profileExists: true,
         };
         
-        // Add to our final list
+        // Adicionar à nossa lista final
         usersWithEmails.push(userItem);
       }
 
-      // Update hard-coded email for your specific user
+      // Atualizar email codificado para seu usuário específico
       const andreUser = usersWithEmails.find(user => 
         user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
       );
@@ -88,8 +90,8 @@ const UserManagement: React.FC = () => {
     try {
       console.log('Criando perfil para usuário:', userId);
       
-      // Use a service role function via RPC to create a profile
-      // This bypasses RLS policies by using the service role
+      // Usar uma função de service role via RPC para criar um perfil
+      // Isso ignora políticas RLS usando o service role
       const { data, error } = await supabase.rpc('create_user_profile', { 
         user_id: userId,
         user_name: userName || 'Usuário',
@@ -144,11 +146,11 @@ const UserManagement: React.FC = () => {
         if (createError) throw createError;
       }
       
-      // Agora promova o usuário a administrador
+      // Agora promova o usuário a administrador usando a função RPC
       await makeAdmin(userId);
       toast.success('Usuário promovido a administrador com sucesso!');
       
-      // Update the local users list
+      // Atualizar a lista de usuários local
       setUsers(users.map(user => 
         user.id === userId 
           ? {...user, role: UserRole.ADMIN} 

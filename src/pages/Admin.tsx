@@ -22,25 +22,25 @@ const Admin: React.FC = () => {
     const updateUserData = async () => {
       console.log("Admin page - Refreshing user data");
       try {
-        // Bypass the profiles table RLS by using the RPC function to check role
+        // Verificar se o usuário está logado
         if (user?.id) {
           console.log("Admin page - Checking user role via RPC for:", user.id);
           
-          // Use the function endpoint that uses SECURITY DEFINER
+          // Usar a função SECURITY DEFINER para verificar o papel do usuário
           const { data, error } = await supabase.rpc('get_user_role', {
             user_id: user.id
           });
           
           if (error) {
             console.error("Error fetching user role:", error);
-            // Fall back to the user context role
+            // Fallback para o papel do contexto do usuário
             setCurrentRole(user.role);
           } else {
             console.log("Admin page - User role from RPC:", data);
-            // Store the role as a string from the RPC call
+            // Armazenar o papel como uma string da chamada RPC
             setCurrentRole(data);
             
-            // Check if context role is outdated and refresh if needed
+            // Verificar se o papel do contexto está desatualizado e atualizar se necessário
             if (data !== user.role) {
               console.log("Admin page - Role mismatch, refreshing user context");
               await refreshUser();
@@ -64,7 +64,7 @@ const Admin: React.FC = () => {
     
   }, [refreshUser, user?.id, user?.role]);
 
-  // Show loading state while checking role
+  // Mostrar estado de carregamento enquanto verifica o papel
   if (isCheckingRole) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -77,17 +77,17 @@ const Admin: React.FC = () => {
     );
   }
 
-  // Redirect to login if not logged in
+  // Redirecionar para login se não estiver logado
   if (!user) {
     console.log("Admin page - User not logged in, redirecting to login");
     toast.error("Você precisa estar logado para acessar esta página");
     return <Navigate to="/login" replace />;
   }
   
-  // Check the role we got directly from the RPC function
+  // Verificar o papel obtido diretamente da função RPC
   const hasAdminAccess = currentRole === UserRole.ADMIN;
   
-  // Redirect to homepage if not an admin
+  // Redirecionar para a página inicial se não for administrador
   if (!hasAdminAccess) {
     console.log("Access denied - User role:", currentRole, "Expected:", UserRole.ADMIN);
     toast.error("Você não tem permissão para acessar esta página");
