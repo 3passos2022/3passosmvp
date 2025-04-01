@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserRole } from '@/lib/types';
+import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,7 +54,7 @@ const Navbar: React.FC = () => {
             whileTap={{ scale: 0.95 }}
             className="font-bold text-xl"
           >
-            <span className="text-primary">3passos</span>
+            <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
           </motion.div>
         </Link>
 

@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { UserRole } from '@/lib/types';
 import { User, UserCircle, Briefcase } from 'lucide-react';
+import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -142,10 +143,7 @@ const Login: React.FC = () => {
         >
           <div className="text-center mb-8">
             <Link to="/" className="inline-block">
-              <h1 className="text-2xl font-bold">
-                <span className="text-primary">3</span>
-                <span>passos</span>
-              </h1>
+                 <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
             </Link>
           </div>
 

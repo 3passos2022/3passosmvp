@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import logoMenu from './../img/Logos/LOGOBRANCO.png';
 
 const Hero: React.FC = () => {
   return (
@@ -14,7 +15,7 @@ const Hero: React.FC = () => {
         <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto px-4 py-20 z-10">
+      <div className="container mx-auto px-10 py-20 z-10">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -35,7 +36,7 @@ const Hero: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight"
+              className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3 tracking-tight"
             >
               Serviços profissionais em <span className="text-gradient">3passos simples</span>
             </motion.h1>
@@ -82,7 +83,7 @@ const Hero: React.FC = () => {
               <div className="relative z-10 p-8 flex flex-col h-full justify-center">
                 <div className="flex items-center justify-center mb-8">
                   <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl">
-                    3
+                      <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
                   </div>
                 </div>
 

@@ -50,8 +50,8 @@ export async function getUserProfile(userId: string) {
     .select('*')
     .eq('id', userId)
     .maybeSingle();
+
+    if (error) throw error;
   
-  if (error) throw error;
-  
-  return data;
+  return data && console.log("OLHA O DATA AQUI",data);
 }
