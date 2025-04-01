@@ -823,7 +823,7 @@ const ServiceDetailsStep: React.FC<{
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Nome do c����modo/área (opcional)</Label>
+                        <Label>Nome do c�����modo/área (opcional)</Label>
                         <Input 
                           value={measurement.roomName} 
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
@@ -944,6 +944,7 @@ const QuoteRequestForm: React.FC = () => {
     
     try {
       const clientId = user?.id || null;
+      const isAnonymous = !user;
       
       const { data, error } = await supabase
         .from('quotes')
@@ -961,7 +962,7 @@ const QuoteRequestForm: React.FC = () => {
           state: formData.state || '',
           zip_code: formData.zipCode || '',
           description: formData.description || '',
-          is_anonymous: !user
+          is_anonymous: isAnonymous
         })
         .select()
         .single();

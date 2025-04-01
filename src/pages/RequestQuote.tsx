@@ -13,7 +13,7 @@ const RequestQuote: React.FC = () => {
   const { user } = useAuth();
   
   // Use React Query for fetching services with caching
-  const { isLoading, error } = useQuery({
+  const { isLoading, error, data: services } = useQuery({
     queryKey: ['services'],
     queryFn: getAllServices,
     staleTime: 5 * 60 * 1000, // 5 minutes cache
