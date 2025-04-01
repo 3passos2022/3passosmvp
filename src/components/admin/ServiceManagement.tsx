@@ -4,11 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Tag, FileImage, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, FileImage, Info, List } from 'lucide-react';
 import { createService, deleteService, getServicesWithMeta, updateService, uploadServiceIcon } from '@/lib/api/services';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -21,7 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import SubServiceManagement from './SubServiceManagement';
-import { supabase } from '@/integrations/supabase/client';
+import QuestionManagement from './QuestionManagement';
+import ItemManagement from './ItemManagement';
 
 interface ServiceFormData {
   id?: string;
@@ -44,6 +45,7 @@ const ServiceManagement: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('sub-services');
 
   // Fetch services
   const { data: services = [], isLoading, isError } = useQuery({
@@ -224,6 +226,10 @@ const ServiceManagement: React.FC = () => {
 
   const selectService = (serviceId: string) => {
     setSelectedServiceId(serviceId);
+  };
+
+  const getSelectedService = () => {
+    return services.find((service: any) => service.id === selectedServiceId);
   };
 
   if (isLoading) {
@@ -446,17 +452,56 @@ const ServiceManagement: React.FC = () => {
         
         <div className="lg:col-span-2">
           {selectedServiceId ? (
-            <SubServiceManagement 
-              serviceId={selectedServiceId} 
-              serviceName={services.find((s: any) => s.id === selectedServiceId)?.name || ''}
-            />
+            <Tabs 
+              defaultValue="sub-services" 
+              value={activeTab}
+              onValueChange={setActiveTab}
+            >
+              <TabsList className="mb-4">
+                <TabsTrigger value="sub-services" className="flex items-center gap-2">
+                  <List className="h-4 w-4" />
+                  <span>Sub-serviços</span>
+                </TabsTrigger>
+                <TabsTrigger value="questions" className="flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  <span>Perguntas</span>
+                </TabsTrigger>
+                <TabsTrigger value="items" className="flex items-center gap-2">
+                  <Tag className="h-4 w-4" />
+                  <span>Itens</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="sub-services">
+                <SubServiceManagement 
+                  serviceId={selectedServiceId} 
+                  serviceName={getSelectedService()?.name || ''}
+                />
+              </TabsContent>
+
+              <TabsContent value="questions">
+                <QuestionManagement
+                  serviceId={selectedServiceId}
+                  parentName={getSelectedService()?.name || ''}
+                  level="service"
+                />
+              </TabsContent>
+
+              <TabsContent value="items">
+                <ItemManagement
+                  serviceId={selectedServiceId}
+                  parentName={getSelectedService()?.name || ''}
+                  level="service"
+                />
+              </TabsContent>
+            </Tabs>
           ) : (
             <Card className="h-full flex items-center justify-center">
               <CardContent className="text-center py-10">
                 <Info className="h-16 w-16 mx-auto text-muted-foreground opacity-30" />
                 <h3 className="mt-4 text-lg font-medium">Selecione um serviço</h3>
                 <p className="text-muted-foreground mt-2">
-                  Selecione um serviço à esquerda para gerenciar seus sub-serviços e especialidades
+                  Selecione um serviço à esquerda para gerenciar seus sub-serviços e outros componentes
                 </p>
               </CardContent>
             </Card>

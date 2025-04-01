@@ -7,8 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, List } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SpecialtyManagement from './SpecialtyManagement';
+import QuestionManagement from './QuestionManagement';
+import ItemManagement from './ItemManagement';
 
 interface SubServiceFormData {
   id?: string;
@@ -32,6 +36,7 @@ const SubServiceManagement: React.FC<SubServiceManagementProps> = ({ serviceId, 
   });
   const [isEditing, setIsEditing] = useState(false);
   const [selectedSubServiceId, setSelectedSubServiceId] = useState<string | null>(null);
+  const [selectedSubServiceName, setSelectedSubServiceName] = useState<string>('');
 
   // Fetch sub-services for the current service
   const { data: subServices = [], isLoading } = useQuery({
@@ -58,6 +63,7 @@ const SubServiceManagement: React.FC<SubServiceManagementProps> = ({ serviceId, 
     });
     setIsEditing(false);
     setSelectedSubServiceId(null);
+    setSelectedSubServiceName('');
   }, [serviceId]);
 
   // Create sub-service mutation
@@ -131,6 +137,7 @@ const SubServiceManagement: React.FC<SubServiceManagementProps> = ({ serviceId, 
       queryClient.invalidateQueries({ queryKey: ['sub-services', serviceId] });
       if (selectedSubServiceId === currentSubService.id) {
         setSelectedSubServiceId(null);
+        setSelectedSubServiceName('');
       }
       toast.success('Sub-serviço excluído com sucesso');
     },
@@ -180,132 +187,180 @@ const SubServiceManagement: React.FC<SubServiceManagementProps> = ({ serviceId, 
     }
   };
 
+  const selectSubService = (subService: any) => {
+    setSelectedSubServiceId(subService.id);
+    setSelectedSubServiceName(subService.name);
+  };
+
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Sub-serviços de {serviceName}</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gerencie os sub-serviços disponíveis para {serviceName}
-          </p>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Sub-serviços de {serviceName}</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Gerencie os sub-serviços disponíveis para {serviceName}
+            </p>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(true);
+                }}
+                size="sm"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Sub-serviço
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px]">
+              <DialogHeader>
+                <DialogTitle>{isEditing ? 'Editar Sub-serviço' : 'Novo Sub-serviço'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="text-sm font-medium">
+                    Nome do Sub-serviço <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="name"
+                    value={currentSubService.name}
+                    onChange={(e) => setCurrentSubService({...currentSubService, name: e.target.value})}
+                    placeholder="Ex: Instalação de Tomadas, Reparos Hidráulicos"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="description" className="text-sm font-medium">
+                    Descrição
+                  </label>
+                  <Textarea
+                    id="description"
+                    value={currentSubService.description || ''}
+                    onChange={(e) => setCurrentSubService({...currentSubService, description: e.target.value})}
+                    placeholder="Descreva brevemente este sub-serviço"
+                    rows={3}
+                  />
+                </div>
+                
+                <DialogFooter>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      resetForm();
+                      setIsDialogOpen(false);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createSubServiceMutation.isPending || updateSubServiceMutation.isPending}
+                  >
+                    {createSubServiceMutation.isPending || updateSubServiceMutation.isPending
+                      ? 'Salvando...'
+                      : isEditing 
+                        ? 'Atualizar' 
+                        : 'Criar'
+                    }
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-10">Carregando sub-serviços...</div>
+          ) : subServices.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              Nenhum sub-serviço cadastrado para este serviço.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {subServices.map((subService: any) => (
+                <Card 
+                  key={subService.id} 
+                  className={`hover:bg-muted/50 transition-colors cursor-pointer ${
+                    selectedSubServiceId === subService.id ? 'border-primary' : ''
+                  }`}
+                  onClick={() => selectSubService(subService)}
+                >
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-medium">{subService.name}</h3>
+                      {subService.description && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {subService.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSubServiceEdit(subService);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Editar</span>
+                      </Button>
+                      <Button
+                        variant="ghost" 
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSubServiceDelete(subService.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Excluir</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {selectedSubServiceId && (
+        <div className="mt-6">
+          <Tabs defaultValue="specialties">
+            <TabsList>
+              <TabsTrigger value="specialties">Especialidades</TabsTrigger>
+              <TabsTrigger value="questions">Perguntas</TabsTrigger>
+              <TabsTrigger value="items">Itens</TabsTrigger>
+            </TabsList>
+            <TabsContent value="specialties" className="pt-4">
+              <SpecialtyManagement subServiceId={selectedSubServiceId} subServiceName={selectedSubServiceName} />
+            </TabsContent>
+            <TabsContent value="questions" className="pt-4">
+              <QuestionManagement 
+                subServiceId={selectedSubServiceId}
+                parentName={selectedSubServiceName}
+                level="subService"
+              />
+            </TabsContent>
+            <TabsContent value="items" className="pt-4">
+              <ItemManagement 
+                subServiceId={selectedSubServiceId}
+                parentName={selectedSubServiceName}
+                level="subService"
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={() => {
-                resetForm();
-                setIsDialogOpen(true);
-              }}
-              size="sm"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Sub-serviço
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px]">
-            <DialogHeader>
-              <DialogTitle>{isEditing ? 'Editar Sub-serviço' : 'Novo Sub-serviço'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="name" className="text-sm font-medium">
-                  Nome do Sub-serviço <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  id="name"
-                  value={currentSubService.name}
-                  onChange={(e) => setCurrentSubService({...currentSubService, name: e.target.value})}
-                  placeholder="Ex: Instalação de Tomadas, Reparos Hidráulicos"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="description" className="text-sm font-medium">
-                  Descrição
-                </label>
-                <Textarea
-                  id="description"
-                  value={currentSubService.description || ''}
-                  onChange={(e) => setCurrentSubService({...currentSubService, description: e.target.value})}
-                  placeholder="Descreva brevemente este sub-serviço"
-                  rows={3}
-                />
-              </div>
-              
-              <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    resetForm();
-                    setIsDialogOpen(false);
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={createSubServiceMutation.isPending || updateSubServiceMutation.isPending}
-                >
-                  {createSubServiceMutation.isPending || updateSubServiceMutation.isPending
-                    ? 'Salvando...'
-                    : isEditing 
-                      ? 'Atualizar' 
-                      : 'Criar'
-                  }
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      
-      <CardContent>
-        {isLoading ? (
-          <div className="text-center py-10">Carregando sub-serviços...</div>
-        ) : subServices.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            Nenhum sub-serviço cadastrado para este serviço.
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
-            {subServices.map((subService: any) => (
-              <Card key={subService.id} className="hover:bg-muted/50 transition-colors">
-                <CardContent className="p-4 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-medium">{subService.name}</h3>
-                    {subService.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {subService.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleSubServiceEdit(subService)}
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">Editar</span>
-                    </Button>
-                    <Button
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleSubServiceDelete(subService.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Excluir</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 
