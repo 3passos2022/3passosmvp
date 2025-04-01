@@ -96,24 +96,24 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
     mutationFn: async (formData: QuestionFormData) => {
       try {
         // First, insert the question
-        const questionData: any = {
+        const questionPayload: any = {
           question: formData.question
         };
         
         if (level === 'service' && serviceId) {
-          questionData.service_id = serviceId;
+          questionPayload.service_id = serviceId;
         } else if (level === 'subService' && subServiceId) {
-          questionData.sub_service_id = subServiceId;
-          if (serviceId) questionData.service_id = serviceId;
+          questionPayload.sub_service_id = subServiceId;
+          if (serviceId) questionPayload.service_id = serviceId;
         } else if (level === 'specialty' && specialtyId) {
-          questionData.specialty_id = specialtyId;
-          if (subServiceId) questionData.sub_service_id = subServiceId;
-          if (serviceId) questionData.service_id = serviceId;
+          questionPayload.specialty_id = specialtyId;
+          if (subServiceId) questionPayload.sub_service_id = subServiceId;
+          if (serviceId) questionPayload.service_id = serviceId;
         }
         
-        const { data: questionData, error: questionError } = await supabase
+        const { data: newQuestion, error: questionError } = await supabase
           .from('service_questions')
-          .insert([questionData])
+          .insert([questionPayload])
           .select('id')
           .single();
         
@@ -124,7 +124,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
         
         if (options.length > 0) {
           const optionsData = options.map(option => ({
-            question_id: questionData.id,
+            question_id: newQuestion.id,
             option_text: option.text
           }));
           
@@ -135,7 +135,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
           if (optionsError) throw optionsError;
         }
         
-        return questionData.id;
+        return newQuestion.id;
       } catch (error) {
         console.error('Error creating question:', error);
         throw error;
