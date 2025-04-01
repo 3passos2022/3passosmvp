@@ -666,6 +666,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_user_role: {
+        Args: {
+          user_id: string
+        }
+        Returns: string
+      }
       update_user_role: {
         Args: {
           user_id: string

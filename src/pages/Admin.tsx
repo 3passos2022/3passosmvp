@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
@@ -37,6 +36,7 @@ const Admin: React.FC = () => {
             setCurrentRole(user.role);
           } else {
             console.log("Admin page - User role from RPC:", data);
+            // Store the role as a string from the RPC call
             setCurrentRole(data);
             
             // Check if context role is outdated and refresh if needed

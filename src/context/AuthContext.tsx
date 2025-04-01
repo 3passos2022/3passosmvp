@@ -36,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       // Use the RPC function to get the user role safely
+      // This function was created in our SQL migration
       const { data: userRole, error: roleError } = await supabase.rpc('get_user_role', {
         user_id: session.user.id
       });
@@ -86,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
-        // We got the role from the RPC function
+        // We got the role from the RPC function, convert string to UserRole
         console.log('RefreshUser - Got role from RPC:', userRole);
         
         // Get the rest of the profile data
