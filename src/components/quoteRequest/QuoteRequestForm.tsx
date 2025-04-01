@@ -939,12 +939,12 @@ const QuoteRequestForm: React.FC = () => {
       toast.error("Por favor, preencha todos os campos obrigatórios");
       return;
     }
-    
+/*     testando exclusão desse trecho.
     if (!user) {
       toast.error("Você precisa estar logado para solicitar um orçamento");
       navigate("/login", { state: { from: "/request-quote", formData } });
       return;
-    }
+    } */
     
     setIsSubmitting(true);
     
@@ -952,7 +952,7 @@ const QuoteRequestForm: React.FC = () => {
       const { data, error } = await supabase
         .from('quotes')
         .insert({
-          client_id: user.id,
+          client_id: user && user.id || null,
           service_id: formData.serviceId,
           sub_service_id: formData.subServiceId || null,
           specialty_id: formData.specialtyId || null,
