@@ -931,27 +931,23 @@ const QuoteRequestForm: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      const address = {
-        street: formData.street || '',
-        number: formData.number || '',
-        complement: formData.complement,
-        neighborhood: formData.neighborhood || '',
-        city: formData.city || '',
-        state: formData.state || '',
-        zipCode: formData.zipCode || '',
-      };
-      
       const { data, error } = await supabase
         .from('quotes')
-        .insert([{
+        .insert({
           client_id: user.id,
           service_id: formData.serviceId,
           sub_service_id: formData.subServiceId || null,
           specialty_id: formData.specialtyId || null,
           status: 'pending',
-          address,
+          street: formData.street || '',
+          number: formData.number || '',
+          complement: formData.complement || null,
+          neighborhood: formData.neighborhood || '',
+          city: formData.city || '',
+          state: formData.state || '',
+          zip_code: formData.zipCode || '',
           description: formData.description || '',
-        }])
+        })
         .select()
         .single();
       
