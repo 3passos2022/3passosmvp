@@ -147,35 +147,50 @@ export type Database = {
         Row: {
           bio: string | null
           city: string | null
+          complement: string | null
           created_at: string | null
           id: string
           latitude: number | null
           longitude: number | null
           neighborhood: string | null
+          number: string | null
           provider_id: string
           service_radius_km: number | null
+          state: string | null
+          street: string | null
+          zip_code: string | null
         }
         Insert: {
           bio?: string | null
           city?: string | null
+          complement?: string | null
           created_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           neighborhood?: string | null
+          number?: string | null
           provider_id: string
           service_radius_km?: number | null
+          state?: string | null
+          street?: string | null
+          zip_code?: string | null
         }
         Update: {
           bio?: string | null
           city?: string | null
+          complement?: string | null
           created_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           neighborhood?: string | null
+          number?: string | null
           provider_id?: string
           service_radius_km?: number | null
+          state?: string | null
+          street?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {

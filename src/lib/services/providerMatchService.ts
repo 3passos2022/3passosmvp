@@ -95,7 +95,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           settings.latitude, 
           settings.longitude
         );
-        isWithinRadius = distance <= (settings.service_radius_km || 10);
+        
+        // Definir o raio como o valor da configuração ou um valor padrão de 0 (todo o Brasil)
+        const serviceRadius = settings.service_radius_km || 0;
+        
+        // Se o raio for 0, o prestador atende todo o Brasil
+        isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
       }
       
       // Calcular preço básico para o serviço
@@ -149,7 +154,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       // Buscar avaliação média
       const { data: ratings } = await supabase
         .from('quotes')
-        .select('rating');
+        .select('rating')
+        .eq('provider_id', provider.provider.userId);
         
       // Verificar se temos ratings válidos
       if (ratings && ratings.length > 0) {

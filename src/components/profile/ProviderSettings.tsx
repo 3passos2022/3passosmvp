@@ -11,21 +11,40 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { geocodeAddress } from '@/lib/services/googleMapsService';
 
 const settingsSchema = z.object({
   bio: z.string().max(500, 'A bio deve ter no máximo 500 caracteres'),
   serviceRadiusKm: z.number().min(0, 'O raio de serviço não pode ser negativo').max(500, 'O raio máximo é de 500km'),
+  street: z.string().min(1, 'Rua é obrigatória'),
+  number: z.string().min(1, 'Número é obrigatório'),
+  complement: z.string().optional(),
+  neighborhood: z.string().min(1, 'Bairro é obrigatório'),
+  city: z.string().min(1, 'Cidade é obrigatória'),
+  state: z.string().min(1, 'Estado é obrigatório'),
+  zipCode: z.string().min(1, 'CEP é obrigatório')
 });
 
 const ProviderSettings: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
   const [settings, setSettings] = useState<{
     id?: string;
     bio?: string;
     serviceRadiusKm?: number;
+    street?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    latitude?: number;
+    longitude?: number;
   }>({});
 
   const {
@@ -39,6 +58,13 @@ const ProviderSettings: React.FC = () => {
     defaultValues: {
       bio: '',
       serviceRadiusKm: 0,
+      street: '',
+      number: '',
+      complement: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+      zipCode: '',
     },
   });
 
@@ -63,6 +89,13 @@ const ProviderSettings: React.FC = () => {
           setSettings(data);
           setValue('bio', data.bio || '');
           setValue('serviceRadiusKm', data.service_radius_km || 0);
+          setValue('street', data.street || '');
+          setValue('number', data.number || '');
+          setValue('complement', data.complement || '');
+          setValue('neighborhood', data.neighborhood || '');
+          setValue('city', data.city || '');
+          setValue('state', data.state || '');
+          setValue('zipCode', data.zip_code || '');
         }
       } catch (error) {
         console.error('Error loading provider settings:', error);
@@ -75,15 +108,54 @@ const ProviderSettings: React.FC = () => {
     loadSettings();
   }, [user, setValue]);
 
+  const handleGeocodeAddress = async (formData: z.infer<typeof settingsSchema>) => {
+    try {
+      setGeocoding(true);
+      const fullAddress = `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city}, ${formData.state}, ${formData.zipCode}`;
+      const location = await geocodeAddress(fullAddress);
+      
+      if (!location) {
+        throw new Error('Não foi possível geocodificar o endereço');
+      }
+
+      return {
+        latitude: location.lat,
+        longitude: location.lng
+      };
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      toast.error('Não foi possível obter as coordenadas do endereço. Verifique se as informações estão corretas.');
+      return null;
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   const onSubmit = async (data: z.infer<typeof settingsSchema>) => {
     if (!user) return;
     
     setSaving(true);
     try {
+      // Geocodificar o endereço para obter latitude e longitude
+      const coordinates = await handleGeocodeAddress(data);
+      if (!coordinates) {
+        setSaving(false);
+        return;
+      }
+
       const settingsData = {
         provider_id: user.id,
         bio: data.bio,
         service_radius_km: data.serviceRadiusKm,
+        street: data.street,
+        number: data.number,
+        complement: data.complement || null,
+        neighborhood: data.neighborhood,
+        city: data.city,
+        state: data.state,
+        zip_code: data.zipCode,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
       };
       
       if (settings.id) {
@@ -140,7 +212,10 @@ const ProviderSettings: React.FC = () => {
               </p>
             </div>
             
+            <Separator className="my-4" />
+            
             <div className="space-y-4">
+              <h3 className="text-md font-medium">Raio de Atendimento</h3>
               <Label>Raio de Atendimento: {serviceRadiusKm} km</Label>
               <Slider 
                 min={0} 
@@ -163,8 +238,117 @@ const ProviderSettings: React.FC = () => {
               </p>
             </div>
             
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Configurações'}
+            <Separator className="my-4" />
+            
+            <div>
+              <h3 className="text-md font-medium mb-4">Endereço</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Seu endereço será utilizado para calcular a distância até os clientes, mas não será exibido publicamente.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="street">Rua</Label>
+                  <Input 
+                    id="street" 
+                    placeholder="Rua/Avenida" 
+                    {...register('street')}
+                  />
+                  {errors.street && (
+                    <p className="text-sm text-red-500">{errors.street.message}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="number">Número</Label>
+                  <Input 
+                    id="number" 
+                    placeholder="Número" 
+                    {...register('number')}
+                  />
+                  {errors.number && (
+                    <p className="text-sm text-red-500">{errors.number.message}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="complement">Complemento</Label>
+                  <Input 
+                    id="complement" 
+                    placeholder="Complemento (opcional)" 
+                    {...register('complement')}
+                  />
+                  {errors.complement && (
+                    <p className="text-sm text-red-500">{errors.complement.message}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="neighborhood">Bairro</Label>
+                  <Input 
+                    id="neighborhood" 
+                    placeholder="Bairro" 
+                    {...register('neighborhood')}
+                  />
+                  {errors.neighborhood && (
+                    <p className="text-sm text-red-500">{errors.neighborhood.message}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="city">Cidade</Label>
+                  <Input 
+                    id="city" 
+                    placeholder="Cidade" 
+                    {...register('city')}
+                  />
+                  {errors.city && (
+                    <p className="text-sm text-red-500">{errors.city.message}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="state">Estado</Label>
+                  <Input 
+                    id="state" 
+                    placeholder="Estado" 
+                    {...register('state')}
+                  />
+                  {errors.state && (
+                    <p className="text-sm text-red-500">{errors.state.message}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">CEP</Label>
+                  <Input 
+                    id="zipCode" 
+                    placeholder="CEP" 
+                    {...register('zipCode')}
+                  />
+                  {errors.zipCode && (
+                    <p className="text-sm text-red-500">{errors.zipCode.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <Button 
+              type="submit" 
+              disabled={saving || geocoding} 
+              className="w-full md:w-auto"
+            >
+              {saving || geocoding ? (
+                <>
+                  <span className="mr-2">
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </span>
+                  {geocoding ? 'Obtendo coordenadas...' : 'Salvando...'}
+                </>
+              ) : 'Salvar Configurações'}
             </Button>
           </form>
         </CardContent>
