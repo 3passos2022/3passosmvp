@@ -684,9 +684,21 @@ export type Database = {
         }
         Returns: string
       }
+      get_user_role_from_id: {
+        Args: {
+          user_id: string
+        }
+        Returns: string
+      }
       is_admin: {
         Args: {
           user_id: string
+        }
+        Returns: boolean
+      }
+      is_anonymous_quote: {
+        Args: {
+          quote_id: string
         }
         Returns: boolean
       }

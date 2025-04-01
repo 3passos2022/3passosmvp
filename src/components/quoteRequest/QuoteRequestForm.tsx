@@ -961,7 +961,7 @@ const QuoteRequestForm: React.FC = () => {
           state: formData.state || '',
           zip_code: formData.zipCode || '',
           description: formData.description || '',
-          is_anonymous: !user,
+          is_anonymous: !user
         })
         .select()
         .single();
@@ -1040,7 +1040,7 @@ const QuoteRequestForm: React.FC = () => {
       };
       
       const quoteDetails = {
-        quoteId: quoteId,
+        id: quoteId,
         serviceId: formData.serviceId || '',
         subServiceId: formData.subServiceId || '',
         specialtyId: formData.specialtyId || '',

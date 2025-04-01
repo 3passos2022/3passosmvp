@@ -273,9 +273,6 @@ export const sendQuoteToProvider = async (
   providerId: string
 ): Promise<{ success: boolean; message: string; quoteId?: string; requiresLogin?: boolean }> => {
   try {
-    // Verificar se o usuário está autenticado ou se é um orçamento anônimo
-    const clientId = quoteDetails.clientId || null;
-    
     // Se não tivermos um quote ID existente, precisamos criá-lo
     if (!quoteDetails.id) {
       return { success: false, message: 'ID do orçamento não fornecido', requiresLogin: false };
