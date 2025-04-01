@@ -23,6 +23,7 @@ export interface Service {
 export interface SubService {
   id: string;
   name: string;
+  description?: string;
   serviceId: string;
   specialties: Specialty[];
 }

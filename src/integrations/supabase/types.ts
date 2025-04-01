@@ -627,18 +627,21 @@ export type Database = {
       sub_services: {
         Row: {
           created_at: string | null
+          description: string | null
           id: string
           name: string
           service_id: string
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           id?: string
           name: string
           service_id: string
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           id?: string
           name?: string
           service_id?: string
