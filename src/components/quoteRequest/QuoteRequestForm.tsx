@@ -15,7 +15,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+  } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -932,7 +932,9 @@ const QuoteRequestForm: React.FC = () => {
     );
   };
   
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
     if (!canSubmit()) {
       toast.error("Por favor, preencha todos os campos obrigatórios");
       return;
@@ -1030,8 +1032,41 @@ const QuoteRequestForm: React.FC = () => {
         }
       }
       
-      toast.success('Orçamento enviado com sucesso!');
-      navigate('/profile/quotes');
+      const address = {
+        street: formData.street,
+        number: formData.number,
+        complement: formData.complement,
+        neighborhood: formData.neighborhood,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode
+      };
+      
+      const additionalInfo = {
+        serviceName: formData.serviceName,
+        subServiceName: formData.subServiceName,
+        specialtyName: formData.specialtyName,
+        items: formData.itemQuantities,
+        measurements: formData.measurements,
+        description: formData.description
+      };
+      
+      const quoteDetails = {
+        serviceId: selectedService?.id || '',
+        subServiceId: selectedSubService?.id || '',
+        specialtyId: selectedSpecialty?.id || '',
+        serviceName: selectedService?.name || '',
+        subServiceName: selectedSubService?.name || '',
+        specialtyName: selectedSpecialty?.name || '',
+        items: selectedItems,
+        measurements: measurements,
+        address: address,
+        description: additionalInfo
+      };
+      
+      sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
+      
+      navigate('/prestadoresencontrados', { state: { quoteDetails } });
       
     } catch (error) {
       console.error('Error:', error);

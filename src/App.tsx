@@ -16,6 +16,7 @@ import MakeAndreAdmin from "./pages/makeAndreAdmin";
 
 // Lazy loaded pages for better performance
 const RequestQuote = lazy(() => import("./pages/RequestQuote"));
+const ProvidersFound = lazy(() => import("./pages/ProvidersFound"));
 const Services = lazy(() => import("./pages/Services"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -43,6 +44,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/request-quote" element={<RequestQuote />} />
+                <Route path="/prestadoresencontrados" element={<ProvidersFound />} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/services/:serviceId" element={<Services />} />
                 <Route path="/profile" element={<Profile />} />

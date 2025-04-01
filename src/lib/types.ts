@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   email: string;
@@ -72,9 +71,12 @@ export interface ProviderProfile {
   bio: string;
   averageRating: number;
   specialties: Specialty[];
+  name?: string;
+  phone?: string;
+  city?: string;
+  neighborhood?: string;
 }
 
-// Define types for our multi-step quote form
 export interface ServiceQuestion {
   id: string;
   question: string;
