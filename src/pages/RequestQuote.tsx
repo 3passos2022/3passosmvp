@@ -68,7 +68,7 @@ const RequestQuote: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <QuoteRequestForm />
+                <QuoteRequestForm services={services} />
               )}
             </div>
           </motion.div>

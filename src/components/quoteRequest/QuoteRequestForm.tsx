@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, ServiceItem } from '@/lib/types';
-import { getAllServices, getQuestions, getServiceItems } from '@/lib/api/services';
+import { getQuestions, getServiceItems } from '@/lib/api/services';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -91,6 +91,10 @@ interface FormData {
     length: number;
     height?: number;
   }[];
+}
+
+interface QuoteRequestFormProps {
+  services?: Service[];
 }
 
 const AddressStep: React.FC<{
@@ -249,31 +253,24 @@ const ServiceStep: React.FC<{
   onNext: () => void;
   formData: FormData;
   updateFormData: (data: Partial<FormData>) => void;
-}> = ({ onNext, formData, updateFormData }) => {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
+  services?: Service[];
+}> = ({ onNext, formData, updateFormData, services = [] }) => {
+  const [loading, setLoading] = useState(!services || services.length === 0);
   const [selectedService, setSelectedService] = useState<string>(formData.serviceId || '');
   const [selectedSubService, setSelectedSubService] = useState<string>(formData.subServiceId || '');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>(formData.specialtyId || '');
+  const [servicesList, setServicesList] = useState<Service[]>(services || []);
   
-  const subServices = services.find(s => s.id === selectedService)?.subServices || [];
+  const subServices = servicesList.find(s => s.id === selectedService)?.subServices || [];
   const specialties = subServices.find(s => s.id === selectedSubService)?.specialties || [];
 
   useEffect(() => {
-    async function loadServices() {
-      try {
-        const servicesData = await getAllServices();
-        setServices(servicesData);
-      } catch (error) {
-        console.error('Error loading services:', error);
-        toast.error('Erro ao carregar serviços');
-      } finally {
-        setLoading(false);
-      }
+    if (services && services.length > 0) {
+      setServicesList(services);
+      setLoading(false);
+      return;
     }
-    
-    loadServices();
-  }, []);
+  }, [services]);
 
   const handleServiceChange = (serviceId: string) => {
     setSelectedService(serviceId);
@@ -904,7 +901,7 @@ const ServiceDetailsStep: React.FC<{
   );
 };
 
-const QuoteRequestForm: React.FC = () => {
+const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -969,7 +966,7 @@ const QuoteRequestForm: React.FC = () => {
       
       if (error) {
         console.error('Error submitting quote:', error);
-        toast.error('Erro ao enviar o orçamento. Por favor tente novamente.');
+        toast.error(`Erro ao enviar o orçamento: ${error.message}`);
         return;
       }
       
@@ -1075,6 +1072,7 @@ const QuoteRequestForm: React.FC = () => {
           onNext={nextStep}
           formData={formData}
           updateFormData={updateFormData}
+          services={services}
         />
       )
     },
