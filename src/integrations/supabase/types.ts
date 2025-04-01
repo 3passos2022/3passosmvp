@@ -702,6 +702,23 @@ export type Database = {
         }
         Returns: boolean
       }
+      submit_quote: {
+        Args: {
+          p_service_id: string
+          p_sub_service_id?: string
+          p_specialty_id?: string
+          p_description?: string
+          p_street?: string
+          p_number?: string
+          p_complement?: string
+          p_neighborhood?: string
+          p_city?: string
+          p_state?: string
+          p_zip_code?: string
+          p_is_anonymous?: boolean
+        }
+        Returns: string
+      }
       update_user_role: {
         Args: {
           user_id: string
