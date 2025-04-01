@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -431,7 +431,9 @@ const ServiceDetailsStep: React.FC<{
   const [allMeasurementsFilled, setAllMeasurementsFilled] = useState(false);
   const [visitedSteps, setVisitedSteps] = useState<string[]>([]);
   const [allStepsCompleted, setAllStepsCompleted] = useState(false);
-
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userInteracted, setUserInteracted] = useState(false);
   const [requiredSteps, setRequiredSteps] = useState<string[]>([]);
 
   useEffect(() => {
@@ -457,7 +459,7 @@ const ServiceDetailsStep: React.FC<{
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
         
         setHasSquareMeterItems(hasSquareItems);
-        setHasLinearMeterItems(hasLinearItems);
+        setHasLinearMeterItems(hasLinearMeterItems);
         
         const neededSteps = [];
         if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
@@ -487,6 +489,21 @@ const ServiceDetailsStep: React.FC<{
     
     loadServiceDetails();
   }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId, visitedSteps]);
+
+  useEffect(() => {
+    if (!carouselApi) return;
+
+    function handleSelect() {
+      setCurrentQuestionIndex(carouselApi.selectedScrollSnap());
+    }
+
+    carouselApi.on("select", handleSelect);
+    setCurrentQuestionIndex(carouselApi.selectedScrollSnap());
+
+    return () => {
+      carouselApi.off("select", handleSelect);
+    };
+  }, [carouselApi]);
 
   useEffect(() => {
     const checkQuestionsAnswered = () => {
@@ -568,7 +585,15 @@ const ServiceDetailsStep: React.FC<{
     allMeasurementsFilled
   ]);
 
+  const goToSubStep = (step: 'quiz' | 'items' | 'measurements') => {
+    setDetailsSubStep(step);
+    if (!visitedSteps.includes(step)) {
+      setVisitedSteps(prev => [...prev, step]);
+    }
+  };
+
   const handleAnswerChange = (questionId: string, optionId: string) => {
+    setUserInteracted(true);
     setAnswers(prev => ({
       ...prev,
       [questionId]: optionId
@@ -576,6 +601,7 @@ const ServiceDetailsStep: React.FC<{
   };
 
   const handleItemQuantityChange = (itemId: string, quantity: number) => {
+    setUserInteracted(true);
     setItemQuantities(prev => ({
       ...prev,
       [itemId]: quantity
@@ -604,19 +630,29 @@ const ServiceDetailsStep: React.FC<{
     const currentStepIndex = requiredSteps.indexOf(detailsSubStep);
     if (currentStepIndex < requiredSteps.length - 1) {
       const nextStep = requiredSteps[currentStepIndex + 1] as 'quiz' | 'items' | 'measurements';
-      setDetailsSubStep(nextStep);
-      if (!visitedSteps.includes(nextStep)) {
-        setVisitedSteps(prev => [...prev, nextStep]);
-      }
+      goToSubStep(nextStep);
+      setUserInteracted(false);
     }
   };
 
   const prevDetailsSubStep = () => {
     const currentStepIndex = requiredSteps.indexOf(detailsSubStep);
     if (currentStepIndex > 0) {
-      setDetailsSubStep(requiredSteps[currentStepIndex - 1] as 'quiz' | 'items' | 'measurements');
+      goToSubStep(requiredSteps[currentStepIndex - 1] as 'quiz' | 'items' | 'measurements');
     } else {
       onBack();
+    }
+  };
+
+  const nextQuestion = () => {
+    if (carouselApi && currentQuestionIndex < questions.length - 1) {
+      carouselApi.scrollNext();
+    }
+  };
+
+  const prevQuestion = () => {
+    if (carouselApi && currentQuestionIndex > 0) {
+      carouselApi.scrollPrev();
     }
   };
 
@@ -655,13 +691,29 @@ const ServiceDetailsStep: React.FC<{
     );
   }
 
-  const calculateProgress = () => {
-    const currentIndex = requiredSteps.indexOf(detailsSubStep);
-    return ((currentIndex + 1) / requiredSteps.length) * 100;
-  };
-
   return (
     <form onSubmit={handleFormSubmit} className="space-y-6">
+      <div className="flex justify-center mb-6">
+        {requiredSteps.map((step, index) => (
+          <div key={step} className="flex items-center">
+            <Button 
+              type="button"
+              variant={detailsSubStep === step ? "default" : "outline"}
+              size="sm"
+              className={`rounded-full px-4 ${index === 0 ? "" : "ml-2"}`}
+              onClick={() => goToSubStep(step as 'quiz' | 'items' | 'measurements')}
+              disabled={!visitedSteps.includes(step) && index !== 0}
+            >
+              {step === 'quiz' ? 'Questionário' : 
+               step === 'items' ? 'Itens' : 'Medidas'}
+            </Button>
+            {index < requiredSteps.length - 1 && (
+              <div className="h-px w-4 bg-gray-200"></div>
+            )}
+          </div>
+        ))}
+      </div>
+
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <p className="text-sm text-muted-foreground">
@@ -674,7 +726,11 @@ const ServiceDetailsStep: React.FC<{
             }
           </p>
         </div>
-        <Progress value={calculateProgress()} className="h-2" />
+        <Progress 
+          segments={requiredSteps.length} 
+          activeSegment={requiredSteps.indexOf(detailsSubStep)}
+          className="h-2"
+        />
       </div>
 
       {detailsSubStep === 'quiz' && (
@@ -682,41 +738,74 @@ const ServiceDetailsStep: React.FC<{
           <h3 className="text-lg font-medium mb-4">Responda as perguntas abaixo</h3>
           
           {questions.length > 0 ? (
-            <Carousel className="w-full">
-              <CarouselContent>
-                {questions.map((question) => (
-                  <CarouselItem key={question.id}>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>{question.question}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <RadioGroup 
-                          value={answers[question.id] || ''} 
-                          onValueChange={(value) => handleAnswerChange(question.id, value)}
-                        >
-                          {question.options.map((option) => (
-                            <div key={option.id} className="flex items-center space-x-2 py-2">
-                              <RadioGroupItem value={option.id} id={option.id} />
-                              <Label htmlFor={option.id}>{option.optionText}</Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      </CardContent>
-                    </Card>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <div className="flex justify-center mt-4">
-                <CarouselPrevious className="mr-2" />
-                <CarouselNext className="ml-2" />
+            <>
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm text-muted-foreground">
+                  Pergunta {currentQuestionIndex + 1} de {questions.length}
+                </p>
               </div>
-            </Carousel>
+              <Progress 
+                value={((currentQuestionIndex + 1) / questions.length) * 100}
+                className="h-1 mb-4"
+              />
+              
+              <Carousel 
+                className="w-full" 
+                setApi={setCarouselApi}
+                opts={{
+                  align: "start",
+                  dragFree: false
+                }}
+              >
+                <CarouselContent>
+                  {questions.map((question) => (
+                    <CarouselItem key={question.id} className="w-full">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>{question.question}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <RadioGroup 
+                            value={answers[question.id] || ''} 
+                            onValueChange={(value) => handleAnswerChange(question.id, value)}
+                          >
+                            {question.options.map((option) => (
+                              <div key={option.id} className="flex items-center space-x-2 py-2">
+                                <RadioGroupItem value={option.id} id={option.id} />
+                                <Label htmlFor={option.id}>{option.optionText}</Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        </CardContent>
+                      </Card>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+              </Carousel>
+              
+              <div className="flex justify-between mt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={prevQuestion} 
+                  disabled={currentQuestionIndex === 0}
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" /> Pergunta Anterior
+                </Button>
+                <Button 
+                  type="button"
+                  onClick={nextQuestion}
+                  disabled={currentQuestionIndex === questions.length - 1}
+                >
+                  Próxima Pergunta <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </>
           ) : (
             <p>Não há perguntas disponíveis para este serviço.</p>
           )}
           
-          <div className="flex justify-between pt-4">
+          <div className="flex justify-between pt-6 border-t mt-6">
             <Button type="button" variant="outline" onClick={prevDetailsSubStep}>
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
             </Button>
@@ -725,7 +814,7 @@ const ServiceDetailsStep: React.FC<{
                 type="button" 
                 onClick={nextDetailsSubStep}
               >
-                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+                Próximo Sub-passo <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             )}
           </div>
@@ -753,13 +842,14 @@ const ServiceDetailsStep: React.FC<{
                     step={item.type === 'quantity' ? '1' : '0.01'}
                     value={itemQuantities[item.id] || ''}
                     onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
+                    onBlur={() => setUserInteracted(true)}
                   />
                 </div>
               </div>
             ))}
           </div>
           
-          <div className="flex justify-between pt-4">
+          <div className="flex justify-between pt-6 border-t mt-6">
             <Button 
               type="button" 
               variant="outline" 
@@ -773,7 +863,7 @@ const ServiceDetailsStep: React.FC<{
                 type="button" 
                 onClick={nextDetailsSubStep}
               >
-                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+                Próximo Sub-passo <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             )}
           </div>
@@ -867,7 +957,7 @@ const ServiceDetailsStep: React.FC<{
             </p>
           )}
           
-          <div className="flex justify-between pt-4">
+          <div className="flex justify-between pt-6 border-t mt-6">
             <Button 
               type="button" 
               variant="outline" 
