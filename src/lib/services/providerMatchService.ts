@@ -24,7 +24,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           service_radius_km,
           latitude,
           longitude,
-          bio
+          bio,
+          city,
+          neighborhood
         )
       `)
       .eq('specialty_id', quoteDetails.specialtyId);
@@ -69,7 +71,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = providerServices.map(ps => {
       // Se o prestador não tem coordenadas ou raio de serviço definido, assumir valores padrão
-      const settings = ps.provider_settings || { service_radius_km: 10, latitude: null, longitude: null, bio: '' };
+      const settings = ps.provider_settings || { service_radius_km: 10, latitude: null, longitude: null, bio: '', city: '', neighborhood: '' };
       const providerLat = settings?.latitude;
       const providerLng = settings?.longitude;
       
@@ -124,8 +126,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           specialties: [],
           name: ps.profiles.name,
           phone: ps.profiles.phone,
-          city: '', // Será preenchido posteriormente
-          neighborhood: '' // Será preenchido posteriormente
+          city: settings?.city || '',
+          neighborhood: settings?.neighborhood || ''
         },
         distance,
         totalPrice,
@@ -135,20 +137,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     // 5. Buscar dados adicionais dos prestadores (localização e avaliações)
     for (const provider of providers) {
-      // Buscar localização com base no ID do usuário
-      if (provider.provider.userId) {
-        const { data: address } = await supabase
-          .from('provider_settings')
-          .select('*')
-          .eq('provider_id', provider.provider.userId)
-          .single();
-        
-        if (address) {
-          provider.provider.city = address?.city || '';
-          provider.provider.neighborhood = address?.neighborhood || '';
-        }
-      }
-      
       // Buscar avaliação média
       const { data: ratings } = await supabase
         .from('quotes')
@@ -270,18 +258,15 @@ export const sendQuoteToProvider = async (
   providerId: string
 ): Promise<{ success: boolean; message: string; quoteId?: string; requiresLogin?: boolean }> => {
   try {
-    // Verificar se o usuário está autenticado
-    if (!quoteDetails.clientId) {
-      console.log('Client ID not provided, login required');
-      return { success: false, message: 'Login necessário', requiresLogin: true };
-    }
-
+    // Verificar se o usuário está autenticado ou se é um orçamento anônimo
+    const clientId = quoteDetails.clientId || null;
+    
     // Usar o quoteId existente se já tivermos criado anteriormente
     const quoteId = quoteDetails.quoteId || '';
     
     // 1. Se não tivermos um quote ID existente, precisamos criá-lo
     if (!quoteId) {
-      return { success: false, message: 'ID do orçamento não fornecido', requiresLogin: true };
+      return { success: false, message: 'ID do orçamento não fornecido', requiresLogin: false };
     }
 
     // 2. Associar o orçamento ao prestador

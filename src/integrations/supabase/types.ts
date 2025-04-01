@@ -146,28 +146,34 @@ export type Database = {
       provider_settings: {
         Row: {
           bio: string | null
+          city: string | null
           created_at: string | null
           id: string
           latitude: number | null
           longitude: number | null
+          neighborhood: string | null
           provider_id: string
           service_radius_km: number | null
         }
         Insert: {
           bio?: string | null
+          city?: string | null
           created_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
+          neighborhood?: string | null
           provider_id: string
           service_radius_km?: number | null
         }
         Update: {
           bio?: string | null
+          city?: string | null
           created_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
+          neighborhood?: string | null
           provider_id?: string
           service_radius_km?: number | null
         }
@@ -381,11 +387,12 @@ export type Database = {
       quotes: {
         Row: {
           city: string
-          client_id: string
+          client_id: string | null
           complement: string | null
           created_at: string | null
           description: string | null
           id: string
+          is_anonymous: boolean | null
           latitude: number | null
           longitude: number | null
           neighborhood: string
@@ -400,11 +407,12 @@ export type Database = {
         }
         Insert: {
           city: string
-          client_id: string
+          client_id?: string | null
           complement?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          is_anonymous?: boolean | null
           latitude?: number | null
           longitude?: number | null
           neighborhood: string
@@ -419,11 +427,12 @@ export type Database = {
         }
         Update: {
           city?: string
-          client_id?: string
+          client_id?: string | null
           complement?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          is_anonymous?: boolean | null
           latitude?: number | null
           longitude?: number | null
           neighborhood?: string

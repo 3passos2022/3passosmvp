@@ -6,8 +6,12 @@ import Footer from '@/components/Footer';
 import QuoteRequestForm from '@/components/quoteRequest/QuoteRequestForm';
 import { useQuery } from '@tanstack/react-query';
 import { getAllServices } from '@/lib/api/services';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 const RequestQuote: React.FC = () => {
+  const { user } = useAuth();
+  
   // Use React Query for fetching services with caching
   const { isLoading, error } = useQuery({
     queryKey: ['services'],
@@ -20,6 +24,19 @@ const RequestQuote: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // Display a welcome toast for non-logged in users
+  useEffect(() => {
+    if (!user) {
+      toast.info(
+        "Você não está logado, mas pode continuar! Se quiser acompanhar seu orçamento depois, faça login.", 
+        {
+          duration: 7000,
+          id: "anonymous-quote-info" // Prevent duplicate toasts
+        }
+      );
+    }
+  }, [user]);
 
   return (
     <div className="min-h-screen flex flex-col">
