@@ -38,3 +38,10 @@ export interface QuoteDetails {
   description?: string;
   clientId?: string;
 }
+
+export interface ProviderServiceItem {
+  id: string;
+  name: string;
+  type: string;
+  pricePerUnit: number;
+}

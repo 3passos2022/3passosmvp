@@ -12,3 +12,10 @@ export function formatCurrency(value: number): string {
     currency: 'BRL',
   }).format(value);
 }
+
+export function parseCurrencyInput(value: string): number {
+  // Remove currency symbols, spaces and replace comma with dot
+  const sanitized = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+  const number = parseFloat(sanitized);
+  return isNaN(number) ? 0 : number;
+}

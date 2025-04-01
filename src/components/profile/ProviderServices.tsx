@@ -8,11 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Specialty, Service, SubService } from '@/lib/types';
+import { Specialty, Service, SubService, ServiceItem } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus, PenLine } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Trash2, Plus, PenLine, Settings } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { getAllServices } from '@/lib/api/services';
+import { formatCurrency, parseCurrencyInput } from '@/lib/utils';
+import { ProviderServiceItem } from '@/lib/types/providerMatch';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 
 // Basic type definitions to avoid deep types
 interface SpecialtyItem {
@@ -31,6 +36,14 @@ interface ProviderServiceItem {
   basePrice: number;
 }
 
+interface ServiceItemWithPrice {
+  id: string;
+  name: string;
+  type: string;
+  pricePerUnit: number;
+  providerItemId?: string;
+}
+
 const ProviderServices = () => {
   const { user } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
@@ -42,6 +55,9 @@ const ProviderServices = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [basePrice, setBasePrice] = useState<string>('');
   const [providerServices, setProviderServices] = useState<ProviderServiceItem[]>([]);
+  const [serviceItems, setServiceItems] = useState<Record<string, ServiceItemWithPrice[]>>({});
+  const [currentServiceId, setCurrentServiceId] = useState<string>('');
+  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   
   // Load all available services
   useEffect(() => {
@@ -124,6 +140,11 @@ const ProviderServices = () => {
         }
         
         setProviderServices(providerServicesWithDetails);
+        
+        // Load service items for each provider service
+        for (const service of providerServicesWithDetails) {
+          await loadServiceItems(service.specialtyId, service.id);
+        }
       } catch (error) {
         console.error('Error loading provider services:', error);
         toast.error('Erro ao carregar seus serviços');
@@ -134,6 +155,54 @@ const ProviderServices = () => {
       loadProviderServices();
     }
   }, [user, services]);
+  
+  const loadServiceItems = async (specialtyId: string, providerServiceId: string) => {
+    if (!user) return;
+    
+    try {
+      // First, get all service items for this specialty
+      const { data: items, error: itemsError } = await supabase
+        .from('service_items')
+        .select('*')
+        .eq('specialty_id', specialtyId);
+      
+      if (itemsError) throw itemsError;
+      
+      if (!items || items.length === 0) {
+        return;
+      }
+      
+      // Then, get provider's prices for these items
+      const { data: providerPrices, error: pricesError } = await supabase
+        .from('provider_item_prices')
+        .select('*')
+        .eq('provider_id', user.id)
+        .in('item_id', items.map(item => item.id));
+      
+      if (pricesError) throw pricesError;
+      
+      // Combine the data
+      const itemsWithPrices: ServiceItemWithPrice[] = items.map(item => {
+        const providerPrice = providerPrices?.find(price => price.item_id === item.id);
+        return {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          pricePerUnit: providerPrice?.price_per_unit || 0,
+          providerItemId: providerPrice?.id,
+        };
+      });
+      
+      // Update the state
+      setServiceItems(prev => ({
+        ...prev,
+        [providerServiceId]: itemsWithPrices,
+      }));
+      
+    } catch (error) {
+      console.error('Error loading service items:', error);
+    }
+  };
   
   const handleAddService = async () => {
     if (!user || !selectedSpecialty || !basePrice) return;
@@ -198,17 +267,23 @@ const ProviderServices = () => {
         if (serviceName) break;
       }
       
+      const newProviderService = {
+        id: data.id,
+        specialtyId: selectedSpecialty,
+        specialtyName,
+        serviceName,
+        subServiceName,
+        basePrice: parseFloat(basePrice),
+      };
+      
       setProviderServices([
         ...providerServices,
-        {
-          id: data.id,
-          specialtyId: selectedSpecialty,
-          specialtyName,
-          serviceName,
-          subServiceName,
-          basePrice: parseFloat(basePrice),
-        },
+        newProviderService
       ]);
+      
+      // Load service items for the new service
+      await loadServiceItems(selectedSpecialty, data.id);
+      
     } catch (error: any) {
       console.error('Error adding provider service:', error);
       toast.error(error.message || 'Erro ao adicionar serviço');
@@ -260,14 +335,93 @@ const ProviderServices = () => {
       
       if (error) throw error;
       
+      // Also delete any item prices associated with this provider's service
+      const items = serviceItems[serviceId] || [];
+      if (items.length > 0) {
+        const itemIds = items.filter(item => item.providerItemId).map(item => item.providerItemId);
+        if (itemIds.length > 0) {
+          await supabase
+            .from('provider_item_prices')
+            .delete()
+            .in('id', itemIds as string[]);
+        }
+      }
+      
       setProviderServices(
         providerServices.filter(service => service.id !== serviceId)
       );
+      
+      // Remove from serviceItems state
+      const newServiceItems = { ...serviceItems };
+      delete newServiceItems[serviceId];
+      setServiceItems(newServiceItems);
       
       toast.success('Serviço removido com sucesso');
     } catch (error) {
       console.error('Error deleting service:', error);
       toast.error('Erro ao remover serviço');
+    }
+  };
+  
+  const handleManageItems = (serviceId: string) => {
+    setCurrentServiceId(serviceId);
+    setIsItemDialogOpen(true);
+  };
+  
+  const updateItemPrice = async (serviceId: string, itemId: string, price: number) => {
+    if (!user) return;
+    
+    try {
+      const item = serviceItems[serviceId].find(i => i.id === itemId);
+      
+      if (item?.providerItemId) {
+        // Update existing price
+        const { error } = await supabase
+          .from('provider_item_prices')
+          .update({ price_per_unit: price })
+          .eq('id', item.providerItemId);
+        
+        if (error) throw error;
+      } else {
+        // Create new price entry
+        const { data, error } = await supabase
+          .from('provider_item_prices')
+          .insert({
+            provider_id: user.id,
+            item_id: itemId,
+            price_per_unit: price,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Update local state with new provider item id
+        setServiceItems(prev => ({
+          ...prev,
+          [serviceId]: prev[serviceId].map(i => 
+            i.id === itemId 
+              ? { ...i, pricePerUnit: price, providerItemId: data.id }
+              : i
+          ),
+        }));
+        
+        return;
+      }
+      
+      // Update the local state
+      setServiceItems(prev => ({
+        ...prev,
+        [serviceId]: prev[serviceId].map(i => 
+          i.id === itemId 
+            ? { ...i, pricePerUnit: price }
+            : i
+        ),
+      }));
+      
+    } catch (error) {
+      console.error('Error updating item price:', error);
+      toast.error('Erro ao atualizar preço do item');
     }
   };
   
@@ -316,7 +470,7 @@ const ProviderServices = () => {
                   
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                      <span>R$ {service.basePrice.toFixed(2)}</span>
+                      <span>Preço base: {formatCurrency(service.basePrice)}</span>
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -325,7 +479,7 @@ const ProviderServices = () => {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Alterar preço</DialogTitle>
+                            <DialogTitle>Alterar preço base</DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4 mt-4">
                             <div className="space-y-2">
@@ -333,20 +487,11 @@ const ProviderServices = () => {
                               <p>{service.specialtyName}</p>
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor={`price-${service.id}`}>Preço (R$)</Label>
+                              <Label htmlFor={`price-${service.id}`}>Preço base (R$)</Label>
                               <Input 
                                 id={`price-${service.id}`}
-                                type="number" 
-                                step="0.01"
-                                min="0"
+                                type="text"
                                 defaultValue={service.basePrice.toString()}
-                                onChange={(e) => {
-                                  // Handle price update
-                                  const newPrice = parseFloat(e.target.value);
-                                  if (!isNaN(newPrice) && newPrice >= 0) {
-                                    updatePrice(service.id, newPrice);
-                                  }
-                                }}
                               />
                             </div>
                             <Button 
@@ -354,7 +499,7 @@ const ProviderServices = () => {
                               disabled={savingPrice}
                               onClick={() => {
                                 const input = document.getElementById(`price-${service.id}`) as HTMLInputElement;
-                                const newPrice = parseFloat(input.value);
+                                const newPrice = parseCurrencyInput(input.value);
                                 if (!isNaN(newPrice) && newPrice >= 0) {
                                   updatePrice(service.id, newPrice);
                                 }
@@ -366,6 +511,16 @@ const ProviderServices = () => {
                         </DialogContent>
                       </Dialog>
                     </div>
+                    
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleManageItems(service.id)}
+                    >
+                      <Settings className="h-4 w-4 mr-1" />
+                      Itens
+                    </Button>
                     
                     <Button 
                       variant="ghost" 
@@ -380,6 +535,75 @@ const ProviderServices = () => {
               ))}
             </div>
           )}
+          
+          <Dialog
+            open={isItemDialogOpen}
+            onOpenChange={setIsItemDialogOpen}
+          >
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  Configurar preços dos itens
+                </DialogTitle>
+              </DialogHeader>
+              
+              {currentServiceId && serviceItems[currentServiceId]?.length > 0 ? (
+                <div className="max-h-[60vh] overflow-y-auto">
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="items">
+                      <AccordionTrigger>
+                        Itens do serviço ({serviceItems[currentServiceId]?.length || 0})
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4">
+                          {serviceItems[currentServiceId]?.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between p-2 border rounded">
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-sm text-gray-500">
+                                  Tipo: {item.type === 'quantity' ? 'Quantidade' : 
+                                         item.type === 'square_meter' ? 'Metro quadrado' : 
+                                         'Metro linear'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-32">
+                                  <Input 
+                                    type="text"
+                                    defaultValue={item.pricePerUnit.toString()}
+                                    onChange={(e) => {
+                                      const price = parseCurrencyInput(e.target.value);
+                                      if (price >= 0) {
+                                        updateItemPrice(currentServiceId, item.id, price);
+                                      }
+                                    }}
+                                    placeholder="R$ 0,00"
+                                  />
+                                </div>
+                                <span className="text-sm text-gray-500">
+                                  por {item.type === 'quantity' ? 'unidade' : 
+                                       item.type === 'square_meter' ? 'm²' : 
+                                       'm'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+              ) : (
+                <div className="text-center p-4">
+                  <p>Este serviço não possui itens configuráveis.</p>
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button onClick={() => setIsItemDialogOpen(false)}>Fechar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           
           <Separator className="my-6" />
           
@@ -458,12 +682,10 @@ const ProviderServices = () => {
                   <Label htmlFor="price">Preço base (R$)</Label>
                   <Input 
                     id="price" 
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
                     value={basePrice}
                     onChange={(e) => setBasePrice(e.target.value)}
-                    placeholder="Ex: 100.00"
+                    placeholder="Ex: 100,00"
                   />
                 </div>
               )}
@@ -476,7 +698,7 @@ const ProviderServices = () => {
                   !selectedSubService || 
                   !selectedSpecialty || 
                   !basePrice ||
-                  parseFloat(basePrice) <= 0
+                  parseFloat(basePrice.replace(',', '.')) <= 0
                 }
               >
                 <Plus className="h-4 w-4 mr-1" />
