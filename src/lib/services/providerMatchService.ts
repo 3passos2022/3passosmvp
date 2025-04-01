@@ -71,7 +71,15 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = providerServices.map(ps => {
       // Se o prestador não tem coordenadas ou raio de serviço definido, assumir valores padrão
-      const settings = ps.provider_settings || { service_radius_km: 10, latitude: null, longitude: null, bio: '', city: '', neighborhood: '' };
+      const settings = ps.provider_settings || { 
+        service_radius_km: 10, 
+        latitude: null, 
+        longitude: null, 
+        bio: '', 
+        city: '', 
+        neighborhood: '' 
+      };
+      
       const providerLat = settings?.latitude;
       const providerLng = settings?.longitude;
       
@@ -101,10 +109,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           );
           
           if (itemPrice) {
-            totalPrice += (itemPrice.price_per_unit * quantity);
+            totalPrice += (itemPrice.price_per_unit * Number(quantity));
           } else {
             // Usar preço padrão se o prestador não tiver um preço específico
-            totalPrice += ps.base_price * quantity;
+            totalPrice += ps.base_price * Number(quantity);
           }
         });
       }
@@ -114,7 +122,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         quoteDetails.measurements.forEach(measurement => {
           // Calcular área ou comprimento
           const area = measurement.area || (measurement.width * measurement.length);
-          totalPrice += ps.base_price * area;
+          totalPrice += ps.base_price * Number(area);
         });
       }
       
@@ -147,7 +155,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       if (ratings && ratings.length > 0) {
         const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
         if (validRatings.length > 0) {
-          const sum = validRatings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+          const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
           provider.provider.averageRating = sum / validRatings.length;
         }
       }
@@ -218,12 +226,19 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     if (ratings && ratings.length > 0) {
       const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
       if (validRatings.length > 0) {
-        const sum = validRatings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+        const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
         averageRating = sum / validRatings.length;
       }
     }
 
-    const settings = provider.provider_settings || {};
+    const settings = provider.provider_settings || {
+      bio: '',
+      service_radius_km: 10,
+      latitude: null,
+      longitude: null,
+      city: '',
+      neighborhood: ''
+    };
 
     return {
       provider: {
@@ -261,11 +276,8 @@ export const sendQuoteToProvider = async (
     // Verificar se o usuário está autenticado ou se é um orçamento anônimo
     const clientId = quoteDetails.clientId || null;
     
-    // Usar o quoteId existente se já tivermos criado anteriormente
-    const quoteId = quoteDetails.quoteId || '';
-    
-    // 1. Se não tivermos um quote ID existente, precisamos criá-lo
-    if (!quoteId) {
+    // Se não tivermos um quote ID existente, precisamos criá-lo
+    if (!quoteDetails.id) {
       return { success: false, message: 'ID do orçamento não fornecido', requiresLogin: false };
     }
 
@@ -273,7 +285,7 @@ export const sendQuoteToProvider = async (
     const { error: providerQuoteError } = await supabase
       .from('quote_providers')
       .insert({
-        quote_id: quoteId,
+        quote_id: quoteDetails.id,
         provider_id: providerId,
         status: 'pending'
       });
@@ -286,7 +298,7 @@ export const sendQuoteToProvider = async (
     return { 
       success: true, 
       message: 'Orçamento enviado com sucesso', 
-      quoteId: quoteId 
+      quoteId: quoteDetails.id 
     };
   } catch (error) {
     console.error('Erro ao enviar orçamento:', error);

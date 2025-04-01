@@ -18,13 +18,14 @@ export interface ProviderDetails extends ProviderMatch {
 }
 
 export interface QuoteDetails {
+  id?: string;
   serviceId: string;
   subServiceId: string;
   specialtyId: string;
   serviceName: string;
   subServiceName: string;
   specialtyName: string;
-  items?: QuoteItem[];
+  items?: Record<string, number>;
   measurements?: QuoteMeasurement[];
   address: {
     street: string;
