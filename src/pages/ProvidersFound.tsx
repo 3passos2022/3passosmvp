@@ -30,7 +30,7 @@ const ProvidersFound: React.FC = () => {
   const [currentFilter, setCurrentFilter] = useState<FilterOption>('');
   
   // Carregamento da API do Google Maps
-  const googleMapsApiKey = 'SUBSTITUA_PELA_SUA_API_KEY'; // Substitua pela sua chave API
+  const googleMapsApiKey = 'AIzaSyCz60dsmYx6T6qHNCs1OZtA7suJGA7xVW8'; // Substitua pela sua chave API
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
   
   // Efeito para carregar detalhes do orçamento da sessão ou URL
