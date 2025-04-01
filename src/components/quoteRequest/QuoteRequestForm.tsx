@@ -942,20 +942,23 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
     try {
       console.log("Enviando dados de cotação via RPC...");
       
-      const { data, error } = await supabase.rpc('submit_quote', {
-        p_service_id: formData.serviceId,
-        p_sub_service_id: formData.subServiceId || null,
-        p_specialty_id: formData.specialtyId || null,
-        p_description: formData.description || null,
-        p_street: formData.street || '',
-        p_number: formData.number || '',
-        p_complement: formData.complement || null,
-        p_neighborhood: formData.neighborhood || '',
-        p_city: formData.city || '',
-        p_state: formData.state || '',
-        p_zip_code: formData.zipCode || '',
-        p_is_anonymous: !user // Se user existir, não é anônimo
-      });
+      const { data: quoteId, error } = await supabase.rpc(
+        "submit_quote" as any,
+        {
+          p_service_id: formData.serviceId,
+          p_sub_service_id: formData.subServiceId || null,
+          p_specialty_id: formData.specialtyId || null,
+          p_description: formData.description || null,
+          p_street: formData.street || '',
+          p_number: formData.number || '',
+          p_complement: formData.complement || null,
+          p_neighborhood: formData.neighborhood || '',
+          p_city: formData.city || '',
+          p_state: formData.state || '',
+          p_zip_code: formData.zipCode || '',
+          p_is_anonymous: !user
+        }
+      );
       
       if (error) {
         console.error('Erro ao enviar cotação:', error);
@@ -963,12 +966,11 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
         return;
       }
       
-      console.log("Cotação criada com sucesso. ID:", data);
-      const quoteId = data; // A função RPC retorna o ID diretamente
+      console.log("Cotação criada com sucesso. ID:", quoteId);
       
       if (formData.answers && Object.keys(formData.answers).length > 0) {
         const answersToInsert = Object.entries(formData.answers).map(([questionId, optionId]) => ({
-          quote_id: quoteId,
+          quote_id: quoteId as string,
           question_id: questionId,
           option_id: optionId,
         }));
@@ -986,7 +988,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
         const itemsToInsert = Object.entries(formData.itemQuantities)
           .filter(([_, quantity]) => quantity > 0)
           .map(([itemId, quantity]) => ({
-            quote_id: quoteId,
+            quote_id: quoteId as string,
             item_id: itemId,
             quantity,
           }));
@@ -1004,7 +1006,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       
       if (formData.measurements && formData.measurements.length > 0) {
         const measurementsToInsert = formData.measurements.map(m => ({
-          quote_id: quoteId,
+          quote_id: quoteId as string,
           room_name: m.roomName,
           width: m.width,
           length: m.length,
@@ -1032,7 +1034,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       };
       
       const quoteDetails = {
-        id: quoteId,
+        id: quoteId as string,
         serviceId: formData.serviceId || '',
         subServiceId: formData.subServiceId || '',
         specialtyId: formData.specialtyId || '',
