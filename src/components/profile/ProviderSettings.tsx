@@ -14,6 +14,8 @@ import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { geocodeAddress } from '@/lib/services/googleMapsService';
+import { fetchAddressByCep } from '@/lib/services/viaCepService';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const settingsSchema = z.object({
   bio: z.string().max(500, 'A bio deve ter no máximo 500 caracteres'),
@@ -32,6 +34,7 @@ const ProviderSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [searchingCep, setSearchingCep] = useState(false);
   const [settings, setSettings] = useState<{
     id?: string;
     bio?: string;
@@ -47,13 +50,7 @@ const ProviderSettings: React.FC = () => {
     longitude?: number;
   }>({});
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm({
+  const form = useForm({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
       bio: '',
@@ -68,8 +65,11 @@ const ProviderSettings: React.FC = () => {
     },
   });
 
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = form;
+
   // Watch the service radius value to update the slider
   const serviceRadiusKm = watch('serviceRadiusKm');
+  const zipCode = watch('zipCode');
 
   useEffect(() => {
     async function loadSettings() {
@@ -128,6 +128,41 @@ const ProviderSettings: React.FC = () => {
       return null;
     } finally {
       setGeocoding(false);
+    }
+  };
+
+  const handleSearchCep = async () => {
+    if (!zipCode || zipCode.length < 8) {
+      toast.error('Digite um CEP válido');
+      return;
+    }
+
+    try {
+      setSearchingCep(true);
+      const address = await fetchAddressByCep(zipCode);
+      
+      if (address) {
+        setValue('street', address.logradouro);
+        setValue('neighborhood', address.bairro);
+        setValue('city', address.localidade);
+        setValue('state', address.uf);
+        
+        if (address.complemento) {
+          setValue('complement', address.complemento);
+        }
+        
+        // Manter o foco no campo número após preencher o endereço
+        document.getElementById('number')?.focus();
+        
+        toast.success('Endereço encontrado!');
+      } else {
+        toast.error('CEP não encontrado');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      toast.error('Erro ao buscar endereço');
+    } finally {
+      setSearchingCep(false);
     }
   };
 
@@ -247,6 +282,36 @@ const ProviderSettings: React.FC = () => {
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="zipCode">CEP</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="zipCode" 
+                      placeholder="CEP" 
+                      {...register('zipCode')}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={handleSearchCep}
+                      disabled={searchingCep}
+                      className="whitespace-nowrap"
+                    >
+                      {searchingCep ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Buscando...
+                        </>
+                      ) : 'Buscar CEP'}
+                    </Button>
+                  </div>
+                  {errors.zipCode && (
+                    <p className="text-sm text-red-500">{errors.zipCode.message}</p>
+                  )}
+                </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="street">Rua</Label>
                   <Input 
@@ -316,18 +381,6 @@ const ProviderSettings: React.FC = () => {
                   />
                   {errors.state && (
                     <p className="text-sm text-red-500">{errors.state.message}</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">CEP</Label>
-                  <Input 
-                    id="zipCode" 
-                    placeholder="CEP" 
-                    {...register('zipCode')}
-                  />
-                  {errors.zipCode && (
-                    <p className="text-sm text-red-500">{errors.zipCode.message}</p>
                   )}
                 </div>
               </div>

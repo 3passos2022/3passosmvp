@@ -15,7 +15,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         base_price,
         provider_id,
         specialty_id,
-        profiles!provider_id (
+        profiles!inner (
           id, 
           name, 
           phone
