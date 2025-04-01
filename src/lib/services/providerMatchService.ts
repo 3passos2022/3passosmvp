@@ -19,14 +19,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           id, 
           name, 
           phone
-        ),
-        provider_settings!provider_id (
-          service_radius_km,
-          latitude,
-          longitude,
-          bio,
-          city,
-          neighborhood
         )
       `)
       .eq('specialty_id', quoteDetails.specialtyId);
@@ -39,6 +31,25 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     if (!providerServices || providerServices.length === 0) {
       console.log('Nenhum prestador encontrado para esta especialidade');
       return [];
+    }
+
+    // Get provider settings separately to avoid join issues
+    const providerIds = providerServices.map(ps => ps.provider_id);
+    const { data: providerSettings, error: settingsError } = await supabase
+      .from('provider_settings')
+      .select('*')
+      .in('provider_id', providerIds);
+
+    if (settingsError) {
+      console.error('Erro ao buscar configurações dos prestadores:', settingsError);
+    }
+
+    // Create a map for quick lookup
+    const settingsMap = new Map();
+    if (providerSettings) {
+      providerSettings.forEach(settings => {
+        settingsMap.set(settings.provider_id, settings);
+      });
     }
 
     // 2. Geocodificar o endereço do cliente
@@ -70,37 +81,21 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = providerServices.map(ps => {
-      // Se o prestador não tem configurações, usar valores padrão
-      if (!ps.provider_settings) {
-        return {
-          provider: {
-            userId: ps.profiles.id,
-            bio: '',
-            averageRating: 0,
-            specialties: [],
-            name: ps.profiles.name,
-            phone: ps.profiles.phone,
-            city: '',
-            neighborhood: ''
-          },
-          distance: 9999,
-          totalPrice: ps.base_price || 0,
-          isWithinRadius: false
-        };
-      }
+      // Get provider settings from map
+      const settings = settingsMap.get(ps.provider_id);
       
       // Calcular distância se possível
       let distance = 9999;
       let isWithinRadius = false;
       
-      if (ps.provider_settings.latitude && ps.provider_settings.longitude && clientLocation) {
+      if (settings && settings.latitude && settings.longitude && clientLocation) {
         distance = calculateDistance(
           clientLocation.lat, 
           clientLocation.lng, 
-          ps.provider_settings.latitude, 
-          ps.provider_settings.longitude
+          settings.latitude, 
+          settings.longitude
         );
-        isWithinRadius = distance <= (ps.provider_settings.service_radius_km || 10);
+        isWithinRadius = distance <= (settings.service_radius_km || 10);
       }
       
       // Calcular preço básico para o serviço
@@ -135,13 +130,13 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return {
         provider: {
           userId: ps.profiles.id,
-          bio: ps.provider_settings.bio || '',
+          bio: settings?.bio || '',
           averageRating: 0, // Será preenchido posteriormente
           specialties: [],
           name: ps.profiles.name,
           phone: ps.profiles.phone,
-          city: ps.provider_settings.city || '',
-          neighborhood: ps.provider_settings.neighborhood || ''
+          city: settings?.city || '',
+          neighborhood: settings?.neighborhood || ''
         },
         distance,
         totalPrice,
@@ -192,15 +187,7 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       .select(`
         id,
         name,
-        phone,
-        provider_settings!provider_id (
-          bio,
-          service_radius_km,
-          latitude,
-          longitude,
-          city,
-          neighborhood
-        )
+        phone
       `)
       .eq('id', providerId)
       .single();
@@ -208,6 +195,17 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     if (providerError || !provider) {
       console.error('Erro ao buscar detalhes do prestador:', providerError);
       return null;
+    }
+
+    // Get provider settings separately
+    const { data: settings, error: settingsError } = await supabase
+      .from('provider_settings')
+      .select('*')
+      .eq('provider_id', providerId)
+      .maybeSingle();
+
+    if (settingsError) {
+      console.error('Erro ao buscar configurações do prestador:', settingsError);
     }
 
     // 2. Buscar portfólio do prestador
@@ -234,25 +232,16 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       }
     }
 
-    const settings = provider.provider_settings || {
-      bio: '',
-      service_radius_km: 10,
-      latitude: null,
-      longitude: null,
-      city: '',
-      neighborhood: ''
-    };
-
     return {
       provider: {
         userId: provider.id,
         name: provider.name,
         phone: provider.phone,
-        bio: settings.bio || '',
+        bio: settings?.bio || '',
         averageRating,
         specialties: [],
-        city: settings.city || '',
-        neighborhood: settings.neighborhood || ''
+        city: settings?.city || '',
+        neighborhood: settings?.neighborhood || ''
       },
       portfolioItems: portfolio ? portfolio.map(item => ({
         id: item.id,

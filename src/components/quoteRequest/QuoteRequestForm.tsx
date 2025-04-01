@@ -823,7 +823,7 @@ const ServiceDetailsStep: React.FC<{
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Nome do c��modo/área (opcional)</Label>
+                        <Label>Nome do c����modo/área (opcional)</Label>
                         <Input 
                           value={measurement.roomName} 
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
@@ -943,12 +943,12 @@ const QuoteRequestForm: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      const anonymousClientId = user?.id || null;
+      const clientId = user?.id || null;
       
       const { data, error } = await supabase
         .from('quotes')
         .insert({
-          client_id: anonymousClientId,
+          client_id: clientId,
           service_id: formData.serviceId,
           sub_service_id: formData.subServiceId || null,
           specialty_id: formData.specialtyId || null,
@@ -1051,7 +1051,7 @@ const QuoteRequestForm: React.FC = () => {
         measurements: formData.measurements || [],
         address: address,
         description: formData.description || '',
-        clientId: anonymousClientId
+        clientId: clientId
       };
       
       sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));

@@ -37,7 +37,7 @@ export interface QuoteDetails {
     zipCode: string;
   };
   description?: string;
-  clientId?: string | null; // Updated to allow null for anonymous users
+  clientId?: string | null;
 }
 
 export interface ProviderServiceItemPrice {

@@ -29,7 +29,7 @@ const RequestQuote: React.FC = () => {
   useEffect(() => {
     if (!user) {
       toast.info(
-        "Você não está logado, mas pode continuar! Se quiser acompanhar seu orçamento depois, faça login.", 
+        "Você não está logado, mas pode continuar! Para acompanhar seu orçamento depois, faça login antes de enviar.", 
         {
           duration: 7000,
           id: "anonymous-quote-info" // Prevent duplicate toasts
