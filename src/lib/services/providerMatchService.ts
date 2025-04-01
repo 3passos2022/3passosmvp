@@ -70,31 +70,37 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = providerServices.map(ps => {
-      // Se o prestador não tem coordenadas ou raio de serviço definido, assumir valores padrão
-      const settings = ps.provider_settings || { 
-        service_radius_km: 10, 
-        latitude: null, 
-        longitude: null, 
-        bio: '', 
-        city: '', 
-        neighborhood: '' 
-      };
-      
-      const providerLat = settings?.latitude;
-      const providerLng = settings?.longitude;
+      // Se o prestador não tem configurações, usar valores padrão
+      if (!ps.provider_settings) {
+        return {
+          provider: {
+            userId: ps.profiles.id,
+            bio: '',
+            averageRating: 0,
+            specialties: [],
+            name: ps.profiles.name,
+            phone: ps.profiles.phone,
+            city: '',
+            neighborhood: ''
+          },
+          distance: 9999,
+          totalPrice: ps.base_price || 0,
+          isWithinRadius: false
+        };
+      }
       
       // Calcular distância se possível
       let distance = 9999;
       let isWithinRadius = false;
       
-      if (providerLat && providerLng && clientLocation) {
+      if (ps.provider_settings.latitude && ps.provider_settings.longitude && clientLocation) {
         distance = calculateDistance(
           clientLocation.lat, 
           clientLocation.lng, 
-          providerLat, 
-          providerLng
+          ps.provider_settings.latitude, 
+          ps.provider_settings.longitude
         );
-        isWithinRadius = distance <= (settings?.service_radius_km || 10);
+        isWithinRadius = distance <= (ps.provider_settings.service_radius_km || 10);
       }
       
       // Calcular preço básico para o serviço
@@ -129,13 +135,13 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return {
         provider: {
           userId: ps.profiles.id,
-          bio: settings?.bio || '',
+          bio: ps.provider_settings.bio || '',
           averageRating: 0, // Será preenchido posteriormente
           specialties: [],
           name: ps.profiles.name,
           phone: ps.profiles.phone,
-          city: settings?.city || '',
-          neighborhood: settings?.neighborhood || ''
+          city: ps.provider_settings.city || '',
+          neighborhood: ps.provider_settings.neighborhood || ''
         },
         distance,
         totalPrice,
@@ -148,14 +154,13 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       // Buscar avaliação média
       const { data: ratings } = await supabase
         .from('quotes')
-        .select('rating')
-        .eq('provider_id', provider.provider.userId)
-        .not('rating', 'is', null);
-      
+        .select('rating');
+        
+      // Verificar se temos ratings válidos
       if (ratings && ratings.length > 0) {
-        const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+        const validRatings = ratings.filter((r: any) => r.rating !== null && r.rating !== undefined);
         if (validRatings.length > 0) {
-          const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
+          const sum = validRatings.reduce((acc: number, curr: any) => acc + (Number(curr.rating) || 0), 0);
           provider.provider.averageRating = sum / validRatings.length;
         }
       }
@@ -218,15 +223,13 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     // 3. Buscar avaliações do prestador
     const { data: ratings } = await supabase
       .from('quotes')
-      .select('rating')
-      .eq('provider_id', providerId)
-      .not('rating', 'is', null);
+      .select('rating');
 
     let averageRating = 0;
     if (ratings && ratings.length > 0) {
-      const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+      const validRatings = ratings.filter((r: any) => r.rating !== null && r.rating !== undefined);
       if (validRatings.length > 0) {
-        const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
+        const sum = validRatings.reduce((acc: number, curr: any) => acc + (Number(curr.rating) || 0), 0);
         averageRating = sum / validRatings.length;
       }
     }

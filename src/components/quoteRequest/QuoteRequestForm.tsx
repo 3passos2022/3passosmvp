@@ -823,7 +823,7 @@ const ServiceDetailsStep: React.FC<{
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Nome do cômodo/área (opcional)</Label>
+                        <Label>Nome do c��modo/área (opcional)</Label>
                         <Input 
                           value={measurement.roomName} 
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
@@ -943,7 +943,7 @@ const QuoteRequestForm: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      const anonymousClientId = user?.id || `anon-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      const anonymousClientId = user?.id || null;
       
       const { data, error } = await supabase
         .from('quotes')
