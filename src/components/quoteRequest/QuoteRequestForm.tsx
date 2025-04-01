@@ -425,16 +425,11 @@ const ServiceDetailsStep: React.FC<{
   const [loading, setLoading] = useState(true);
   const [hasSquareMeterItems, setHasSquareMeterItems] = useState(false);
   const [hasLinearMeterItems, setHasLinearMeterItems] = useState(false);
-  const [showReview, setShowReview] = useState(false);
   const [allQuestionsAnswered, setAllQuestionsAnswered] = useState(false);
-  const [allItemsFilled, setAllItemsFilled] = useState(false);
-  const [allMeasurementsFilled, setAllMeasurementsFilled] = useState(false);
-  const [visitedSteps, setVisitedSteps] = useState<string[]>([]);
-  const [allStepsCompleted, setAllStepsCompleted] = useState(false);
+  const [requiredSteps, setRequiredSteps] = useState<string[]>(['quiz']);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userInteracted, setUserInteracted] = useState(false);
-  const [requiredSteps, setRequiredSteps] = useState<string[]>([]);
+  const [visitedSteps, setVisitedSteps] = useState<string[]>(['quiz']);
 
   useEffect(() => {
     async function loadServiceDetails() {
@@ -459,7 +454,7 @@ const ServiceDetailsStep: React.FC<{
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
         
         setHasSquareMeterItems(hasSquareItems);
-        setHasLinearMeterItems(hasLinearMeterItems);
+        setHasLinearMeterItems(hasLinearItems);
         
         const neededSteps = [];
         if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
@@ -475,9 +470,6 @@ const ServiceDetailsStep: React.FC<{
         
         if (neededSteps.length > 0) {
           setDetailsSubStep(neededSteps[0] as 'quiz' | 'items' | 'measurements');
-          if (!visitedSteps.includes(neededSteps[0])) {
-            setVisitedSteps(prev => [...prev, neededSteps[0]]);
-          }
         }
       } catch (error) {
         console.error('Error loading service details:', error);
@@ -488,7 +480,7 @@ const ServiceDetailsStep: React.FC<{
     }
     
     loadServiceDetails();
-  }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId, visitedSteps]);
+  }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId]);
 
   useEffect(() => {
     if (!carouselApi) return;
@@ -519,72 +511,6 @@ const ServiceDetailsStep: React.FC<{
     checkQuestionsAnswered();
   }, [answers, questions]);
 
-  useEffect(() => {
-    const checkItemsFilled = () => {
-      if (items.length === 0) {
-        setAllItemsFilled(true);
-        return;
-      }
-      
-      const filledItems = items.filter(item => itemQuantities[item.id] !== undefined);
-      setAllItemsFilled(filledItems.length === items.length);
-    };
-    
-    checkItemsFilled();
-  }, [itemQuantities, items]);
-
-  useEffect(() => {
-    const checkMeasurementsFilled = () => {
-      if (!hasSquareMeterItems && !hasLinearMeterItems) {
-        setAllMeasurementsFilled(true);
-        return;
-      }
-      
-      setAllMeasurementsFilled(measurements.length > 0);
-    };
-    
-    checkMeasurementsFilled();
-  }, [measurements, hasSquareMeterItems, hasLinearMeterItems]);
-
-  useEffect(() => {
-    if (detailsSubStep === 'quiz' && allQuestionsAnswered && requiredSteps.includes('items')) {
-      setDetailsSubStep('items');
-      if (!visitedSteps.includes('items')) {
-        setVisitedSteps(prev => [...prev, 'items']);
-      }
-    } else if (detailsSubStep === 'items' && allItemsFilled && requiredSteps.includes('measurements')) {
-      setDetailsSubStep('measurements');
-      if (!visitedSteps.includes('measurements')) {
-        setVisitedSteps(prev => [...prev, 'measurements']);
-      }
-    }
-  }, [allQuestionsAnswered, allItemsFilled, detailsSubStep, requiredSteps, visitedSteps]);
-
-  useEffect(() => {
-    const checkAllStepsCompleted = () => {
-      if (requiredSteps.length === 0) {
-        setAllStepsCompleted(true);
-        return;
-      }
-      
-      const allVisited = requiredSteps.every(step => visitedSteps.includes(step));
-      
-      const quizDone = !requiredSteps.includes('quiz') || allQuestionsAnswered;
-      const itemsDone = !requiredSteps.includes('items') || allItemsFilled;
-      const measurementsDone = !requiredSteps.includes('measurements') || allMeasurementsFilled;
-      
-      setAllStepsCompleted(allVisited && quizDone && itemsDone && measurementsDone);
-    };
-    
-    checkAllStepsCompleted();
-  }, [
-    requiredSteps, 
-    visitedSteps, 
-    allQuestionsAnswered, 
-    allItemsFilled, 
-    allMeasurementsFilled
-  ]);
-
   const goToSubStep = (step: 'quiz' | 'items' | 'measurements') => {
     setDetailsSubStep(step);
     if (!visitedSteps.includes(step)) {
@@ -593,7 +519,6 @@ const ServiceDetailsStep: React.FC<{
   };
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
-    setUserInteracted(true);
     setAnswers(prev => ({
       ...prev,
       [questionId]: optionId
@@ -601,7 +526,6 @@ const ServiceDetailsStep: React.FC<{
   };
 
   const handleItemQuantityChange = (itemId: string, quantity: number) => {
-    setUserInteracted(true);
     setItemQuantities(prev => ({
       ...prev,
       [itemId]: quantity
@@ -631,7 +555,6 @@ const ServiceDetailsStep: React.FC<{
     if (currentStepIndex < requiredSteps.length - 1) {
       const nextStep = requiredSteps[currentStepIndex + 1] as 'quiz' | 'items' | 'measurements';
       goToSubStep(nextStep);
-      setUserInteracted(false);
     }
   };
 
@@ -658,6 +581,11 @@ const ServiceDetailsStep: React.FC<{
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (detailsSubStep === 'quiz' && !allQuestionsAnswered) {
+      toast.error('Por favor, responda todas as perguntas');
+      return;
+    }
     
     updateFormData({
       answers,
@@ -702,7 +630,6 @@ const ServiceDetailsStep: React.FC<{
               size="sm"
               className={`rounded-full px-4 ${index === 0 ? "" : "ml-2"}`}
               onClick={() => goToSubStep(step as 'quiz' | 'items' | 'measurements')}
-              disabled={!visitedSteps.includes(step) && index !== 0}
             >
               {step === 'quiz' ? 'Questionário' : 
                step === 'items' ? 'Itens' : 'Medidas'}
@@ -813,6 +740,7 @@ const ServiceDetailsStep: React.FC<{
               <Button 
                 type="button" 
                 onClick={nextDetailsSubStep}
+                disabled={!allQuestionsAnswered}
               >
                 Próximo Sub-passo <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
@@ -842,7 +770,6 @@ const ServiceDetailsStep: React.FC<{
                     step={item.type === 'quantity' ? '1' : '0.01'}
                     value={itemQuantities[item.id] || ''}
                     onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
-                    onBlur={() => setUserInteracted(true)}
                   />
                 </div>
               </div>
@@ -967,7 +894,6 @@ const ServiceDetailsStep: React.FC<{
             </Button>
             <Button 
               type="submit"
-              disabled={!allStepsCompleted}
             >
               Finalizar <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
