@@ -188,12 +188,14 @@ export const getServicesWithMeta = async (): Promise<ServiceWithMeta[]> => {
   try {
     const { data, error } = await supabase
       .from('services')
-      .select('id, name, description, icon_url, tags, sub_services(id, name)')
+      .select('id, name, description, icon_url, tags, sub_services:sub_services(id, name)')
       .order('name');
       
     if (error) throw error;
     
-    // Map the data to the expected format
+    if (!data) return [];
+    
+    // Map the data to the expected format, ensuring proper typing
     return data.map((service: any) => ({
       id: service.id,
       name: service.name,

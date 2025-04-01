@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Select,
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from '@/components/ui/label';
 
 interface ItemFormData {
   id?: string;
@@ -34,9 +35,9 @@ interface ItemManagementProps {
 }
 
 const ItemManagement: React.FC<ItemManagementProps> = ({ 
-  serviceId,
+  serviceId, 
   subServiceId, 
-  specialtyId,
+  specialtyId, 
   parentName,
   level
 }) => {
@@ -51,46 +52,36 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
   });
   const [isEditing, setIsEditing] = useState(false);
 
-  // Determine query key and parameters based on the level
-  const getQueryParams = () => {
-    switch (level) {
-      case 'service':
-        return {
-          key: ['items', 'service', serviceId],
-          field: 'service_id',
-          value: serviceId
-        };
-      case 'subService':
-        return {
-          key: ['items', 'subService', subServiceId],
-          field: 'sub_service_id',
-          value: subServiceId
-        };
-      case 'specialty':
-        return {
-          key: ['items', 'specialty', specialtyId],
-          field: 'specialty_id',
-          value: specialtyId
-        };
-    }
-  };
-
-  const queryParams = getQueryParams();
-
   // Fetch items for the current parent
   const { data: items = [], isLoading } = useQuery({
-    queryKey: queryParams.key,
+    queryKey: ['items', serviceId, subServiceId, specialtyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('service_items')
         .select('*')
-        .eq(queryParams.field, queryParams.value)
         .order('name');
+      
+      if (level === 'service' && serviceId) {
+        query = query.eq('service_id', serviceId)
+          .is('sub_service_id', null)
+          .is('specialty_id', null);
+      } else if (level === 'subService' && subServiceId) {
+        query = query.eq('sub_service_id', subServiceId)
+          .is('specialty_id', null);
+      } else if (level === 'specialty' && specialtyId) {
+        query = query.eq('specialty_id', specialtyId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data || [];
     },
-    enabled: !!queryParams.value,
+    enabled: !!(
+      (level === 'service' && serviceId) ||
+      (level === 'subService' && subServiceId) ||
+      (level === 'specialty' && specialtyId)
+    ),
   });
 
   // Reset form when parent changes
@@ -108,17 +99,25 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
   // Create item mutation
   const createItemMutation = useMutation({
     mutationFn: async (formData: ItemFormData) => {
+      const itemData: any = {
+        name: formData.name,
+        type: formData.type,
+      };
+      
+      if (level === 'service' && serviceId) {
+        itemData.service_id = serviceId;
+      } else if (level === 'subService' && subServiceId) {
+        itemData.sub_service_id = subServiceId;
+        if (serviceId) itemData.service_id = serviceId;
+      } else if (level === 'specialty' && specialtyId) {
+        itemData.specialty_id = specialtyId;
+        if (subServiceId) itemData.sub_service_id = subServiceId;
+        if (serviceId) itemData.service_id = serviceId;
+      }
+      
       const { data, error } = await supabase
         .from('service_items')
-        .insert([
-          { 
-            name: formData.name,
-            type: formData.type,
-            service_id: formData.serviceId || null,
-            sub_service_id: formData.subServiceId || null,
-            specialty_id: formData.specialtyId || null
-          }
-        ])
+        .insert([itemData])
         .select('id')
         .single();
       
@@ -126,7 +125,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
       return data.id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryParams.key });
+      queryClient.invalidateQueries({ queryKey: ['items', serviceId, subServiceId, specialtyId] });
       resetForm();
       setIsDialogOpen(false);
       toast.success('Item criado com sucesso');
@@ -145,7 +144,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
         .from('service_items')
         .update({ 
           name: formData.name,
-          type: formData.type
+          type: formData.type 
         })
         .eq('id', formData.id);
       
@@ -153,7 +152,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
       return formData.id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryParams.key });
+      queryClient.invalidateQueries({ queryKey: ['items', serviceId, subServiceId, specialtyId] });
       resetForm();
       setIsDialogOpen(false);
       toast.success('Item atualizado com sucesso');
@@ -175,7 +174,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryParams.key });
+      queryClient.invalidateQueries({ queryKey: ['items', serviceId, subServiceId, specialtyId] });
       toast.success('Item excluído com sucesso');
     },
     onError: (error: any) => {
@@ -213,7 +212,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
     setCurrentItem({
       id: item.id,
       name: item.name,
-      type: item.type as 'quantity' | 'square_meter' | 'linear_meter',
+      type: item.type,
       serviceId: item.service_id,
       subServiceId: item.sub_service_id,
       specialtyId: item.specialty_id
@@ -228,7 +227,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
     }
   };
 
-  const getTypeLabel = (type: string) => {
+  const getItemTypeName = (type: string): string => {
     switch (type) {
       case 'quantity': return 'Quantidade';
       case 'square_meter': return 'Metro quadrado';
@@ -241,9 +240,9 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
     <Card className="h-full">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Itens para {parentName}</CardTitle>
+          <CardTitle>Itens de {parentName}</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Gerencie os itens que serão utilizados nos orçamentos
+            Gerencie os itens disponíveis para este {level === 'service' ? 'serviço' : level === 'subService' ? 'sub-serviço' : 'especialidade'}
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -272,24 +271,22 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
                   id="name"
                   value={currentItem.name}
                   onChange={(e) => setCurrentItem({...currentItem, name: e.target.value})}
-                  placeholder="Ex: Tomada, Interruptor, Lata de tinta"
+                  placeholder="Ex: Tomada, Torneira, Janela"
                   required
                 />
               </div>
               
-              <div>
-                <label htmlFor="type" className="text-sm font-medium">
-                  Tipo de Medida <span className="text-red-500">*</span>
-                </label>
-                <Select 
-                  value={currentItem.type} 
+              <div className="space-y-2">
+                <Label htmlFor="type">Tipo de Item <span className="text-red-500">*</span></Label>
+                <Select
+                  value={currentItem.type}
                   onValueChange={(value) => setCurrentItem({
                     ...currentItem, 
                     type: value as 'quantity' | 'square_meter' | 'linear_meter'
                   })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
+                    <SelectValue placeholder="Selecione o tipo do item" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="quantity">Quantidade</SelectItem>
@@ -297,6 +294,9 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
                     <SelectItem value="linear_meter">Metro linear</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  O tipo determina como este item será contabilizado nos orçamentos
+                </p>
               </div>
               
               <DialogFooter>
@@ -332,7 +332,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
           <div className="text-center py-10">Carregando itens...</div>
         ) : items.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
-            Nenhum item cadastrado para {parentName}.
+            Nenhum item cadastrado para este {level === 'service' ? 'serviço' : level === 'subService' ? 'sub-serviço' : 'especialidade'}.
           </div>
         ) : (
           <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
@@ -341,10 +341,9 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
                 <CardContent className="p-4 flex justify-between items-center">
                   <div>
                     <h3 className="font-medium">{item.name}</h3>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <Tag className="h-3 w-3" />
-                      <span>{getTypeLabel(item.type)}</span>
-                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Tipo: {getItemTypeName(item.type)}
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <Button
