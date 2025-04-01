@@ -20,14 +20,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Plus, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +46,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Progress } from "@/components/ui/progress";
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Rua é obrigatória'),
@@ -104,7 +104,10 @@ const AddressStep: React.FC<{
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    setValue,
+    watch,
+    reset,
+    formState: { errors, isValid },
   } = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -116,7 +119,46 @@ const AddressStep: React.FC<{
       state: formData.state || '',
       zipCode: formData.zipCode || '',
     },
+    mode: 'onChange'
   });
+
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
+  const zipCode = watch('zipCode');
+
+  // Watch for CEP changes and fetch address data
+  useEffect(() => {
+    const fetchAddressFromCep = async () => {
+      const cleanZipCode = zipCode?.replace(/\D/g, '');
+      
+      if (cleanZipCode?.length === 8) {
+        setIsFetchingCep(true);
+        try {
+          const response = await fetch(`https://viacep.com.br/ws/${cleanZipCode}/json/`);
+          const data = await response.json();
+          
+          if (!data.erro) {
+            setValue('street', data.logradouro, { shouldValidate: true });
+            setValue('neighborhood', data.bairro, { shouldValidate: true });
+            setValue('city', data.localidade, { shouldValidate: true });
+            setValue('state', data.uf, { shouldValidate: true });
+            // Focus on the number field after CEP is successfully processed
+            setTimeout(() => {
+              document.getElementById('number')?.focus();
+            }, 100);
+          } else {
+            toast.error('CEP não encontrado');
+          }
+        } catch (error) {
+          console.error('Error fetching address:', error);
+          toast.error('Erro ao buscar o endereço');
+        } finally {
+          setIsFetchingCep(false);
+        }
+      }
+    };
+
+    fetchAddressFromCep();
+  }, [zipCode, setValue]);
 
   const onSubmit = (data: AddressFormData) => {
     updateFormData(data);
@@ -125,6 +167,25 @@ const AddressStep: React.FC<{
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="zipCode">CEP</Label>
+        <div className="flex items-center">
+          <Input 
+            id="zipCode" 
+            {...register('zipCode')}
+            placeholder="00000-000"
+            className="flex-grow"
+          />
+          {isFetchingCep && <Loader2 className="animate-spin ml-2 h-4 w-4 text-primary" />}
+          {!isFetchingCep && zipCode?.length >= 8 && !errors.zipCode && 
+            <CheckCircle2 className="ml-2 h-4 w-4 text-green-500" />
+          }
+        </div>
+        {errors.zipCode && (
+          <p className="text-sm text-red-500">{errors.zipCode.message}</p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="street">Rua</Label>
@@ -174,21 +235,15 @@ const AddressStep: React.FC<{
             <p className="text-sm text-red-500">{errors.state.message}</p>
           )}
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="zipCode">CEP</Label>
-          <Input id="zipCode" {...register('zipCode')} />
-          {errors.zipCode && (
-            <p className="text-sm text-red-500">{errors.zipCode.message}</p>
-          )}
-        </div>
       </div>
 
       <div className="pt-4 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
           <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
         </Button>
-        <Button type="submit">Solicitar Orçamentos</Button>
+        <Button type="submit" disabled={!isValid}>
+          Revisar Orçamento
+        </Button>
       </div>
     </form>
   );
@@ -243,8 +298,8 @@ const ServiceStep: React.FC<{
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedService || !selectedSubService || !selectedSpecialty) {
-      toast.error('Por favor, selecione o serviço completo');
+    if (!selectedService) {
+      toast.error('Por favor, selecione pelo menos um serviço');
       return;
     }
     
@@ -254,8 +309,8 @@ const ServiceStep: React.FC<{
     
     updateFormData({
       serviceId: selectedService,
-      subServiceId: selectedSubService,
-      specialtyId: selectedSpecialty,
+      subServiceId: selectedSubService || undefined,
+      specialtyId: selectedSpecialty || undefined,
       serviceName,
       subServiceName,
       specialtyName,
@@ -276,6 +331,7 @@ const ServiceStep: React.FC<{
           <Select 
             value={selectedService} 
             onValueChange={handleServiceChange}
+            required
           >
             <SelectTrigger id="service">
               <SelectValue placeholder="Selecione um serviço" />
@@ -292,7 +348,7 @@ const ServiceStep: React.FC<{
 
         {selectedService && (
           <div className="space-y-2">
-            <Label htmlFor="subService">Selecione o tipo de serviço</Label>
+            <Label htmlFor="subService">Selecione o tipo de serviço (opcional)</Label>
             <Select 
               value={selectedSubService} 
               onValueChange={handleSubServiceChange}
@@ -313,7 +369,7 @@ const ServiceStep: React.FC<{
 
         {selectedSubService && (
           <div className="space-y-2">
-            <Label htmlFor="specialty">Selecione a especialidade</Label>
+            <Label htmlFor="specialty">Selecione a especialidade (opcional)</Label>
             <Select 
               value={selectedSpecialty} 
               onValueChange={handleSpecialtyChange}
@@ -345,7 +401,7 @@ const ServiceStep: React.FC<{
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button type="submit">
+        <Button type="submit" disabled={!selectedService}>
           Próximo <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -360,7 +416,8 @@ const ServiceDetailsStep: React.FC<{
   formData: FormData;
   updateFormData: (data: Partial<FormData>) => void;
 }> = ({ onNext, onBack, formData, updateFormData }) => {
-  const [activeTab, setActiveTab] = useState('quiz');
+  // Define sub-steps for the service details
+  const [detailsSubStep, setDetailsSubStep] = useState<'quiz' | 'items' | 'measurements'>('quiz');
   const [questions, setQuestions] = useState<ServiceQuestion[]>([]);
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [answers, setAnswers] = useState<{[key: string]: string}>(formData.answers || {});
@@ -376,6 +433,10 @@ const ServiceDetailsStep: React.FC<{
   const [hasSquareMeterItems, setHasSquareMeterItems] = useState(false);
   const [hasLinearMeterItems, setHasLinearMeterItems] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [allQuestionsAnswered, setAllQuestionsAnswered] = useState(false);
+  const [allItemsFilled, setAllItemsFilled] = useState(false);
+  const [allMeasurementsFilled, setAllMeasurementsFilled] = useState(false);
+  const [visitedSteps, setVisitedSteps] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadServiceDetails() {
@@ -399,12 +460,22 @@ const ServiceDetailsStep: React.FC<{
         setHasSquareMeterItems(allItems.some(item => item.type === 'square_meter'));
         setHasLinearMeterItems(allItems.some(item => item.type === 'linear_meter'));
         
-        if (questions.length > 0) {
-          setActiveTab('quiz');
+        // Set initial sub-step - choose first available sub-step
+        if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
+          setDetailsSubStep('quiz');
+          if (!visitedSteps.includes('quiz')) {
+            setVisitedSteps(prev => [...prev, 'quiz']);
+          }
         } else if (allItems.length > 0) {
-          setActiveTab('items');
+          setDetailsSubStep('items');
+          if (!visitedSteps.includes('items')) {
+            setVisitedSteps(prev => [...prev, 'items']);
+          }
         } else if (hasSquareMeterItems || hasLinearMeterItems) {
-          setActiveTab('measurements');
+          setDetailsSubStep('measurements');
+          if (!visitedSteps.includes('measurements')) {
+            setVisitedSteps(prev => [...prev, 'measurements']);
+          }
         }
       } catch (error) {
         console.error('Error loading service details:', error);
@@ -416,6 +487,76 @@ const ServiceDetailsStep: React.FC<{
     
     loadServiceDetails();
   }, [formData]);
+
+  // Check if all questions are answered
+  useEffect(() => {
+    const checkQuestionsAnswered = () => {
+      if (questions.length === 0) {
+        setAllQuestionsAnswered(true);
+        return;
+      }
+      
+      const answeredQuestions = questions.filter(q => answers[q.id]);
+      setAllQuestionsAnswered(answeredQuestions.length === questions.length);
+    };
+    
+    checkQuestionsAnswered();
+  }, [answers, questions]);
+
+  // Check if all required items are filled
+  useEffect(() => {
+    const checkItemsFilled = () => {
+      if (items.length === 0) {
+        setAllItemsFilled(true);
+        return;
+      }
+      
+      // Consider item filled if it has any quantity or is zero
+      const filledItems = items.filter(item => itemQuantities[item.id] !== undefined);
+      setAllItemsFilled(filledItems.length === items.length);
+    };
+    
+    checkItemsFilled();
+  }, [itemQuantities, items]);
+
+  // Check if measurements are filled
+  useEffect(() => {
+    const checkMeasurementsFilled = () => {
+      if (!hasSquareMeterItems && !hasLinearMeterItems) {
+        setAllMeasurementsFilled(true);
+        return;
+      }
+      
+      // If we need measurements, require at least one
+      setAllMeasurementsFilled(measurements.length > 0);
+    };
+    
+    checkMeasurementsFilled();
+  }, [measurements, hasSquareMeterItems, hasLinearMeterItems]);
+
+  // Auto advance to next sub-step when current is complete
+  useEffect(() => {
+    if (detailsSubStep === 'quiz' && allQuestionsAnswered) {
+      if (items.length > 0) {
+        setDetailsSubStep('items');
+        if (!visitedSteps.includes('items')) {
+          setVisitedSteps(prev => [...prev, 'items']);
+        }
+      } else if ((hasSquareMeterItems || hasLinearMeterItems) && !allMeasurementsFilled) {
+        setDetailsSubStep('measurements');
+        if (!visitedSteps.includes('measurements')) {
+          setVisitedSteps(prev => [...prev, 'measurements']);
+        }
+      }
+    } else if (detailsSubStep === 'items' && allItemsFilled) {
+      if ((hasSquareMeterItems || hasLinearMeterItems) && !allMeasurementsFilled) {
+        setDetailsSubStep('measurements');
+        if (!visitedSteps.includes('measurements')) {
+          setVisitedSteps(prev => [...prev, 'measurements']);
+        }
+      }
+    }
+  }, [allQuestionsAnswered, allItemsFilled, detailsSubStep, items.length, hasSquareMeterItems, hasLinearMeterItems]);
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setAnswers(prev => ({
@@ -449,19 +590,31 @@ const ServiceDetailsStep: React.FC<{
     setMeasurements(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleToReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    updateFormData({
-      answers,
-      itemQuantities,
-      measurements
-    });
-    
-    setShowReview(true);
+  const nextDetailsSubStep = () => {
+    if (detailsSubStep === 'quiz') {
+      setDetailsSubStep('items');
+      if (!visitedSteps.includes('items')) {
+        setVisitedSteps(prev => [...prev, 'items']);
+      }
+    } else if (detailsSubStep === 'items') {
+      setDetailsSubStep('measurements');
+      if (!visitedSteps.includes('measurements')) {
+        setVisitedSteps(prev => [...prev, 'measurements']);
+      }
+    }
   };
 
-  const handleSubmit = () => {
+  const prevDetailsSubStep = () => {
+    if (detailsSubStep === 'items') {
+      setDetailsSubStep('quiz');
+    } else if (detailsSubStep === 'measurements') {
+      setDetailsSubStep('items');
+    }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
     updateFormData({
       answers,
       itemQuantities,
@@ -471,258 +624,382 @@ const ServiceDetailsStep: React.FC<{
     onNext();
   };
 
+  const allSubStepsVisited = () => {
+    const requiredSteps = [];
+    
+    if (questions.length > 0) requiredSteps.push('quiz');
+    if (items.length > 0) requiredSteps.push('items');
+    if (hasSquareMeterItems || hasLinearMeterItems) requiredSteps.push('measurements');
+    
+    return requiredSteps.every(step => visitedSteps.includes(step));
+  };
+
   if (loading) {
     return <div className="text-center py-8">Carregando detalhes do serviço...</div>;
   }
 
-  if (showReview) {
+  // If there are no details to collect, just show a simple message and allow proceeding
+  if (questions.length === 0 && items.length === 0 && !hasSquareMeterItems && !hasLinearMeterItems) {
     return (
       <div className="space-y-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Revise seu pedido de orçamento</h3>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Serviço Solicitado</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Serviço:</span>
-                  <span className="font-medium">{formData.serviceName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Tipo de serviço:</span>
-                  <span className="font-medium">{formData.subServiceName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Especialidade:</span>
-                  <span className="font-medium">{formData.specialtyName}</span>
-                </div>
-                {formData.description && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-gray-500">Descrição:</p>
-                      <p className="mt-1">{formData.description}</p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Endereço</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <p>{formData.street}, {formData.number}</p>
-                {formData.complement && <p>{formData.complement}</p>}
-                <p>{formData.neighborhood}, {formData.city} - {formData.state}</p>
-                <p>CEP: {formData.zipCode}</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="text-center py-8">
+          <p>Não há detalhes adicionais necessários para este serviço.</p>
         </div>
-
+        
         <div className="flex justify-between pt-4">
-          <Button type="button" variant="outline" onClick={() => setShowReview(false)}>
+          <Button type="button" variant="outline" onClick={onBack}>
             <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
           </Button>
-          <Button onClick={handleSubmit}>
-            Solicitar Orçamentos
+          <Button onClick={onNext}>
+            Próximo <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </div>
     );
   }
 
+  // Progress bar calculation
+  const calculateProgress = () => {
+    const steps = [];
+    if (questions.length > 0) steps.push('quiz');
+    if (items.length > 0) steps.push('items');
+    if (hasSquareMeterItems || hasLinearMeterItems) steps.push('measurements');
+    
+    const currentIndex = steps.indexOf(detailsSubStep);
+    const totalSteps = steps.length;
+    
+    return ((currentIndex + 1) / totalSteps) * 100;
+  };
+
   return (
-    <form onSubmit={handleToReview} className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3">
-          {questions.length > 0 && (
-            <TabsTrigger value="quiz">Questionário</TabsTrigger>
-          )}
-          {items.length > 0 && (
-            <TabsTrigger value="items">Itens do Serviço</TabsTrigger>
-          )}
-          {(hasSquareMeterItems || hasLinearMeterItems) && (
-            <TabsTrigger value="measurements">Medidas</TabsTrigger>
-          )}
-        </TabsList>
+    <form onSubmit={handleFormSubmit} className="space-y-6">
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="text-sm text-muted-foreground">
+            Passo {
+              detailsSubStep === 'quiz' ? '1' : 
+              detailsSubStep === 'items' ? '2' : '3'
+            } de {
+              [questions.length > 0, items.length > 0, (hasSquareMeterItems || hasLinearMeterItems)].filter(Boolean).length
+            }
+          </p>
+          <p className="text-sm font-medium">
+            {
+              detailsSubStep === 'quiz' ? 'Questionário' :
+              detailsSubStep === 'items' ? 'Itens do Serviço' : 'Medidas'
+            }
+          </p>
+        </div>
+        <Progress value={calculateProgress()} className="h-2" />
+      </div>
 
-        {questions.length > 0 && (
-          <TabsContent value="quiz" className="pt-4">
-            <h3 className="text-lg font-medium mb-4">Responda as perguntas abaixo</h3>
-            
-            {questions.length > 0 ? (
-              <Carousel className="w-full">
-                <CarouselContent>
-                  {questions.map((question) => (
-                    <CarouselItem key={question.id}>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>{question.question}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <RadioGroup 
-                            value={answers[question.id] || ''} 
-                            onValueChange={(value) => handleAnswerChange(question.id, value)}
-                          >
-                            {question.options.map((option) => (
-                              <div key={option.id} className="flex items-center space-x-2 py-2">
-                                <RadioGroupItem value={option.id} id={option.id} />
-                                <Label htmlFor={option.id}>{option.optionText}</Label>
-                              </div>
-                            ))}
-                          </RadioGroup>
-                        </CardContent>
-                      </Card>
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <div className="flex justify-center mt-4">
-                  <CarouselPrevious className="mr-2" />
-                  <CarouselNext className="ml-2" />
-                </div>
-              </Carousel>
-            ) : (
-              <p>Não há perguntas disponíveis para este serviço.</p>
-            )}
-          </TabsContent>
-        )}
-
-        {items.length > 0 && (
-          <TabsContent value="items" className="pt-4">
-            <h3 className="text-lg font-medium mb-4">Informe as quantidades necessárias</h3>
-            
-            <div className="space-y-4">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {item.type === 'quantity' ? 'Quantidade' : 
-                       item.type === 'square_meter' ? 'Metro Quadrado' : 'Metro Linear'}
-                    </p>
-                  </div>
-                  <div className="w-24">
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      step={item.type === 'quantity' ? '1' : '0.01'}
-                      value={itemQuantities[item.id] || ''}
-                      onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        )}
-
-        {(hasSquareMeterItems || hasLinearMeterItems) && (
-          <TabsContent value="measurements" className="pt-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Informe as medidas necessárias</h3>
-              <Button type="button" onClick={addMeasurement} variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-1" /> Adicionar
+      {detailsSubStep === 'quiz' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium mb-4">Responda as perguntas abaixo</h3>
+          
+          {questions.length > 0 ? (
+            <Carousel className="w-full">
+              <CarouselContent>
+                {questions.map((question) => (
+                  <CarouselItem key={question.id}>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>{question.question}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <RadioGroup 
+                          value={answers[question.id] || ''} 
+                          onValueChange={(value) => handleAnswerChange(question.id, value)}
+                        >
+                          {question.options.map((option) => (
+                            <div key={option.id} className="flex items-center space-x-2 py-2">
+                              <RadioGroupItem value={option.id} id={option.id} />
+                              <Label htmlFor={option.id}>{option.optionText}</Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </CardContent>
+                    </Card>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <div className="flex justify-center mt-4">
+                <CarouselPrevious className="mr-2" />
+                <CarouselNext className="ml-2" />
+              </div>
+            </Carousel>
+          ) : (
+            <p>Não há perguntas disponíveis para este serviço.</p>
+          )}
+          
+          <div className="flex justify-between pt-4">
+            <Button type="button" variant="outline" onClick={onBack}>
+              <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
+            {items.length > 0 ? (
+              <Button 
+                type="button" 
+                onClick={nextDetailsSubStep}
+              >
+                Próximo <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
-            </div>
+            ) : (hasSquareMeterItems || hasLinearMeterItems) ? (
+              <Button 
+                type="button" 
+                onClick={nextDetailsSubStep}
+              >
+                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button 
+                type="submit"
+                disabled={!allSubStepsVisited()}
+              >
+                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {detailsSubStep === 'items' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium mb-4">Informe as quantidades necessárias</h3>
+          
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
+                <div>
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {item.type === 'quantity' ? 'Quantidade' : 
+                     item.type === 'square_meter' ? 'Metro Quadrado' : 'Metro Linear'}
+                  </p>
+                </div>
+                <div className="w-24">
+                  <Input 
+                    type="number" 
+                    min="0" 
+                    step={item.type === 'quantity' ? '1' : '0.01'}
+                    value={itemQuantities[item.id] || ''}
+                    onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex justify-between pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={questions.length > 0 ? prevDetailsSubStep : onBack}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
             
-            {measurements.length > 0 ? (
-              <div className="space-y-6">
-                {measurements.map((measurement, index) => (
-                  <Card key={measurement.id} className="relative">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute top-2 right-2"
-                      onClick={() => removeMeasurement(index)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                    
-                    <CardContent className="pt-6">
-                      <div className="space-y-4">
+            {(hasSquareMeterItems || hasLinearMeterItems) ? (
+              <Button 
+                type="button" 
+                onClick={nextDetailsSubStep}
+              >
+                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button 
+                type="submit"
+                disabled={!allSubStepsVisited()}
+              >
+                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {detailsSubStep === 'measurements' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Informe as medidas necessárias</h3>
+            <Button type="button" onClick={addMeasurement} variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-1" /> Adicionar
+            </Button>
+          </div>
+          
+          {measurements.length > 0 ? (
+            <div className="space-y-6">
+              {measurements.map((measurement, index) => (
+                <Card key={measurement.id} className="relative">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute top-2 right-2"
+                    onClick={() => removeMeasurement(index)}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                  
+                  <CardContent className="pt-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Nome do cômodo/área (opcional)</Label>
+                        <Input 
+                          value={measurement.roomName} 
+                          onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
+                          placeholder="Ex: Sala, Quarto, Cozinha"
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <Label>Nome do cômodo/área (opcional)</Label>
+                          <Label>Largura (m)</Label>
                           <Input 
-                            value={measurement.roomName} 
-                            onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
-                            placeholder="Ex: Sala, Quarto, Cozinha"
+                            type="number" 
+                            step="0.01" 
+                            min="0"
+                            value={measurement.width || ''} 
+                            onChange={(e) => updateMeasurement(index, 'width', parseFloat(e.target.value) || 0)}
                           />
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label>Largura (m)</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              min="0"
-                              value={measurement.width || ''} 
-                              onChange={(e) => updateMeasurement(index, 'width', parseFloat(e.target.value) || 0)}
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Comprimento (m)</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              min="0"
-                              value={measurement.length || ''} 
-                              onChange={(e) => updateMeasurement(index, 'length', parseFloat(e.target.value) || 0)}
-                            />
-                          </div>
-                          
-                          {hasSquareMeterItems && (
-                            <div className="space-y-2">
-                              <Label>Altura (m) (opcional)</Label>
-                              <Input 
-                                type="number" 
-                                step="0.01" 
-                                min="0"
-                                value={measurement.height || ''} 
-                                onChange={(e) => updateMeasurement(index, 'height', parseFloat(e.target.value) || undefined)}
-                              />
-                            </div>
-                          )}
+                        <div className="space-y-2">
+                          <Label>Comprimento (m)</Label>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            min="0"
+                            value={measurement.length || ''} 
+                            onChange={(e) => updateMeasurement(index, 'length', parseFloat(e.target.value) || 0)}
+                          />
                         </div>
                         
-                        <div className="p-3 bg-gray-50 rounded-md">
-                          <p className="text-sm font-medium">
-                            Área total: {(measurement.width * measurement.length).toFixed(2)} m²
-                          </p>
-                        </div>
+                        {hasSquareMeterItems && (
+                          <div className="space-y-2">
+                            <Label>Altura (m) (opcional)</Label>
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              min="0"
+                              value={measurement.height || ''} 
+                              onChange={(e) => updateMeasurement(index, 'height', parseFloat(e.target.value) || undefined)}
+                            />
+                          </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center py-8 text-gray-500">
-                Clique em "Adicionar" para incluir as medidas necessárias para o serviço.
-              </p>
-            )}
-          </TabsContent>
-        )}
-      </Tabs>
+                      
+                      <div className="p-3 bg-gray-50 rounded-md">
+                        <p className="text-sm font-medium">
+                          Área total: {(measurement.width * measurement.length).toFixed(2)} m²
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center py-8 text-gray-500">
+              Clique em "Adicionar" para incluir as medidas necessárias para o serviço.
+            </p>
+          )}
+          
+          <div className="flex justify-between pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={prevDetailsSubStep}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
+            <Button 
+              type="submit"
+              disabled={!allSubStepsVisited() || (measurements.length === 0 && (hasSquareMeterItems || hasLinearMeterItems))}
+            >
+              Próximo <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </form>
+  );
+};
 
+// Review Step Component
+const ReviewStep: React.FC<{
+  onSubmit: () => void;
+  onBack: () => void;
+  onEditSection: (section: string) => void;
+  formData: FormData;
+}> = ({ onSubmit, onBack, onEditSection, formData }) => {
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-medium text-center">Revise seu pedido de orçamento</h3>
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-md font-medium">Serviço Solicitado</CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => onEditSection('service')}>
+            Editar
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Serviço:</span>
+              <span className="font-medium">{formData.serviceName}</span>
+            </div>
+            {formData.subServiceName && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Tipo de serviço:</span>
+                <span className="font-medium">{formData.subServiceName}</span>
+              </div>
+            )}
+            {formData.specialtyName && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Especialidade:</span>
+                <span className="font-medium">{formData.specialtyName}</span>
+              </div>
+            )}
+            {formData.description && (
+              <>
+                <Separator />
+                <div>
+                  <p className="text-gray-500">Descrição:</p>
+                  <p className="mt-1">{formData.description}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-md font-medium">Endereço</CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => onEditSection('address')}>
+            Editar
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1">
+            <p>{formData.street}, {formData.number}</p>
+            {formData.complement && <p>{formData.complement}</p>}
+            <p>{formData.neighborhood}, {formData.city} - {formData.state}</p>
+            <p>CEP: {formData.zipCode}</p>
+          </div>
+        </CardContent>
+      </Card>
+      
       <div className="flex justify-between pt-4">
         <Button type="button" variant="outline" onClick={onBack}>
           <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
         </Button>
-        <Button type="submit">
-          Próximo <ChevronRight className="ml-2 h-4 w-4" />
+        <Button onClick={onSubmit}>
+          Enviar Orçamento
         </Button>
       </div>
-    </form>
+    </div>
   );
 };
 
@@ -802,6 +1079,16 @@ const QuoteRequestForm: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleEditSection = (section: string) => {
+    if (section === 'service') {
+      handleStepChange(1);
+    } else if (section === 'details') {
+      handleStepChange(2);
+    } else if (section === 'address') {
+      handleStepChange(3);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       setShowLoginDialog(true);
@@ -815,8 +1102,8 @@ const QuoteRequestForm: React.FC = () => {
         .insert({
           client_id: user.id,
           service_id: formData.serviceId || '',
-          sub_service_id: formData.subServiceId || '',
-          specialty_id: formData.specialtyId || '',
+          sub_service_id: formData.subServiceId || null,
+          specialty_id: formData.specialtyId || null,
           description: formData.description || '',
           street: formData.street || '',
           number: formData.number || '',
@@ -906,7 +1193,7 @@ const QuoteRequestForm: React.FC = () => {
           <div className="flex justify-between relative mb-6">
             <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
             
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="relative z-10">
                 <div 
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -919,6 +1206,7 @@ const QuoteRequestForm: React.FC = () => {
                   {s === 1 && 'Serviço'}
                   {s === 2 && 'Detalhes'}
                   {s === 3 && 'Endereço'}
+                  {s === 4 && 'Revisar'}
                 </div>
               </div>
             ))}
@@ -951,14 +1239,32 @@ const QuoteRequestForm: React.FC = () => {
           
           {step === 3 && (
             <AddressStep 
-              onNext={handleSubmit} 
+              onNext={() => handleStepChange(4)} 
               onBack={() => handleStepChange(2)} 
               formData={formData} 
               updateFormData={updateFormData} 
             />
           )}
+          
+          {step === 4 && (
+            <ReviewStep 
+              onSubmit={handleSubmit}
+              onBack={() => handleStepChange(3)}
+              onEditSection={handleEditSection}
+              formData={formData}
+            />
+          )}
         </motion.div>
       </div>
+
+      {isSubmitting && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-md shadow-lg flex flex-col items-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+            <p className="text-lg font-medium">Enviando orçamento...</p>
+          </div>
+        </div>
+      )}
 
       <LoginDialog 
         isOpen={showLoginDialog} 
