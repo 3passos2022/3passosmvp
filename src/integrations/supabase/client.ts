@@ -13,7 +13,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
   auth: {
     persistSession: true,
     storageKey: '3passos-auth',
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',

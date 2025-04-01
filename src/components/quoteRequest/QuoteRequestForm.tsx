@@ -940,30 +940,22 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
     setIsSubmitting(true);
     
     try {
-      const quoteData = {
-        client_id: user?.id || null,
-        service_id: formData.serviceId,
-        sub_service_id: formData.subServiceId || null,
-        specialty_id: formData.specialtyId || null,
-        status: 'pending',
-        street: formData.street || '',
-        number: formData.number || '',
-        complement: formData.complement || null,
-        neighborhood: formData.neighborhood || '',
-        city: formData.city || '',
-        state: formData.state || '',
-        zip_code: formData.zipCode || '',
-        description: formData.description || '',
-        is_anonymous: !user
-      };
-
-      console.log("Enviando dados de cotação:", quoteData);
+      console.log("Enviando dados de cotação via RPC...");
       
-      const { data, error } = await supabase
-        .from('quotes')
-        .insert(quoteData)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('submit_quote', {
+        p_service_id: formData.serviceId,
+        p_sub_service_id: formData.subServiceId || null,
+        p_specialty_id: formData.specialtyId || null,
+        p_description: formData.description || null,
+        p_street: formData.street || '',
+        p_number: formData.number || '',
+        p_complement: formData.complement || null,
+        p_neighborhood: formData.neighborhood || '',
+        p_city: formData.city || '',
+        p_state: formData.state || '',
+        p_zip_code: formData.zipCode || '',
+        p_is_anonymous: !user // Se user existir, não é anônimo
+      });
       
       if (error) {
         console.error('Erro ao enviar cotação:', error);
@@ -971,8 +963,8 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
         return;
       }
       
-      console.log("Cotação criada com sucesso:", data);
-      const quoteId = data.id;
+      console.log("Cotação criada com sucesso. ID:", data);
+      const quoteId = data; // A função RPC retorna o ID diretamente
       
       if (formData.answers && Object.keys(formData.answers).length > 0) {
         const answersToInsert = Object.entries(formData.answers).map(([questionId, optionId]) => ({
