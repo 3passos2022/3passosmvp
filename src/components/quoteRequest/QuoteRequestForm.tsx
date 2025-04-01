@@ -93,7 +93,6 @@ interface FormData {
   }[];
 }
 
-// Component for address form
 const AddressStep: React.FC<{
   onNext: () => void;
   onBack: () => void;
@@ -124,7 +123,6 @@ const AddressStep: React.FC<{
   const [isFetchingCep, setIsFetchingCep] = useState(false);
   const zipCode = watch('zipCode');
 
-  // Watch for CEP changes and fetch address data
   useEffect(() => {
     const fetchAddressFromCep = async () => {
       const cleanZipCode = zipCode?.replace(/\D/g, '');
@@ -140,7 +138,6 @@ const AddressStep: React.FC<{
             setValue('neighborhood', data.bairro, { shouldValidate: true });
             setValue('city', data.localidade, { shouldValidate: true });
             setValue('state', data.uf, { shouldValidate: true });
-            // Focus on the number field after CEP is successfully processed
             setTimeout(() => {
               document.getElementById('number')?.focus();
             }, 100);
@@ -248,7 +245,6 @@ const AddressStep: React.FC<{
   );
 };
 
-// Component for service selection
 const ServiceStep: React.FC<{
   onNext: () => void;
   formData: FormData;
@@ -408,14 +404,12 @@ const ServiceStep: React.FC<{
   );
 };
 
-// Component for service details step (quiz, items, measurements)
 const ServiceDetailsStep: React.FC<{
   onNext: () => void;
   onBack: () => void;
   formData: FormData;
   updateFormData: (data: Partial<FormData>) => void;
 }> = ({ onNext, onBack, formData, updateFormData }) => {
-  // Define sub-steps for the service details
   const [detailsSubStep, setDetailsSubStep] = useState<'quiz' | 'items' | 'measurements'>('quiz');
   const [questions, setQuestions] = useState<ServiceQuestion[]>([]);
   const [items, setItems] = useState<ServiceItem[]>([]);
@@ -438,7 +432,6 @@ const ServiceDetailsStep: React.FC<{
   const [visitedSteps, setVisitedSteps] = useState<string[]>([]);
   const [allStepsCompleted, setAllStepsCompleted] = useState(false);
 
-  // Track required steps
   const [requiredSteps, setRequiredSteps] = useState<string[]>([]);
 
   useEffect(() => {
@@ -466,7 +459,6 @@ const ServiceDetailsStep: React.FC<{
         setHasSquareMeterItems(hasSquareItems);
         setHasLinearMeterItems(hasLinearItems);
         
-        // Determine required steps
         const neededSteps = [];
         if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
           neededSteps.push('quiz');
@@ -479,7 +471,6 @@ const ServiceDetailsStep: React.FC<{
         }
         setRequiredSteps(neededSteps);
         
-        // Set initial sub-step - choose first available sub-step
         if (neededSteps.length > 0) {
           setDetailsSubStep(neededSteps[0] as 'quiz' | 'items' | 'measurements');
           if (!visitedSteps.includes(neededSteps[0])) {
@@ -495,9 +486,8 @@ const ServiceDetailsStep: React.FC<{
     }
     
     loadServiceDetails();
-  }, [formData]);
+  }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId, visitedSteps]);
 
-  // Check if all questions are answered
   useEffect(() => {
     const checkQuestionsAnswered = () => {
       if (questions.length === 0) {
@@ -512,7 +502,6 @@ const ServiceDetailsStep: React.FC<{
     checkQuestionsAnswered();
   }, [answers, questions]);
 
-  // Check if all required items are filled
   useEffect(() => {
     const checkItemsFilled = () => {
       if (items.length === 0) {
@@ -520,7 +509,6 @@ const ServiceDetailsStep: React.FC<{
         return;
       }
       
-      // Consider item filled if it has any quantity or is zero
       const filledItems = items.filter(item => itemQuantities[item.id] !== undefined);
       setAllItemsFilled(filledItems.length === items.length);
     };
@@ -528,7 +516,6 @@ const ServiceDetailsStep: React.FC<{
     checkItemsFilled();
   }, [itemQuantities, items]);
 
-  // Check if measurements are filled
   useEffect(() => {
     const checkMeasurementsFilled = () => {
       if (!hasSquareMeterItems && !hasLinearMeterItems) {
@@ -536,14 +523,12 @@ const ServiceDetailsStep: React.FC<{
         return;
       }
       
-      // If we need measurements, require at least one
       setAllMeasurementsFilled(measurements.length > 0);
     };
     
     checkMeasurementsFilled();
   }, [measurements, hasSquareMeterItems, hasLinearMeterItems]);
 
-  // Auto advance to next sub-step when current is complete
   useEffect(() => {
     if (detailsSubStep === 'quiz' && allQuestionsAnswered && requiredSteps.includes('items')) {
       setDetailsSubStep('items');
@@ -553,24 +538,20 @@ const ServiceDetailsStep: React.FC<{
     } else if (detailsSubStep === 'items' && allItemsFilled && requiredSteps.includes('measurements')) {
       setDetailsSubStep('measurements');
       if (!visitedSteps.includes('measurements')) {
-        setVisitedSteps(prev => [...prev, 'items']);
+        setVisitedSteps(prev => [...prev, 'measurements']);
       }
     }
   }, [allQuestionsAnswered, allItemsFilled, detailsSubStep, requiredSteps, visitedSteps]);
 
-  // Check if all steps are completed
   useEffect(() => {
     const checkAllStepsCompleted = () => {
-      // If no required steps, then we're done
       if (requiredSteps.length === 0) {
         setAllStepsCompleted(true);
         return;
       }
       
-      // All required steps must be visited
       const allVisited = requiredSteps.every(step => visitedSteps.includes(step));
       
-      // All necessary data must be filled
       const quizDone = !requiredSteps.includes('quiz') || allQuestionsAnswered;
       const itemsDone = !requiredSteps.includes('items') || allItemsFilled;
       const measurementsDone = !requiredSteps.includes('measurements') || allMeasurementsFilled;
@@ -655,7 +636,6 @@ const ServiceDetailsStep: React.FC<{
     return <div className="text-center py-8">Carregando detalhes do serviço...</div>;
   }
 
-  // If there are no details to collect, just show a simple message and allow proceeding
   if (requiredSteps.length === 0) {
     return (
       <div className="space-y-6">
@@ -675,7 +655,6 @@ const ServiceDetailsStep: React.FC<{
     );
   }
 
-  // Progress bar calculation
   const calculateProgress = () => {
     const currentIndex = requiredSteps.indexOf(detailsSubStep);
     return ((currentIndex + 1) / requiredSteps.length) * 100;
@@ -898,3 +877,324 @@ const ServiceDetailsStep: React.FC<{
             </Button>
             <Button 
               type="submit"
+              disabled={!allStepsCompleted}
+            >
+              Finalizar <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </form>
+  );
+};
+
+const QuoteRequestForm: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<FormData>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  
+  const nextStep = () => setCurrentStep(prev => prev + 1);
+  
+  const prevStep = () => setCurrentStep(prev => prev - 1);
+  
+  const updateFormData = (data: Partial<FormData>) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+  
+  const canSubmit = () => {
+    return !!(
+      formData.serviceId &&
+      formData.street &&
+      formData.number &&
+      formData.neighborhood &&
+      formData.city &&
+      formData.state &&
+      formData.zipCode
+    );
+  };
+  
+  const handleSubmit = async () => {
+    if (!canSubmit()) {
+      toast.error("Por favor, preencha todos os campos obrigatórios");
+      return;
+    }
+    
+    if (!user) {
+      toast.error("Você precisa estar logado para solicitar um orçamento");
+      navigate("/login", { state: { from: "/request-quote", formData } });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const address = {
+        street: formData.street || '',
+        number: formData.number || '',
+        complement: formData.complement,
+        neighborhood: formData.neighborhood || '',
+        city: formData.city || '',
+        state: formData.state || '',
+        zipCode: formData.zipCode || '',
+      };
+      
+      const { data, error } = await supabase
+        .from('quotes')
+        .insert([{
+          client_id: user.id,
+          service_id: formData.serviceId,
+          sub_service_id: formData.subServiceId || null,
+          specialty_id: formData.specialtyId || null,
+          status: 'pending',
+          address,
+          description: formData.description || '',
+        }])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error submitting quote:', error);
+        toast.error('Erro ao enviar o orçamento. Por favor tente novamente.');
+        return;
+      }
+      
+      const quoteId = data.id;
+      
+      if (formData.answers && Object.keys(formData.answers).length > 0) {
+        const answersToInsert = Object.entries(formData.answers).map(([questionId, optionId]) => ({
+          quote_id: quoteId,
+          question_id: questionId,
+          option_id: optionId,
+        }));
+        
+        const { error: answersError } = await supabase
+          .from('quote_answers')
+          .insert(answersToInsert);
+        
+        if (answersError) {
+          console.error('Error saving answers:', answersError);
+        }
+      }
+      
+      if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
+        const itemsToInsert = Object.entries(formData.itemQuantities)
+          .filter(([_, quantity]) => quantity > 0)
+          .map(([itemId, quantity]) => ({
+            quote_id: quoteId,
+            item_id: itemId,
+            quantity,
+          }));
+        
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('quote_items')
+            .insert(itemsToInsert);
+          
+          if (itemsError) {
+            console.error('Error saving item quantities:', itemsError);
+          }
+        }
+      }
+      
+      if (formData.measurements && formData.measurements.length > 0) {
+        const measurementsToInsert = formData.measurements.map(m => ({
+          quote_id: quoteId,
+          room_name: m.roomName,
+          width: m.width,
+          length: m.length,
+          height: m.height || null,
+          area: m.width * m.length,
+        }));
+        
+        const { error: measurementsError } = await supabase
+          .from('quote_measurements')
+          .insert(measurementsToInsert);
+        
+        if (measurementsError) {
+          console.error('Error saving measurements:', measurementsError);
+        }
+      }
+      
+      toast.success('Orçamento enviado com sucesso!');
+      navigate('/profile/quotes');
+      
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Ocorreu um erro inesperado. Por favor tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const steps = [
+    {
+      title: 'Serviço',
+      component: (
+        <ServiceStep
+          onNext={nextStep}
+          formData={formData}
+          updateFormData={updateFormData}
+        />
+      )
+    },
+    {
+      title: 'Detalhes',
+      component: (
+        <ServiceDetailsStep
+          onNext={nextStep}
+          onBack={prevStep}
+          formData={formData}
+          updateFormData={updateFormData}
+        />
+      )
+    },
+    {
+      title: 'Endereço',
+      component: (
+        <AddressStep
+          onNext={() => setShowReview(true)}
+          onBack={prevStep}
+          formData={formData}
+          updateFormData={updateFormData}
+        />
+      )
+    }
+  ];
+  
+  return (
+    <div>
+      <div className="flex mb-8">
+        {steps.map((step, index) => (
+          <div key={index} className="flex-1">
+            <div 
+              className={`
+                flex flex-col items-center
+                ${index <= currentStep ? 'text-primary' : 'text-gray-400'}
+              `}
+            >
+              <div 
+                className={`
+                  w-8 h-8 flex items-center justify-center rounded-full mb-2 
+                  ${index < currentStep ? 'bg-primary text-white' : 
+                    index === currentStep ? 'border-2 border-primary text-primary' : 
+                    'border-2 border-gray-300'}
+                `}
+              >
+                {index < currentStep ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : (
+                  index + 1
+                )}
+              </div>
+              <span className="text-sm">{step.title}</span>
+            </div>
+            
+            {index < steps.length - 1 && (
+              <div 
+                className={`
+                  hidden md:block flex-grow h-0.5 mt-4
+                  ${index < currentStep ? 'bg-primary' : 'bg-gray-300'}
+                `}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      
+      <div className="mt-8">
+        {steps[currentStep].component}
+      </div>
+      
+      <Dialog open={showReview} onOpenChange={setShowReview}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Revisar Orçamento</DialogTitle>
+            <DialogDescription>
+              Verifique as informações abaixo antes de enviar seu orçamento
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div>
+              <h3 className="font-medium text-lg mb-2">Serviço Selecionado</h3>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Serviço</p>
+                      <p className="font-medium">{formData.serviceName}</p>
+                    </div>
+                    
+                    {formData.subServiceName && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
+                        <p className="font-medium">{formData.subServiceName}</p>
+                      </div>
+                    )}
+                    
+                    {formData.specialtyName && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Especialidade</p>
+                        <p className="font-medium">{formData.specialtyName}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {formData.description && (
+                    <div className="mt-4">
+                      <p className="text-sm text-muted-foreground">Descrição</p>
+                      <p className="text-sm mt-1">{formData.description}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div>
+              <h3 className="font-medium text-lg mb-2">Endereço</h3>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-1 gap-2">
+                    <p>
+                      {formData.street}, {formData.number}
+                      {formData.complement && `, ${formData.complement}`}
+                    </p>
+                    <p>{formData.neighborhood}</p>
+                    <p>
+                      {formData.city} - {formData.state}
+                    </p>
+                    <p>CEP: {formData.zipCode}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReview(false)}>
+              Editar
+            </Button>
+            <Button 
+              onClick={handleSubmit}
+              disabled={isSubmitting || !canSubmit()}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                'Enviar Orçamento'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default QuoteRequestForm;
