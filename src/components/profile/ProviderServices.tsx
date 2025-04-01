@@ -8,16 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Specialty, Service, SubService, ServiceItem } from '@/lib/types';
+import { Specialty, Service, SubService } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, Plus, PenLine, Settings } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { getAllServices } from '@/lib/api/services';
 import { formatCurrency, parseCurrencyInput } from '@/lib/utils';
-import { ProviderServiceItem } from '@/lib/types/providerMatch';
+import { ProviderServiceItemPrice } from '@/lib/types/providerMatch';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useForm } from 'react-hook-form';
 
 // Basic type definitions to avoid deep types
 interface SpecialtyItem {
@@ -36,14 +34,6 @@ interface ProviderServiceItem {
   basePrice: number;
 }
 
-interface ServiceItemWithPrice {
-  id: string;
-  name: string;
-  type: string;
-  pricePerUnit: number;
-  providerItemId?: string;
-}
-
 const ProviderServices = () => {
   const { user } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
@@ -55,7 +45,7 @@ const ProviderServices = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [basePrice, setBasePrice] = useState<string>('');
   const [providerServices, setProviderServices] = useState<ProviderServiceItem[]>([]);
-  const [serviceItems, setServiceItems] = useState<Record<string, ServiceItemWithPrice[]>>({});
+  const [serviceItems, setServiceItems] = useState<Record<string, ProviderServiceItemPrice[]>>({});
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
   
@@ -160,43 +150,111 @@ const ProviderServices = () => {
     if (!user) return;
     
     try {
-      // First, get all service items for this specialty
-      const { data: items, error: itemsError } = await supabase
-        .from('service_items')
-        .select('*')
-        .eq('specialty_id', specialtyId);
+      // Get all items related to this service hierarchy
+      const { data: specialty } = await supabase
+        .from('specialties')
+        .select('*, sub_service:sub_services(*, service:services(*))')
+        .eq('id', specialtyId)
+        .single();
       
-      if (itemsError) throw itemsError;
-      
-      if (!items || items.length === 0) {
+      if (!specialty || !specialty.sub_service) {
         return;
       }
       
-      // Then, get provider's prices for these items
-      const { data: providerPrices, error: pricesError } = await supabase
-        .from('provider_item_prices')
+      // Get all service items for the related service, subservice, and specialty
+      const serviceId = specialty.sub_service.service?.id;
+      const subServiceId = specialty.sub_service.id;
+      
+      let allItems: ProviderServiceItemPrice[] = [];
+      
+      // 1. Items for the service level
+      if (serviceId) {
+        const { data: serviceItems } = await supabase
+          .from('service_items')
+          .select('*')
+          .eq('service_id', serviceId)
+          .is('sub_service_id', null)
+          .is('specialty_id', null);
+          
+        if (serviceItems && serviceItems.length > 0) {
+          const serviceItemsWithDetails = serviceItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            type: item.type,
+            pricePerUnit: 0,
+            level: 'service' as const,
+            parentName: specialty.sub_service.service?.name || 'Serviço'
+          }));
+          
+          allItems = [...allItems, ...serviceItemsWithDetails];
+        }
+      }
+      
+      // 2. Items for the subservice level
+      if (subServiceId) {
+        const { data: subServiceItems } = await supabase
+          .from('service_items')
+          .select('*')
+          .eq('sub_service_id', subServiceId)
+          .is('specialty_id', null);
+          
+        if (subServiceItems && subServiceItems.length > 0) {
+          const subServiceItemsWithDetails = subServiceItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            type: item.type,
+            pricePerUnit: 0,
+            level: 'subService' as const,
+            parentName: specialty.sub_service.name || 'Subserviço'
+          }));
+          
+          allItems = [...allItems, ...subServiceItemsWithDetails];
+        }
+      }
+      
+      // 3. Items for the specialty level
+      const { data: specialtyItems } = await supabase
+        .from('service_items')
         .select('*')
-        .eq('provider_id', user.id)
-        .in('item_id', items.map(item => item.id));
-      
-      if (pricesError) throw pricesError;
-      
-      // Combine the data
-      const itemsWithPrices: ServiceItemWithPrice[] = items.map(item => {
-        const providerPrice = providerPrices?.find(price => price.item_id === item.id);
-        return {
+        .eq('specialty_id', specialtyId);
+        
+      if (specialtyItems && specialtyItems.length > 0) {
+        const specialtyItemsWithDetails = specialtyItems.map(item => ({
           id: item.id,
           name: item.name,
           type: item.type,
-          pricePerUnit: providerPrice?.price_per_unit || 0,
-          providerItemId: providerPrice?.id,
-        };
-      });
+          pricePerUnit: 0,
+          level: 'specialty' as const,
+          parentName: specialty.name || 'Especialidade'
+        }));
+        
+        allItems = [...allItems, ...specialtyItemsWithDetails];
+      }
+      
+      // Now get provider's prices for these items
+      if (allItems.length > 0) {
+        const { data: providerPrices } = await supabase
+          .from('provider_item_prices')
+          .select('*')
+          .eq('provider_id', user.id)
+          .in('item_id', allItems.map(item => item.id));
+          
+        if (providerPrices && providerPrices.length > 0) {
+          allItems = allItems.map(item => {
+            const providerPrice = providerPrices.find(price => price.item_id === item.id);
+            return {
+              ...item,
+              pricePerUnit: providerPrice?.price_per_unit || 0,
+              providerItemId: providerPrice?.id
+            };
+          });
+        }
+      }
       
       // Update the state
       setServiceItems(prev => ({
         ...prev,
-        [providerServiceId]: itemsWithPrices,
+        [providerServiceId]: allItems,
       }));
       
     } catch (error) {
@@ -372,7 +430,7 @@ const ProviderServices = () => {
     if (!user) return;
     
     try {
-      const item = serviceItems[serviceId].find(i => i.id === itemId);
+      const item = serviceItems[serviceId]?.find(i => i.id === itemId);
       
       if (item?.providerItemId) {
         // Update existing price
@@ -423,6 +481,16 @@ const ProviderServices = () => {
       console.error('Error updating item price:', error);
       toast.error('Erro ao atualizar preço do item');
     }
+  };
+  
+  // Group service items by their level
+  const getGroupedItems = (serviceId: string) => {
+    const items = serviceItems[serviceId] || [];
+    return {
+      service: items.filter(item => item.level === 'service'),
+      subService: items.filter(item => item.level === 'subService'),
+      specialty: items.filter(item => item.level === 'specialty')
+    };
   };
   
   // Get sub-services for the selected service
@@ -549,48 +617,156 @@ const ProviderServices = () => {
               
               {currentServiceId && serviceItems[currentServiceId]?.length > 0 ? (
                 <div className="max-h-[60vh] overflow-y-auto">
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="items">
-                      <AccordionTrigger>
-                        Itens do serviço ({serviceItems[currentServiceId]?.length || 0})
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-4">
-                          {serviceItems[currentServiceId]?.map((item) => (
-                            <div key={item.id} className="flex items-center justify-between p-2 border rounded">
-                              <div>
-                                <p className="font-medium">{item.name}</p>
-                                <p className="text-sm text-gray-500">
-                                  Tipo: {item.type === 'quantity' ? 'Quantidade' : 
-                                         item.type === 'square_meter' ? 'Metro quadrado' : 
-                                         'Metro linear'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="w-32">
-                                  <Input 
-                                    type="text"
-                                    defaultValue={item.pricePerUnit.toString()}
-                                    onChange={(e) => {
-                                      const price = parseCurrencyInput(e.target.value);
-                                      if (price >= 0) {
-                                        updateItemPrice(currentServiceId, item.id, price);
-                                      }
-                                    }}
-                                    placeholder="R$ 0,00"
-                                  />
+                  <Accordion type="multiple" className="w-full" defaultValue={["service", "subService", "specialty"]}>
+                    {/* Service Level Items */}
+                    {getGroupedItems(currentServiceId).service.length > 0 && (
+                      <AccordionItem value="service">
+                        <AccordionTrigger>
+                          Itens do serviço principal ({getGroupedItems(currentServiceId).service.length || 0})
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-2 mb-2 pb-2">
+                            <p className="text-sm text-muted-foreground">
+                              {providerServices.find(s => s.id === currentServiceId)?.serviceName}
+                            </p>
+                          </div>
+                          <div className="space-y-4">
+                            {getGroupedItems(currentServiceId).service.map((item) => (
+                              <div key={item.id} className="flex items-center justify-between p-2 border rounded">
+                                <div>
+                                  <p className="font-medium">{item.name}</p>
+                                  <p className="text-sm text-gray-500">
+                                    Tipo: {item.type === 'quantity' ? 'Quantidade' : 
+                                           item.type === 'square_meter' ? 'Metro quadrado' : 
+                                           'Metro linear'}
+                                  </p>
                                 </div>
-                                <span className="text-sm text-gray-500">
-                                  por {item.type === 'quantity' ? 'unidade' : 
-                                       item.type === 'square_meter' ? 'm²' : 
-                                       'm'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-32">
+                                    <Input 
+                                      type="text"
+                                      defaultValue={item.pricePerUnit.toString()}
+                                      onChange={(e) => {
+                                        const price = parseCurrencyInput(e.target.value);
+                                        if (price >= 0) {
+                                          updateItemPrice(currentServiceId, item.id, price);
+                                        }
+                                      }}
+                                      placeholder="R$ 0,00"
+                                    />
+                                  </div>
+                                  <span className="text-sm text-gray-500">
+                                    por {item.type === 'quantity' ? 'unidade' : 
+                                         item.type === 'square_meter' ? 'm²' : 
+                                         'm'}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                    
+                    {/* SubService Level Items */}
+                    {getGroupedItems(currentServiceId).subService.length > 0 && (
+                      <AccordionItem value="subService">
+                        <AccordionTrigger>
+                          Itens do sub-serviço ({getGroupedItems(currentServiceId).subService.length || 0})
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-2 mb-2 pb-2">
+                            <p className="text-sm text-muted-foreground">
+                              {providerServices.find(s => s.id === currentServiceId)?.subServiceName}
+                            </p>
+                          </div>
+                          <div className="space-y-4">
+                            {getGroupedItems(currentServiceId).subService.map((item) => (
+                              <div key={item.id} className="flex items-center justify-between p-2 border rounded">
+                                <div>
+                                  <p className="font-medium">{item.name}</p>
+                                  <p className="text-sm text-gray-500">
+                                    Tipo: {item.type === 'quantity' ? 'Quantidade' : 
+                                           item.type === 'square_meter' ? 'Metro quadrado' : 
+                                           'Metro linear'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-32">
+                                    <Input 
+                                      type="text"
+                                      defaultValue={item.pricePerUnit.toString()}
+                                      onChange={(e) => {
+                                        const price = parseCurrencyInput(e.target.value);
+                                        if (price >= 0) {
+                                          updateItemPrice(currentServiceId, item.id, price);
+                                        }
+                                      }}
+                                      placeholder="R$ 0,00"
+                                    />
+                                  </div>
+                                  <span className="text-sm text-gray-500">
+                                    por {item.type === 'quantity' ? 'unidade' : 
+                                         item.type === 'square_meter' ? 'm²' : 
+                                         'm'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                    
+                    {/* Specialty Level Items */}
+                    {getGroupedItems(currentServiceId).specialty.length > 0 && (
+                      <AccordionItem value="specialty">
+                        <AccordionTrigger>
+                          Itens da especialidade ({getGroupedItems(currentServiceId).specialty.length || 0})
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-2 mb-2 pb-2">
+                            <p className="text-sm text-muted-foreground">
+                              {providerServices.find(s => s.id === currentServiceId)?.specialtyName}
+                            </p>
+                          </div>
+                          <div className="space-y-4">
+                            {getGroupedItems(currentServiceId).specialty.map((item) => (
+                              <div key={item.id} className="flex items-center justify-between p-2 border rounded">
+                                <div>
+                                  <p className="font-medium">{item.name}</p>
+                                  <p className="text-sm text-gray-500">
+                                    Tipo: {item.type === 'quantity' ? 'Quantidade' : 
+                                           item.type === 'square_meter' ? 'Metro quadrado' : 
+                                           'Metro linear'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-32">
+                                    <Input 
+                                      type="text"
+                                      defaultValue={item.pricePerUnit.toString()}
+                                      onChange={(e) => {
+                                        const price = parseCurrencyInput(e.target.value);
+                                        if (price >= 0) {
+                                          updateItemPrice(currentServiceId, item.id, price);
+                                        }
+                                      }}
+                                      placeholder="R$ 0,00"
+                                    />
+                                  </div>
+                                  <span className="text-sm text-gray-500">
+                                    por {item.type === 'quantity' ? 'unidade' : 
+                                         item.type === 'square_meter' ? 'm²' : 
+                                         'm'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
                   </Accordion>
                 </div>
               ) : (
@@ -713,3 +889,4 @@ const ProviderServices = () => {
 };
 
 export default ProviderServices;
+

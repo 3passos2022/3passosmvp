@@ -39,9 +39,13 @@ export interface QuoteDetails {
   clientId?: string;
 }
 
-export interface ProviderServiceItem {
+export interface ProviderServiceItemPrice {
   id: string;
   name: string;
   type: string;
   pricePerUnit: number;
+  providerItemId?: string;
+  level: 'service' | 'subService' | 'specialty';
+  parentName: string;
 }
+

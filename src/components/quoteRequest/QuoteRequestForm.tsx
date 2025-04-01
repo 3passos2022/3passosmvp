@@ -1042,26 +1042,17 @@ const QuoteRequestForm: React.FC = () => {
         zipCode: formData.zipCode
       };
       
-      const additionalInfo = {
-        serviceName: formData.serviceName,
-        subServiceName: formData.subServiceName,
-        specialtyName: formData.specialtyName,
-        items: formData.itemQuantities,
-        measurements: formData.measurements,
-        description: formData.description
-      };
-      
       const quoteDetails = {
-        serviceId: selectedService?.id || '',
-        subServiceId: selectedSubService?.id || '',
-        specialtyId: selectedSpecialty?.id || '',
-        serviceName: selectedService?.name || '',
-        subServiceName: selectedSubService?.name || '',
-        specialtyName: selectedSpecialty?.name || '',
-        items: selectedItems,
-        measurements: measurements,
+        serviceId: formData.serviceId || '',
+        subServiceId: formData.subServiceId || '',
+        specialtyId: formData.specialtyId || '',
+        serviceName: formData.serviceName || '',
+        subServiceName: formData.subServiceName || '',
+        specialtyName: formData.specialtyName || '',
+        items: formData.itemQuantities || {},
+        measurements: formData.measurements || [],
         address: address,
-        description: additionalInfo
+        description: formData.description || ''
       };
       
       sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
@@ -1225,7 +1216,7 @@ const QuoteRequestForm: React.FC = () => {
               Editar
             </Button>
             <Button 
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(new Event('submit') as unknown as React.FormEvent<HTMLFormElement>)}
               disabled={isSubmitting || !canSubmit()}
             >
               {isSubmitting ? (
