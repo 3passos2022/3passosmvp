@@ -940,36 +940,38 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
     setIsSubmitting(true);
     
     try {
-      const clientId = user?.id || null;
-      const isAnonymous = !user;
+      const quoteData = {
+        client_id: user?.id || null,
+        service_id: formData.serviceId,
+        sub_service_id: formData.subServiceId || null,
+        specialty_id: formData.specialtyId || null,
+        status: 'pending',
+        street: formData.street || '',
+        number: formData.number || '',
+        complement: formData.complement || null,
+        neighborhood: formData.neighborhood || '',
+        city: formData.city || '',
+        state: formData.state || '',
+        zip_code: formData.zipCode || '',
+        description: formData.description || '',
+        is_anonymous: !user
+      };
+
+      console.log("Enviando dados de cotação:", quoteData);
       
       const { data, error } = await supabase
         .from('quotes')
-        .insert({
-          client_id: clientId,
-          service_id: formData.serviceId,
-          sub_service_id: formData.subServiceId || null,
-          specialty_id: formData.specialtyId || null,
-          status: 'pending',
-          street: formData.street || '',
-          number: formData.number || '',
-          complement: formData.complement || null,
-          neighborhood: formData.neighborhood || '',
-          city: formData.city || '',
-          state: formData.state || '',
-          zip_code: formData.zipCode || '',
-          description: formData.description || '',
-          is_anonymous: isAnonymous
-        })
+        .insert(quoteData)
         .select()
         .single();
       
       if (error) {
-        console.error('Error submitting quote:', error);
+        console.error('Erro ao enviar cotação:', error);
         toast.error(`Erro ao enviar o orçamento: ${error.message}`);
         return;
       }
       
+      console.log("Cotação criada com sucesso:", data);
       const quoteId = data.id;
       
       if (formData.answers && Object.keys(formData.answers).length > 0) {
@@ -984,7 +986,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
           .insert(answersToInsert);
         
         if (answersError) {
-          console.error('Error saving answers:', answersError);
+          console.error('Erro ao salvar respostas:', answersError);
         }
       }
       
@@ -1003,7 +1005,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
             .insert(itemsToInsert);
           
           if (itemsError) {
-            console.error('Error saving item quantities:', itemsError);
+            console.error('Erro ao salvar quantidades de itens:', itemsError);
           }
         }
       }
@@ -1023,7 +1025,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
           .insert(measurementsToInsert);
         
         if (measurementsError) {
-          console.error('Error saving measurements:', measurementsError);
+          console.error('Erro ao salvar medidas:', measurementsError);
         }
       }
       
@@ -1049,7 +1051,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
         measurements: formData.measurements || [],
         address: address,
         description: formData.description || '',
-        clientId: clientId
+        clientId: user?.id || null
       };
       
       sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
@@ -1057,7 +1059,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       navigate('/prestadoresencontrados', { state: { quoteDetails } });
       
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Erro:', error);
       toast.error('Ocorreu um erro inesperado. Por favor tente novamente.');
     } finally {
       setIsSubmitting(false);
