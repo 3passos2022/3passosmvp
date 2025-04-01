@@ -36,6 +36,7 @@ declare global {
                     lng: () => number;
                   };
                 };
+                formatted_address?: string;
               }>,
               status: string
             ) => void
@@ -55,7 +56,7 @@ declare global {
               callback: () => void
             ) => void;
             getPlace: () => {
-              geometry: {
+              geometry?: {
                 location: {
                   lat: () => number;
                   lng: () => number;

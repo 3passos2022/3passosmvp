@@ -71,8 +71,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     const providers: ProviderMatch[] = providerServices.map(ps => {
       // Se o prestador não tem coordenadas ou raio de serviço definido, assumir valores padrão
       const settings = ps.provider_settings || { service_radius_km: 10, latitude: null, longitude: null };
-      const providerLat = settings.latitude;
-      const providerLng = settings.longitude;
+      const providerLat = settings?.latitude;
+      const providerLng = settings?.longitude;
       
       // Calcular distância se possível
       let distance = 9999;
@@ -85,7 +85,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           providerLat, 
           providerLng
         );
-        isWithinRadius = distance <= (settings.service_radius_km || 10);
+        isWithinRadius = distance <= (settings?.service_radius_km || 10);
       }
       
       // Calcular preço básico para o serviço
@@ -120,7 +120,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return {
         provider: {
           userId: ps.profiles.id,
-          bio: settings.bio || '',
+          bio: settings?.bio || '',
           averageRating: 0, // Será preenchido posteriormente
           specialties: [],
           name: ps.profiles.name,
@@ -140,24 +140,24 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       if (provider.provider.userId) {
         const { data: address } = await supabase
           .from('provider_settings')
-          .select('city, neighborhood')
+          .select('*')
           .eq('provider_id', provider.provider.userId)
           .single();
         
         if (address) {
-          provider.provider.city = address.city || '';
-          provider.provider.neighborhood = address.neighborhood || '';
+          provider.provider.city = address?.city || '';
+          provider.provider.neighborhood = address?.neighborhood || '';
         }
       }
       
       // Buscar avaliação média
-      const { data: ratings, error: ratingsError } = await supabase
+      const { data: ratings } = await supabase
         .from('quotes')
-        .select('rating')
+        .select('*')
         .eq('provider_id', provider.provider.userId)
         .not('rating', 'is', null);
       
-      if (!ratingsError && ratings && ratings.length > 0) {
+      if (ratings && ratings.length > 0) {
         const sum = ratings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
         provider.provider.averageRating = sum / ratings.length;
       }
@@ -218,15 +218,15 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     }
 
     // 3. Buscar avaliações do prestador
-    const { data: ratings, error: ratingsError } = await supabase
+    const { data: ratings } = await supabase
       .from('quotes')
-      .select('rating')
+      .select('*')
       .eq('provider_id', providerId)
       .not('rating', 'is', null);
 
     let averageRating = 0;
-    if (!ratingsError && ratings && ratings.length > 0) {
-      const sum = ratings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+    if (ratings && ratings.length > 0) {
+      const sum = ratings.reduce((acc, curr) => acc + (curr?.rating || 0), 0);
       averageRating = sum / ratings.length;
     }
 
@@ -261,10 +261,12 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
 export const sendQuoteToProvider = async (
   quoteDetails: QuoteDetails, 
   providerId: string
-): Promise<{ success: boolean; message: string; quoteId?: string }> => {
+): Promise<{ success: boolean; message: string; quoteId?: string; requiresLogin?: boolean }> => {
   try {
+    // Verificar se o usuário está autenticado
     if (!quoteDetails.clientId) {
-      return { success: false, message: 'Cliente não autenticado' };
+      console.log('Client ID not provided, login required');
+      return { success: false, message: 'Login necessário', requiresLogin: true };
     }
 
     // 1. Criar o orçamento no banco de dados

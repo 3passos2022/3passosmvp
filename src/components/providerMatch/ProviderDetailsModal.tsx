@@ -1,178 +1,276 @@
 
 import React, { useState } from 'react';
-import { ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
-import { sendQuoteToProvider } from '@/lib/services/providerMatchService';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Check } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/utils';
+import { Star, MapPin, Send, Phone } from 'lucide-react';
+import { ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
 import { useToast } from '@/hooks/use-toast';
+import { sendQuoteToProvider } from '@/lib/services/providerMatchService';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
 
 interface ProviderDetailsModalProps {
-  provider: ProviderDetails | null;
+  provider: ProviderDetails;
   isOpen: boolean;
   onClose: () => void;
   quoteDetails: QuoteDetails;
+  onLoginRequired?: () => void;
+  isLoggedIn: boolean;
 }
 
-const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({ 
-  provider, isOpen, onClose, quoteDetails 
+const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
+  provider,
+  isOpen,
+  onClose,
+  quoteDetails,
+  onLoginRequired,
+  isLoggedIn
 }) => {
   const [isSending, setIsSending] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
-
-  if (!provider) return null;
 
   const handleSendQuote = async () => {
-    if (!user) {
-      toast({
-        title: "Login necessário",
-        description: "Você precisa estar logado para enviar orçamentos",
-        variant: "default",
-      });
-      
-      // Salvar detalhes do orçamento e redirecionamento pendente no sessionStorage
-      sessionStorage.setItem('pendingQuote', JSON.stringify({
-        providerId: provider.provider.userId,
-        quoteDetails: quoteDetails
-      }));
-      
-      navigate('/login?redirect=pendingQuote');
-      return;
-    }
-
     setIsSending(true);
-
-    // Adicionar o ID do cliente aos detalhes do orçamento
-    const quoteWithClientId = {
-      ...quoteDetails,
-      clientId: user.id
-    };
-
-    const result = await sendQuoteToProvider(
-      quoteWithClientId, 
-      provider.provider.userId
-    );
-
-    setIsSending(false);
-
-    if (result.success) {
-      setIsSuccess(true);
+    try {
+      const result = await sendQuoteToProvider(quoteDetails, provider.provider.userId);
+      
+      if (result.requiresLogin) {
+        toast({
+          title: "Login necessário",
+          description: "Você precisa estar logado para enviar um orçamento",
+        });
+        
+        if (onLoginRequired) {
+          onLoginRequired();
+        }
+        return;
+      }
+      
+      if (result.success) {
+        toast({
+          title: "Orçamento enviado",
+          description: "Seu orçamento foi enviado com sucesso para o prestador",
+        });
+        onClose();
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao enviar orçamento:", error);
       toast({
-        title: "Orçamento enviado",
-        description: "O prestador foi notificado e responderá em breve",
-        variant: "default",
+        title: "Erro",
+        description: "Ocorreu um erro ao enviar o orçamento",
+        variant: "destructive"
       });
-    } else {
-      toast({
-        title: "Erro ao enviar orçamento",
-        description: result.message,
-        variant: "destructive",
-      });
+    } finally {
+      setIsSending(false);
     }
-  };
-
-  // Renderizar estrelas de avaliação
-  const renderRatingStars = (rating: number) => {
-    return Array(5).fill(0).map((_, i) => (
-      <Star 
-        key={i}
-        className={`h-4 w-4 ${i < Math.round(rating) 
-          ? 'fill-yellow-400 text-yellow-400' 
-          : 'fill-gray-200 text-gray-200'}`}
-      />
-    ));
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-              <span className="text-lg font-semibold text-gray-500">
-                {provider.provider.name?.charAt(0) || "P"}
-              </span>
-            </div>
-            <span>{provider.provider.name}</span>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <Avatar className="h-8 w-8 bg-primary text-white">
+              <AvatarFallback>{provider.provider.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            {provider.provider.name}
+            {provider.provider.averageRating > 0 && (
+              <Badge variant="outline" className="ml-2 flex items-center gap-1">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                <span>{provider.provider.averageRating.toFixed(1)}</span>
+              </Badge>
+            )}
           </DialogTitle>
-          <DialogDescription className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            <span>
-              {provider.provider.city && provider.provider.neighborhood 
-                ? `${provider.provider.neighborhood}, ${provider.provider.city}` 
-                : 'Localização não disponível'}
-            </span>
-            <span className="mx-2">•</span>
-            <span className="flex items-center">
-              {renderRatingStars(provider.rating)}
-              <span className="ml-1">
-                {provider.rating > 0 ? provider.rating.toFixed(1) : 'Novo'}
-              </span>
-            </span>
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium mb-2">Sobre o prestador</h4>
-            <p className="text-sm text-muted-foreground">
-              {provider.provider.bio || 'Este prestador não possui uma descrição.'}
-            </p>
-          </div>
-
-          {provider.portfolioItems && provider.portfolioItems.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium mb-2">Portfólio</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {provider.portfolioItems.map((item) => (
-                  <div key={item.id} className="relative aspect-square rounded-md overflow-hidden">
-                    <img 
-                      src={item.imageUrl} 
-                      alt={item.description || 'Imagem de portfólio'} 
-                      className="object-cover w-full h-full"
-                    />
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="md:w-2/3">
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="info">Informações</TabsTrigger>
+                <TabsTrigger value="portfolio">Portfólio</TabsTrigger>
+                <TabsTrigger value="contact">Contato</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="info" className="space-y-4 mt-4">
+                {provider.provider.bio && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-md">Sobre</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm">{provider.provider.bio}</p>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Detalhes</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        {provider.provider.city && provider.provider.neighborhood
+                          ? `${provider.provider.neighborhood}, ${provider.provider.city}`
+                          : "Localização não informada"}
+                        {provider.distance > 0 && ` (${provider.distance.toFixed(2)} km)`}
+                      </span>
+                    </div>
+                    
+                    {provider.isWithinRadius ? (
+                      <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+                        Atende na sua região
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">
+                        Fora da área de atendimento
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Preço</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xl font-bold text-primary">
+                      {formatCurrency(provider.totalPrice)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      *Preço estimado para o serviço solicitado
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="portfolio" className="space-y-4 mt-4">
+                {provider.portfolioItems.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center">
+                      <p className="text-muted-foreground">Este prestador ainda não adicionou itens ao portfólio</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {provider.portfolioItems.map((item) => (
+                      <Card key={item.id}>
+                        <div className="aspect-video overflow-hidden">
+                          <img 
+                            src={item.imageUrl} 
+                            alt="Portfolio"
+                            className="w-full h-full object-cover" 
+                          />
+                        </div>
+                        {item.description && (
+                          <CardContent className="pt-3">
+                            <p className="text-sm">{item.description}</p>
+                          </CardContent>
+                        )}
+                      </Card>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <h4 className="text-sm font-medium mb-2">Valor estimado</h4>
-            <p className="text-xl font-bold text-primary">
-              {formatCurrency(provider.totalPrice)}
-            </p>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="contact" className="mt-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Informações de contato</CardTitle>
+                    <CardDescription>
+                      Contate o prestador diretamente ou envie um orçamento
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {provider.provider.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <a 
+                          href={`tel:${provider.provider.phone}`}
+                          className="text-sm hover:underline text-primary"
+                        >
+                          {provider.provider.phone}
+                        </a>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          <div className="md:w-1/3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Orçamento para</CardTitle>
+                <CardDescription>
+                  {quoteDetails.serviceName} &gt; {quoteDetails.subServiceName} &gt; {quoteDetails.specialtyName}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <p className="text-sm line-clamp-3">
+                  <span className="font-medium">Endereço:</span> {quoteDetails.address.street}, {quoteDetails.address.number}, {quoteDetails.address.neighborhood}, {quoteDetails.address.city}
+                </p>
+                {quoteDetails.description && (
+                  <p className="text-sm mt-2 line-clamp-3">
+                    <span className="font-medium">Descrição:</span> {quoteDetails.description}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        <DialogFooter>
-          {isSuccess ? (
-            <div className="w-full flex items-center justify-center p-2 bg-green-50 text-green-700 rounded-md">
-              <Check className="mr-2 h-5 w-5" />
-              <span>Orçamento enviado com sucesso!</span>
-            </div>
-          ) : (
-            <Button 
-              className="w-full" 
-              onClick={handleSendQuote} 
-              disabled={isSending}
-            >
-              {isSending ? 'Enviando...' : 'Enviar meu orçamento'}
-            </Button>
-          )}
+        <DialogFooter className="pt-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="w-full sm:w-auto"
+          >
+            Fechar
+          </Button>
+          <Button
+            onClick={handleSendQuote}
+            disabled={isSending}
+            className="w-full sm:w-auto"
+          >
+            {isSending ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> 
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Enviar orçamento
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

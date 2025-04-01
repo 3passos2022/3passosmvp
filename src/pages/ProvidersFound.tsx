@@ -137,7 +137,7 @@ const ProvidersFound: React.FC = () => {
   const handleFilterChange = (filter: FilterOption) => {
     setCurrentFilter(filter);
     
-    if (!filter || filter === '') {
+    if (!filter) {
       // Ordenar por relevância (prestadores no raio primeiro, depois por distância)
       setFilteredProviders([...providers].sort((a, b) => {
         if (a.isWithinRadius && !b.isWithinRadius) return -1;
@@ -174,6 +174,20 @@ const ProvidersFound: React.FC = () => {
     setIsModalOpen(false);
     setSelectedProviderId(null);
     setSelectedProvider(null);
+  };
+
+  // Função para lidar com o redirecionamento para login se necessário
+  const handleLoginRedirect = () => {
+    // Salvar dados do orçamento atual no sessionStorage antes de redirecionar
+    if (quoteDetails) {
+      sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
+      sessionStorage.setItem('redirectAfterLogin', '/prestadoresencontrados');
+      // Se houver um provedor selecionado, também salvar essa informação
+      if (selectedProviderId) {
+        sessionStorage.setItem('selectedProviderId', selectedProviderId);
+      }
+    }
+    navigate('/login');
   };
   
   // Renderizar mensagem de prestadores não encontrados
@@ -250,7 +264,12 @@ const ProvidersFound: React.FC = () => {
                   provider={selectedProvider} 
                   isOpen={isModalOpen} 
                   onClose={handleCloseModal} 
-                  quoteDetails={quoteDetails} 
+                  quoteDetails={{
+                    ...quoteDetails,
+                    clientId: user?.id || undefined
+                  }}
+                  onLoginRequired={handleLoginRedirect}
+                  isLoggedIn={!!user}
                 />
               )}
             </>
