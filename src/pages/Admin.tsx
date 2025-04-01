@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
@@ -100,24 +101,24 @@ const Admin: React.FC = () => {
       <div className="flex-1 container mx-auto py-8">
         <h1 className="text-3xl font-bold mb-8">Painel Administrativo</h1>
         
-        <Tabs defaultValue="users" className="w-full">
+        <Tabs defaultValue="services" className="w-full">
           <TabsList className="mb-8">
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>Usuários</span>
-            </TabsTrigger>
             <TabsTrigger value="services" className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4" />
               <span>Serviços</span>
             </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Usuários</span>
+            </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
           
           <TabsContent value="services">
             <ServiceManagement />
+          </TabsContent>
+          
+          <TabsContent value="users">
+            <UserManagement />
           </TabsContent>
         </Tabs>
 
