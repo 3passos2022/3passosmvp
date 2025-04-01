@@ -9,7 +9,7 @@ import { getAllServices } from '@/lib/api/services';
 
 const RequestQuote: React.FC = () => {
   // Use React Query for fetching services with caching
-  const { data: services, isLoading, error } = useQuery({
+  const { isLoading, error } = useQuery({
     queryKey: ['services'],
     queryFn: getAllServices,
     staleTime: 5 * 60 * 1000, // 5 minutes cache

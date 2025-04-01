@@ -49,16 +49,15 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // 3. Buscar itens e medições para calcular preço
-    let totalItems = [];
-    let totalMeasurements = [];
+    let totalItems: any[] = [];
     
-    if (quoteDetails.items && quoteDetails.items.length > 0) {
+    if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
       // Buscar preços específicos de itens que os prestadores oferecem
       const { data: itemPrices, error: itemsError } = await supabase
         .from('provider_item_prices')
         .select('*')
         .in('provider_id', providerServices.map(ps => ps.provider_id))
-        .in('item_id', quoteDetails.items.map(item => item.itemId));
+        .in('item_id', Object.keys(quoteDetails.items));
         
       if (itemsError) {
         console.error('Erro ao buscar preços de itens:', itemsError);
@@ -70,7 +69,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = providerServices.map(ps => {
       // Se o prestador não tem coordenadas ou raio de serviço definido, assumir valores padrão
-      const settings = ps.provider_settings || { service_radius_km: 10, latitude: null, longitude: null };
+      const settings = ps.provider_settings || { service_radius_km: 10, latitude: null, longitude: null, bio: '' };
       const providerLat = settings?.latitude;
       const providerLng = settings?.longitude;
       
@@ -92,18 +91,18 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       let totalPrice = ps.base_price || 0;
       
       // Adicionar preços de itens específicos
-      if (quoteDetails.items && quoteDetails.items.length > 0) {
-        quoteDetails.items.forEach(item => {
+      if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
+        Object.entries(quoteDetails.items).forEach(([itemId, quantity]) => {
           // Encontrar o preço específico do prestador para este item
           const itemPrice = totalItems.find(
-            ip => ip.provider_id === ps.provider_id && ip.item_id === item.itemId
+            ip => ip.provider_id === ps.provider_id && ip.item_id === itemId
           );
           
           if (itemPrice) {
-            totalPrice += (itemPrice.price_per_unit * item.quantity);
+            totalPrice += (itemPrice.price_per_unit * quantity);
           } else {
             // Usar preço padrão se o prestador não tiver um preço específico
-            totalPrice += ps.base_price * item.quantity;
+            totalPrice += ps.base_price * quantity;
           }
         });
       }
@@ -153,13 +152,16 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       // Buscar avaliação média
       const { data: ratings } = await supabase
         .from('quotes')
-        .select('*')
+        .select('rating')
         .eq('provider_id', provider.provider.userId)
         .not('rating', 'is', null);
       
       if (ratings && ratings.length > 0) {
-        const sum = ratings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
-        provider.provider.averageRating = sum / ratings.length;
+        const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+        if (validRatings.length > 0) {
+          const sum = validRatings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+          provider.provider.averageRating = sum / validRatings.length;
+        }
       }
     }
 
@@ -220,26 +222,31 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     // 3. Buscar avaliações do prestador
     const { data: ratings } = await supabase
       .from('quotes')
-      .select('*')
+      .select('rating')
       .eq('provider_id', providerId)
       .not('rating', 'is', null);
 
     let averageRating = 0;
     if (ratings && ratings.length > 0) {
-      const sum = ratings.reduce((acc, curr) => acc + (curr?.rating || 0), 0);
-      averageRating = sum / ratings.length;
+      const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+      if (validRatings.length > 0) {
+        const sum = validRatings.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+        averageRating = sum / validRatings.length;
+      }
     }
+
+    const settings = provider.provider_settings || {};
 
     return {
       provider: {
         userId: provider.id,
         name: provider.name,
         phone: provider.phone,
-        bio: provider.provider_settings?.bio || '',
+        bio: settings.bio || '',
         averageRating,
         specialties: [],
-        city: provider.provider_settings?.city || '',
-        neighborhood: provider.provider_settings?.neighborhood || ''
+        city: settings.city || '',
+        neighborhood: settings.neighborhood || ''
       },
       portfolioItems: portfolio ? portfolio.map(item => ({
         id: item.id,
@@ -269,37 +276,19 @@ export const sendQuoteToProvider = async (
       return { success: false, message: 'Login necessário', requiresLogin: true };
     }
 
-    // 1. Criar o orçamento no banco de dados
-    const { data: quote, error: quoteError } = await supabase
-      .from('quotes')
-      .insert({
-        client_id: quoteDetails.clientId,
-        service_id: quoteDetails.serviceId,
-        sub_service_id: quoteDetails.subServiceId,
-        specialty_id: quoteDetails.specialtyId,
-        street: quoteDetails.address.street,
-        number: quoteDetails.address.number,
-        complement: quoteDetails.address.complement,
-        neighborhood: quoteDetails.address.neighborhood,
-        city: quoteDetails.address.city,
-        state: quoteDetails.address.state,
-        zip_code: quoteDetails.address.zipCode,
-        description: quoteDetails.description || '',
-        status: 'pending',
-      })
-      .select('id')
-      .single();
-
-    if (quoteError || !quote) {
-      console.error('Erro ao criar orçamento:', quoteError);
-      return { success: false, message: 'Erro ao criar orçamento' };
+    // Usar o quoteId existente se já tivermos criado anteriormente
+    const quoteId = quoteDetails.quoteId || '';
+    
+    // 1. Se não tivermos um quote ID existente, precisamos criá-lo
+    if (!quoteId) {
+      return { success: false, message: 'ID do orçamento não fornecido', requiresLogin: true };
     }
 
     // 2. Associar o orçamento ao prestador
     const { error: providerQuoteError } = await supabase
       .from('quote_providers')
       .insert({
-        quote_id: quote.id,
+        quote_id: quoteId,
         provider_id: providerId,
         status: 'pending'
       });
@@ -309,47 +298,10 @@ export const sendQuoteToProvider = async (
       return { success: false, message: 'Erro ao enviar orçamento ao prestador' };
     }
 
-    // 3. Adicionar itens ao orçamento, se houver
-    if (quoteDetails.items && quoteDetails.items.length > 0) {
-      const quoteItems = quoteDetails.items.map(item => ({
-        quote_id: quote.id,
-        item_id: item.itemId,
-        quantity: item.quantity
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('quote_items')
-        .insert(quoteItems);
-
-      if (itemsError) {
-        console.error('Erro ao adicionar itens ao orçamento:', itemsError);
-      }
-    }
-
-    // 4. Adicionar medições ao orçamento, se houver
-    if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
-      const quoteMeasurements = quoteDetails.measurements.map(measurement => ({
-        quote_id: quote.id,
-        room_name: measurement.roomName,
-        width: measurement.width,
-        length: measurement.length,
-        height: measurement.height,
-        area: measurement.area
-      }));
-
-      const { error: measurementsError } = await supabase
-        .from('quote_measurements')
-        .insert(quoteMeasurements);
-
-      if (measurementsError) {
-        console.error('Erro ao adicionar medições ao orçamento:', measurementsError);
-      }
-    }
-
     return { 
       success: true, 
       message: 'Orçamento enviado com sucesso', 
-      quoteId: quote.id 
+      quoteId: quoteId 
     };
   } catch (error) {
     console.error('Erro ao enviar orçamento:', error);

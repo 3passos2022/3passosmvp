@@ -46,6 +46,11 @@ declare global {
           lat: () => number;
           lng: () => number;
         };
+        geometry: {
+          spherical: {
+            computeDistanceBetween: (from: any, to: any) => number;
+          };
+        };
         places: {
           Autocomplete: new (
             input: HTMLInputElement,

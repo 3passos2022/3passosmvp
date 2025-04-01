@@ -939,20 +939,16 @@ const QuoteRequestForm: React.FC = () => {
       toast.error("Por favor, preencha todos os campos obrigatórios");
       return;
     }
-/*     testando exclusão desse trecho.
-    if (!user) {
-      toast.error("Você precisa estar logado para solicitar um orçamento");
-      navigate("/login", { state: { from: "/request-quote", formData } });
-      return;
-    } */
     
     setIsSubmitting(true);
     
     try {
+      const anonymousClientId = user?.id || `anon-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      
       const { data, error } = await supabase
         .from('quotes')
         .insert({
-          client_id: user && user.id || null,
+          client_id: anonymousClientId,
           service_id: formData.serviceId,
           sub_service_id: formData.subServiceId || null,
           specialty_id: formData.specialtyId || null,
@@ -965,6 +961,7 @@ const QuoteRequestForm: React.FC = () => {
           state: formData.state || '',
           zip_code: formData.zipCode || '',
           description: formData.description || '',
+          is_anonymous: !user,
         })
         .select()
         .single();
@@ -1043,6 +1040,7 @@ const QuoteRequestForm: React.FC = () => {
       };
       
       const quoteDetails = {
+        quoteId: quoteId,
         serviceId: formData.serviceId || '',
         subServiceId: formData.subServiceId || '',
         specialtyId: formData.specialtyId || '',
@@ -1052,7 +1050,8 @@ const QuoteRequestForm: React.FC = () => {
         items: formData.itemQuantities || {},
         measurements: formData.measurements || [],
         address: address,
-        description: formData.description || ''
+        description: formData.description || '',
+        clientId: anonymousClientId
       };
       
       sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
