@@ -48,4 +48,3 @@ export interface ProviderServiceItemPrice {
   level: 'service' | 'subService' | 'specialty';
   parentName: string;
 }
-

@@ -19,3 +19,53 @@ export function parseCurrencyInput(value: string): number {
   const number = parseFloat(sanitized);
   return isNaN(number) ? 0 : number;
 }
+
+// Add Google Maps types to fix TypeScript errors
+declare global {
+  interface Window {
+    google: {
+      maps: {
+        Geocoder: new () => {
+          geocode: (
+            request: { address: string },
+            callback: (
+              results: Array<{
+                geometry: {
+                  location: {
+                    lat: () => number;
+                    lng: () => number;
+                  };
+                };
+              }>,
+              status: string
+            ) => void
+          ) => void;
+        };
+        LatLng: new (lat: number, lng: number) => {
+          lat: () => number;
+          lng: () => number;
+        };
+        places: {
+          Autocomplete: new (
+            input: HTMLInputElement,
+            options?: { types?: string[] }
+          ) => {
+            addListener: (
+              event: string,
+              callback: () => void
+            ) => void;
+            getPlace: () => {
+              geometry: {
+                location: {
+                  lat: () => number;
+                  lng: () => number;
+                };
+              };
+              formatted_address: string;
+            };
+          };
+        };
+      };
+    };
+  }
+}
