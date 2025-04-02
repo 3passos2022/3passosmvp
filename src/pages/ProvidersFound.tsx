@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -19,7 +18,6 @@ const ProvidersFound: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Estado para controlar os prestadores encontrados
   const [providers, setProviders] = useState<ProviderMatch[]>([]);
   const [filteredProviders, setFilteredProviders] = useState<ProviderMatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,30 +27,27 @@ const ProvidersFound: React.FC = () => {
   const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
   const [currentFilter, setCurrentFilter] = useState<FilterOption>('');
   
-  // Carregamento da API do Google Maps
-  const googleMapsApiKey = 'AIzaSyCz60dsmYx6T6qHNCs1OZtA7suJGA7xVW8'; // Substitua pela sua chave API
+  const googleMapsApiKey = 'AIzaSyCz60dsmYx6T6qHNCs1OZtA7suJGA7xVW8';
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
   
-  // Efeito para carregar detalhes do orçamento da sessão ou URL
   useEffect(() => {
     const fetchQuoteDetails = async () => {
       setIsLoading(true);
       
       try {
-        // Verificar se há detalhes do orçamento na URL (state do react-router)
         if (location.state?.quoteDetails) {
+          console.log('Detalhes do orçamento encontrados no state:', location.state.quoteDetails);
           setQuoteDetails(location.state.quoteDetails);
           return;
         }
         
-        // Verificar se há detalhes do orçamento no sessionStorage
         const storedQuote = sessionStorage.getItem('currentQuote');
         if (storedQuote) {
+          console.log('Detalhes do orçamento encontrados no sessionStorage');
           setQuoteDetails(JSON.parse(storedQuote));
           return;
         }
         
-        // Se não houver detalhes, redirecionar para a página de orçamento
         toast({
           title: "Informações insuficientes",
           description: "Por favor, complete o formulário de orçamento primeiro.",
@@ -75,15 +70,23 @@ const ProvidersFound: React.FC = () => {
     fetchQuoteDetails();
   }, [location, navigate, toast]);
   
-  // Efeito para buscar prestadores quando o Google Maps estiver carregado e tivermos os detalhes do orçamento
   useEffect(() => {
     const fetchProviders = async () => {
-      if (!isMapsLoaded || !quoteDetails) return;
+      if (!quoteDetails) {
+        console.log('Aguardando detalhes do orçamento');
+        return;
+      }
       
       setIsLoading(true);
+      console.log('Buscando prestadores para o orçamento:', quoteDetails);
       
       try {
+        if (!isMapsLoaded) {
+          console.log('Aguardando carregamento da API do Google Maps...');
+        }
+        
         const matchingProviders = await findMatchingProviders(quoteDetails);
+        console.log('Prestadores encontrados:', matchingProviders);
         setProviders(matchingProviders);
         setFilteredProviders(matchingProviders);
       } catch (error) {
@@ -99,46 +102,12 @@ const ProvidersFound: React.FC = () => {
     };
     
     fetchProviders();
-  }, [isMapsLoaded, quoteDetails, toast]);
+  }, [quoteDetails, isMapsLoaded, toast]);
   
-  // Efeito para carregar detalhes do prestador selecionado
-  useEffect(() => {
-    const fetchProviderDetails = async () => {
-      if (!selectedProviderId) return;
-      
-      try {
-        const details = await getProviderDetails(selectedProviderId);
-        if (details) {
-          // Adicionar informações de distância e preço do prestador original
-          const originalProvider = providers.find(p => p.provider.userId === selectedProviderId);
-          if (originalProvider) {
-            details.distance = originalProvider.distance;
-            details.totalPrice = originalProvider.totalPrice;
-            details.isWithinRadius = originalProvider.isWithinRadius;
-          }
-          
-          setSelectedProvider(details);
-          setIsModalOpen(true);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar detalhes do prestador:', error);
-        toast({
-          title: "Erro ao carregar detalhes",
-          description: "Não foi possível carregar as informações do prestador.",
-          variant: "destructive",
-        });
-      }
-    };
-    
-    fetchProviderDetails();
-  }, [selectedProviderId, providers, toast]);
-  
-  // Função para lidar com a mudança de filtros
   const handleFilterChange = (filter: FilterOption) => {
     setCurrentFilter(filter);
     
     if (!filter) {
-      // Ordenar por relevância (prestadores no raio primeiro, depois por distância)
       setFilteredProviders([...providers].sort((a, b) => {
         if (a.isWithinRadius && !b.isWithinRadius) return -1;
         if (!a.isWithinRadius && b.isWithinRadius) return 1;
@@ -164,25 +133,20 @@ const ProvidersFound: React.FC = () => {
     setFilteredProviders(sorted);
   };
   
-  // Função para lidar com a visualização de detalhes do prestador
   const handleViewDetails = (providerId: string) => {
     setSelectedProviderId(providerId);
   };
   
-  // Função para fechar o modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedProviderId(null);
     setSelectedProvider(null);
   };
 
-  // Função para lidar com o redirecionamento para login se necessário
   const handleLoginRedirect = () => {
-    // Salvar dados do orçamento atual no sessionStorage antes de redirecionar
     if (quoteDetails) {
       sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
       sessionStorage.setItem('redirectAfterLogin', '/prestadoresencontrados');
-      // Se houver um provedor selecionado, também salvar essa informação
       if (selectedProviderId) {
         sessionStorage.setItem('selectedProviderId', selectedProviderId);
       }
@@ -190,7 +154,36 @@ const ProvidersFound: React.FC = () => {
     navigate('/login');
   };
   
-  // Renderizar mensagem de prestadores não encontrados
+  useEffect(() => {
+    const fetchProviderDetails = async () => {
+      if (!selectedProviderId) return;
+      
+      try {
+        const details = await getProviderDetails(selectedProviderId);
+        if (details) {
+          const originalProvider = providers.find(p => p.provider.userId === selectedProviderId);
+          if (originalProvider) {
+            details.distance = originalProvider.distance;
+            details.totalPrice = originalProvider.totalPrice;
+            details.isWithinRadius = originalProvider.isWithinRadius;
+          }
+          
+          setSelectedProvider(details);
+          setIsModalOpen(true);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar detalhes do prestador:', error);
+        toast({
+          title: "Erro ao carregar detalhes",
+          description: "Não foi possível carregar as informações do prestador.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchProviderDetails();
+  }, [selectedProviderId, providers, toast]);
+  
   const renderNoProvidersMessage = () => {
     const inRadiusProviders = providers.filter(p => p.isWithinRadius);
     

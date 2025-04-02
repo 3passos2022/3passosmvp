@@ -65,6 +65,7 @@ const geocodeFallback = async (address: string): Promise<GeocodingResult | null>
       };
     }
     
+    console.error('Nenhum resultado encontrado na geocodificação alternativa');
     return null;
   } catch (error) {
     console.error('Erro na geocodificação alternativa:', error);
@@ -141,6 +142,7 @@ export const useGoogleMaps = (apiKey: string): boolean => {
     script.defer = true;
     
     script.onload = () => {
+      console.log('Google Maps API carregada com sucesso');
       setIsLoaded(true);
     };
     

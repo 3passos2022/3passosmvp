@@ -7,6 +7,8 @@ import { Specialty, ServiceItem } from '@/lib/types';
 // Função para encontrar prestadores que atendem aos critérios
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[]> => {
   try {
+    console.log('Iniciando busca de prestadores com especialidade:', quoteDetails.specialtyId);
+    
     // 1. Encontrar prestadores que oferecem o serviço específico
     const { data: providerServices, error: servicesError } = await supabase
       .from('provider_services')
@@ -33,6 +35,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return [];
     }
 
+    console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço`);
+
     // Get provider settings separately to avoid join issues
     const providerIds = providerServices.map(ps => ps.provider_id);
     const { data: providerSettings, error: settingsError } = await supabase
@@ -54,12 +58,15 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     // 2. Geocodificar o endereço do cliente
     const fullAddress = `${quoteDetails.address.street}, ${quoteDetails.address.number}, ${quoteDetails.address.neighborhood}, ${quoteDetails.address.city}, ${quoteDetails.address.state}, ${quoteDetails.address.zipCode}`;
+    console.log('Geocodificando endereço do cliente:', fullAddress);
     const clientLocation = await geocodeAddress(fullAddress);
 
     if (!clientLocation) {
       console.error('Não foi possível geocodificar o endereço do cliente');
       return [];
     }
+
+    console.log('Coordenadas do cliente:', clientLocation);
 
     // 3. Buscar itens e medições para calcular preço
     let totalItems = [];
@@ -103,6 +110,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
         // Se o raio for 0, o prestador atende todo o Brasil
         isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
+        
+        console.log(`Prestador ${ps.profiles.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
+      } else {
+        console.log(`Prestador ${ps.profiles.name}, não possui coordenadas de localização ou configuração de raio`);
+        // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
+        isWithinRadius = true;
       }
       
       // Calcular preço básico para o serviço
@@ -151,7 +164,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // 5. Buscar dados adicionais dos prestadores (localização e avaliações)
+    // 5. Buscar dados adicionais dos prestadores (avaliações)
     for (const provider of providers) {
       // Buscar avaliação média
       const { data: ratings } = await supabase
@@ -179,6 +192,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return a.distance - b.distance;
     });
 
+    console.log(`Retornando ${providers.length} prestadores, ${providers.filter(p => p.isWithinRadius).length} dentro do raio`);
     return providers;
   } catch (error) {
     console.error('Erro ao buscar prestadores correspondentes:', error);
@@ -229,7 +243,8 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     // 3. Buscar avaliações do prestador
     const { data: ratings } = await supabase
       .from('quotes')
-      .select('rating');
+      .select('rating')
+      .eq('provider_id', providerId);
 
     let averageRating = 0;
     if (ratings && ratings.length > 0) {
