@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -48,69 +49,79 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     // Construir uma consulta mais abrangente para encontrar prestadores
     // Vamos buscar prestadores que oferecem a especialidade, o subserviço ou o serviço principal
-    let query = supabase
-      .from('provider_services')
-      .select(`
-        id, 
-        base_price,
-        provider_id,
-        specialty_id
-      `);
+    // Primeiro, obter todos os prestadores da tabela provider_services
+    console.log('Buscando prestadores que oferecem serviços compatíveis...');
     
-    // Adicionar filtros OR para cada nível de serviço
-    let filters = [];
+    // Montando a consulta com filtros OR
+    let filterConditions = [];
     
+    // Adicionar filtro para especialidade específica
     if (quoteDetails.specialtyId) {
-      filters.push(`specialty_id.eq.${quoteDetails.specialtyId}`);
+      filterConditions.push(`specialty_id=eq.${quoteDetails.specialtyId}`);
     }
     
+    // Adicionar filtro para subserviço
     if (quoteDetails.subServiceId) {
-      filters.push(`specialty_id.eq.${quoteDetails.subServiceId}`);
+      filterConditions.push(`specialty_id=eq.${quoteDetails.subServiceId}`);
     }
     
+    // Adicionar filtro para serviço principal
     if (quoteDetails.serviceId) {
-      filters.push(`specialty_id.eq.${quoteDetails.serviceId}`);
+      filterConditions.push(`specialty_id=eq.${quoteDetails.serviceId}`);
     }
     
-    // Verificar se temos especialidades relacionadas no mesmo subserviço
-    if (specialtyInfo && specialtyInfo.sub_service_id) {
-      const { data: relatedSpecialties } = await supabase
-        .from('specialties')
-        .select('id')
-        .eq('sub_service_id', specialtyInfo.sub_service_id);
-        
-      if (relatedSpecialties && relatedSpecialties.length > 0) {
-        relatedSpecialties.forEach(spec => {
-          if (spec.id !== quoteDetails.specialtyId) {
-            filters.push(`specialty_id.eq.${spec.id}`);
-          }
-        });
-      }
+    let queryUrl = 'provider_services?select=id,base_price,provider_id,specialty_id';
+    if (filterConditions.length > 0) {
+      queryUrl += `&or=(${filterConditions.join(',')})`;
     }
     
-    // Aplicar todos os filtros com OR
-    if (filters.length > 0) {
-      query = query.or(filters.join(','));
-    }
+    console.log('URL da consulta:', queryUrl);
     
-    // Executar a consulta
-    const { data: providerServices, error: servicesError } = await query;
+    // Executar a consulta direta para depuração
+    const { data: providerServices, error: servicesError } = await supabase
+      .from('provider_services')
+      .select('id, base_price, provider_id, specialty_id');
 
-    if (servicesError) {
-      console.error('Erro ao buscar serviços dos prestadores:', servicesError);
+    console.log('Resultado da consulta simples:', providerServices);
+    
+    // Agora fazer a consulta com filtros
+    const { data: filteredServices, error: filteredError } = await supabase
+      .from('provider_services')
+      .select('id, base_price, provider_id, specialty_id');
+      
+    // Se tivermos filtros, vamos aplicá-los manualmente para garantir que estamos pegando os prestadores corretos
+    let relevantServices = filteredServices || [];
+    
+    if (relevantServices.length > 0) {
+      console.log(`Encontrados ${relevantServices.length} serviços de prestadores antes da filtragem`);
+      
+      // Filtrar manualmente para garantir que estamos pegando os prestadores corretos
+      if (quoteDetails.specialtyId || quoteDetails.subServiceId || quoteDetails.serviceId) {
+        relevantServices = relevantServices.filter(service => 
+          service.specialty_id === quoteDetails.specialtyId || 
+          service.specialty_id === quoteDetails.subServiceId || 
+          service.specialty_id === quoteDetails.serviceId
+        );
+      }
+      
+      console.log(`Após filtragem: ${relevantServices.length} serviços de prestadores`);
+    }
+    
+    if (filteredError) {
+      console.error('Erro ao buscar serviços dos prestadores:', filteredError);
       return [];
     }
 
-    if (!providerServices || providerServices.length === 0) {
+    if (!relevantServices || relevantServices.length === 0) {
       console.log('Nenhum prestador encontrado para este serviço ou suas categorias relacionadas');
       return [];
     }
 
-    console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
-    console.log('Provider services:', providerServices);
+    console.log(`Encontrados ${relevantServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
+    console.log('Provider services:', relevantServices);
 
     // Get provider profiles in a separate query
-    const providerIds = providerServices.map(ps => ps.provider_id);
+    const providerIds = relevantServices.map(ps => ps.provider_id);
 
     // Fetch provider profiles separately to avoid recursion
     const { data: providerProfiles, error: profilesError } = await supabase
@@ -152,8 +163,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Recuperar informações detalhadas sobre os serviços para calcular relevância
     const { data: allSpecialtyInfo, error: allSpecialtyError } = await supabase
       .from('specialties')
-      .select('id, name, sub_service_id')
-      .in('id', providerServices.map(ps => ps.specialty_id));
+      .select('id, name, sub_service_id');
       
     if (allSpecialtyError) {
       console.error('Erro ao buscar informações das especialidades:', allSpecialtyError);
@@ -179,7 +189,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // 3. Buscar itens e medições para calcular preço
-    let totalItems = [];
+    let itemPricesList: any[] = [];
     
     if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
       // Buscar preços específicos de itens que os prestadores oferecem
@@ -191,15 +201,15 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
       if (itemsError) {
         console.error('Erro ao buscar preços de itens:', itemsError);
-      } else {
-        totalItems = itemPrices || [];
+      } else if (itemPrices) {
+        itemPricesList = itemPrices;
       }
     }
 
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = [];
     
-    for (const ps of providerServices) {
+    for (const ps of relevantServices) {
       // Get provider profile from map
       const profile = profilesMap.get(ps.provider_id);
       
@@ -240,7 +250,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         );
         
         // Definir o raio como o valor da configuração ou um valor padrão de 0 (todo o Brasil)
-        const serviceRadius = settings?.service_radius_km || 0;
+        const serviceRadius = settings.service_radius_km || 0;
         
         // Se o raio for 0, o prestador atende todo o Brasil
         isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
@@ -259,8 +269,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
         Object.entries(quoteDetails.items).forEach(([itemId, quantity]) => {
           // Encontrar o preço específico do prestador para este item
-          const itemPrice = totalItems.find(
-            (ip: any) => ip.provider_id === ps.provider_id && ip.item_id === itemId
+          const itemPrice = itemPricesList.find(
+            (ip) => ip.provider_id === ps.provider_id && ip.item_id === itemId
           );
           
           if (itemPrice) {
@@ -312,9 +322,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
       // Verificar se temos ratings válidos
       if (ratings && ratings.length > 0) {
-        const validRatings = ratings.filter((r: any) => r.rating !== null && r.rating !== undefined);
+        const validRatings = ratings.filter((r) => r.rating !== null && r.rating !== undefined);
         if (validRatings.length > 0) {
-          const sum = validRatings.reduce((acc: number, curr: any) => acc + (Number(curr.rating) || 0), 0);
+          const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
           provider.provider.averageRating = sum / validRatings.length;
         }
       }
@@ -390,9 +400,9 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
 
     let averageRating = 0;
     if (ratings && ratings.length > 0) {
-      const validRatings = ratings.filter((r: any) => r.rating !== null && r.rating !== undefined);
+      const validRatings = ratings.filter((r) => r.rating !== null && r.rating !== undefined);
       if (validRatings.length > 0) {
-        const sum = validRatings.reduce((acc: number, curr: any) => acc + (Number(curr.rating) || 0), 0);
+        const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
         averageRating = sum / validRatings.length;
       }
     }
@@ -411,7 +421,7 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
 
     return {
       provider: providerProfile,
-      portfolioItems: portfolio ? portfolio.map((item: any) => ({
+      portfolioItems: portfolio ? portfolio.map((item) => ({
         id: item.id,
         imageUrl: item.image_url,
         description: item.description
