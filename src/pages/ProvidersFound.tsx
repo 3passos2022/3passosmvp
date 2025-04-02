@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -91,6 +90,13 @@ const ProvidersFound: React.FC = () => {
           Subserviço: ${quoteDetails.subServiceName || 'Nenhum'} (${quoteDetails.subServiceId || 'Nenhum'})
           Especialidade: ${quoteDetails.specialtyName || 'Nenhum'} (${quoteDetails.specialtyId || 'Nenhum'})
         `);
+        
+        // Depurar tabela provider_services antes da busca
+        const { data: debugProviderServices } = await supabase
+          .from('provider_services')
+          .select('*');
+        
+        console.log('DEBUG - Todos os provider_services:', debugProviderServices);
         
         const matchingProviders = await findMatchingProviders(quoteDetails);
         console.log('Prestadores encontrados:', matchingProviders);

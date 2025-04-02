@@ -48,80 +48,51 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
     
     // Construir uma consulta mais abrangente para encontrar prestadores
-    // Vamos buscar prestadores que oferecem a especialidade, o subserviço ou o serviço principal
-    // Primeiro, obter todos os prestadores da tabela provider_services
     console.log('Buscando prestadores que oferecem serviços compatíveis...');
     
-    // Montando a consulta com filtros OR
-    let filterConditions = [];
-    
-    // Adicionar filtro para especialidade específica
-    if (quoteDetails.specialtyId) {
-      filterConditions.push(`specialty_id=eq.${quoteDetails.specialtyId}`);
-    }
-    
-    // Adicionar filtro para subserviço
-    if (quoteDetails.subServiceId) {
-      filterConditions.push(`specialty_id=eq.${quoteDetails.subServiceId}`);
-    }
-    
-    // Adicionar filtro para serviço principal
-    if (quoteDetails.serviceId) {
-      filterConditions.push(`specialty_id=eq.${quoteDetails.serviceId}`);
-    }
-    
-    let queryUrl = 'provider_services?select=id,base_price,provider_id,specialty_id';
-    if (filterConditions.length > 0) {
-      queryUrl += `&or=(${filterConditions.join(',')})`;
-    }
-    
-    console.log('URL da consulta:', queryUrl);
-    
-    // Executar a consulta direta para depuração
-    const { data: providerServices, error: servicesError } = await supabase
+    // Abordagem mais simples: buscar todos os provider_services e filtrar depois
+    const { data: allProviderServices, error: providerServicesError } = await supabase
       .from('provider_services')
       .select('id, base_price, provider_id, specialty_id');
 
-    console.log('Resultado da consulta simples:', providerServices);
-    
-    // Agora fazer a consulta com filtros
-    const { data: filteredServices, error: filteredError } = await supabase
-      .from('provider_services')
-      .select('id, base_price, provider_id, specialty_id');
-      
-    // Se tivermos filtros, vamos aplicá-los manualmente para garantir que estamos pegando os prestadores corretos
-    let relevantServices = filteredServices || [];
-    
-    if (relevantServices.length > 0) {
-      console.log(`Encontrados ${relevantServices.length} serviços de prestadores antes da filtragem`);
-      
-      // Filtrar manualmente para garantir que estamos pegando os prestadores corretos
-      if (quoteDetails.specialtyId || quoteDetails.subServiceId || quoteDetails.serviceId) {
-        relevantServices = relevantServices.filter(service => 
-          service.specialty_id === quoteDetails.specialtyId || 
-          service.specialty_id === quoteDetails.subServiceId || 
-          service.specialty_id === quoteDetails.serviceId
-        );
-      }
-      
-      console.log(`Após filtragem: ${relevantServices.length} serviços de prestadores`);
-    }
-    
-    if (filteredError) {
-      console.error('Erro ao buscar serviços dos prestadores:', filteredError);
+    if (providerServicesError) {
+      console.error('Erro ao buscar serviços dos prestadores:', providerServicesError);
       return [];
     }
 
-    if (!relevantServices || relevantServices.length === 0) {
+    console.log(`Encontrados ${allProviderServices?.length || 0} registros de serviços de prestadores no total`);
+    
+    // Filtrar manualmente para garantir que pegamos os prestadores corretos
+    const providerServices = allProviderServices?.filter(service => {
+      // Verificar se o prestador oferece o serviço específico solicitado
+      if (quoteDetails.specialtyId && service.specialty_id === quoteDetails.specialtyId) {
+        console.log(`Prestador ${service.provider_id} oferece a especialidade exata`);
+        return true;
+      }
+      
+      if (quoteDetails.subServiceId && service.specialty_id === quoteDetails.subServiceId) {
+        console.log(`Prestador ${service.provider_id} oferece o subserviço`);
+        return true;
+      }
+      
+      if (quoteDetails.serviceId && service.specialty_id === quoteDetails.serviceId) {
+        console.log(`Prestador ${service.provider_id} oferece o serviço principal`);
+        return true;
+      }
+      
+      return false;
+    }) || [];
+    
+    if (!providerServices.length) {
       console.log('Nenhum prestador encontrado para este serviço ou suas categorias relacionadas');
       return [];
     }
 
-    console.log(`Encontrados ${relevantServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
-    console.log('Provider services:', relevantServices);
+    console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
+    console.log('Provider services:', providerServices);
 
     // Get provider profiles in a separate query
-    const providerIds = relevantServices.map(ps => ps.provider_id);
+    const providerIds = providerServices.map(ps => ps.provider_id);
 
     // Fetch provider profiles separately to avoid recursion
     const { data: providerProfiles, error: profilesError } = await supabase
@@ -163,7 +134,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Recuperar informações detalhadas sobre os serviços para calcular relevância
     const { data: allSpecialtyInfo, error: allSpecialtyError } = await supabase
       .from('specialties')
-      .select('id, name, sub_service_id');
+      .select('id, name, sub_service_id')
+      .in('id', providerServices.map(ps => ps.specialty_id));
       
     if (allSpecialtyError) {
       console.error('Erro ao buscar informações das especialidades:', allSpecialtyError);
@@ -209,7 +181,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // 4. Calcular distâncias e preços para cada prestador
     const providers: ProviderMatch[] = [];
     
-    for (const ps of relevantServices) {
+    for (const ps of providerServices) {
       // Get provider profile from map
       const profile = profilesMap.get(ps.provider_id);
       
@@ -314,19 +286,30 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     // 5. Buscar dados adicionais dos prestadores (avaliações)
     for (const provider of providers) {
-      // Buscar avaliação média
-      const { data: ratings } = await supabase
-        .from('quotes')
-        .select('rating')
-        .eq('provider_id', provider.provider.userId);
-        
-      // Verificar se temos ratings válidos
-      if (ratings && ratings.length > 0) {
-        const validRatings = ratings.filter((r) => r.rating !== null && r.rating !== undefined);
-        if (validRatings.length > 0) {
-          const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
-          provider.provider.averageRating = sum / validRatings.length;
+      try {
+        // Verificar se o campo rating existe na tabela quotes
+        const { data: ratings, error } = await supabase
+          .from('quotes')
+          .select('rating')
+          .eq('provider_id', provider.provider.userId);
+          
+        if (error) {
+          console.error('Erro ao buscar avaliações:', error);
+          continue;
         }
+        
+        // Verificar se temos ratings válidos
+        if (ratings && ratings.length > 0) {
+          // Filtrar ratings que têm um valor válido
+          const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+          
+          if (validRatings.length > 0) {
+            const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
+            provider.provider.averageRating = sum / validRatings.length;
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao processar avaliações:', err);
       }
     }
 
@@ -393,18 +376,22 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     }
 
     // 3. Buscar avaliações do prestador
-    const { data: ratings } = await supabase
-      .from('quotes')
-      .select('rating')
-      .eq('provider_id', providerId);
-
     let averageRating = 0;
-    if (ratings && ratings.length > 0) {
-      const validRatings = ratings.filter((r) => r.rating !== null && r.rating !== undefined);
-      if (validRatings.length > 0) {
-        const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
-        averageRating = sum / validRatings.length;
+    try {
+      const { data: ratings, error: ratingError } = await supabase
+        .from('quotes')
+        .select('rating')
+        .eq('provider_id', providerId);
+
+      if (!ratingError && ratings && ratings.length > 0) {
+        const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+        if (validRatings.length > 0) {
+          const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
+          averageRating = sum / validRatings.length;
+        }
       }
+    } catch (err) {
+      console.error('Erro ao calcular avaliações:', err);
     }
 
     // Criar explicitamente um objeto ProviderProfile para evitar problemas de tipagem
