@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import ProviderCard from '@/components/providerMatch/ProviderCard';
 import ProviderDetailsModal from '@/components/providerMatch/ProviderDetailsModal';
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
 import { toast as sonnerToast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const ProvidersFound: React.FC = () => {
   const location = useLocation();
@@ -91,13 +93,7 @@ const ProvidersFound: React.FC = () => {
           Especialidade: ${quoteDetails.specialtyName || 'Nenhum'} (${quoteDetails.specialtyId || 'Nenhum'})
         `);
         
-        // Depurar tabela provider_services antes da busca
-        const { data: debugProviderServices } = await supabase
-          .from('provider_services')
-          .select('*');
-        
-        console.log('DEBUG - Todos os provider_services:', debugProviderServices);
-        
+        // Buscar todos os prestadores disponíveis
         const matchingProviders = await findMatchingProviders(quoteDetails);
         console.log('Prestadores encontrados:', matchingProviders);
         

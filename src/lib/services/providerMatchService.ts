@@ -6,124 +6,91 @@ import { calculateDistance, geocodeAddress } from './googleMapsService';
 // Função para encontrar prestadores que atendem aos critérios
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[]> => {
   try {
-    console.log('Iniciando busca de prestadores com serviço:', quoteDetails.serviceName);
-    console.log('Detalhes da busca:', {
+    console.log('Iniciando busca de prestadores com detalhes:', {
       serviceId: quoteDetails.serviceId,
+      serviceName: quoteDetails.serviceName,
       subServiceId: quoteDetails.subServiceId,
-      specialtyId: quoteDetails.specialtyId
+      subServiceName: quoteDetails.subServiceName,
+      specialtyId: quoteDetails.specialtyId,
+      specialtyName: quoteDetails.specialtyName
     });
     
-    // Primeiro, vamos verificar se a especialidade existe e obter informações sobre ela
-    let specialtyInfo = null;
-    if (quoteDetails.specialtyId) {
-      const { data: specialty, error: specialtyError } = await supabase
-        .from('specialties')
-        .select('id, name, sub_service_id')
-        .eq('id', quoteDetails.specialtyId)
-        .maybeSingle();
-      
-      if (specialtyError) {
-        console.error('Erro ao buscar informações da especialidade:', specialtyError);
-      } else if (specialty) {
-        specialtyInfo = specialty;
-        console.log('Especialidade encontrada:', specialtyInfo);
-      }
-    }
-    
-    // Agora, vamos verificar se o subserviço existe e obter informações sobre ele
-    let subServiceInfo = null;
-    if (quoteDetails.subServiceId) {
-      const { data: subService, error: subServiceError } = await supabase
-        .from('sub_services')
-        .select('id, name, service_id')
-        .eq('id', quoteDetails.subServiceId)
-        .maybeSingle();
-      
-      if (subServiceError) {
-        console.error('Erro ao buscar informações do subserviço:', subServiceError);
-      } else if (subService) {
-        subServiceInfo = subService;
-        console.log('Subserviço encontrado:', subServiceInfo);
-      }
-    }
-    
-    // Construir uma consulta mais abrangente para encontrar prestadores
-    console.log('Buscando prestadores que oferecem serviços compatíveis...');
-    
-    // Abordagem mais simples: buscar todos os provider_services e filtrar depois
-    const { data: allProviderServices, error: providerServicesError } = await supabase
-      .from('provider_services')
-      .select('id, base_price, provider_id, specialty_id');
+    // Vamos registrar o endereço para verificar se os dados estão corretos
+    console.log('Endereço do cliente:', quoteDetails.address);
 
-    if (providerServicesError) {
-      console.error('Erro ao buscar serviços dos prestadores:', providerServicesError);
-      return [];
-    }
-
-    console.log(`Encontrados ${allProviderServices?.length || 0} registros de serviços de prestadores no total`);
+    // Primeiro, vamos buscar todos os prestadores com seus serviços
+    console.log('Buscando prestadores disponíveis...');
     
-    // Filtrar manualmente para garantir que pegamos os prestadores corretos
-    const providerServices = allProviderServices?.filter(service => {
-      // Verificar se o prestador oferece o serviço específico solicitado
-      if (quoteDetails.specialtyId && service.specialty_id === quoteDetails.specialtyId) {
-        console.log(`Prestador ${service.provider_id} oferece a especialidade exata`);
-        return true;
-      }
-      
-      if (quoteDetails.subServiceId && service.specialty_id === quoteDetails.subServiceId) {
-        console.log(`Prestador ${service.provider_id} oferece o subserviço`);
-        return true;
-      }
-      
-      if (quoteDetails.serviceId && service.specialty_id === quoteDetails.serviceId) {
-        console.log(`Prestador ${service.provider_id} oferece o serviço principal`);
-        return true;
-      }
-      
-      return false;
-    }) || [];
-    
-    if (!providerServices.length) {
-      console.log('Nenhum prestador encontrado para este serviço ou suas categorias relacionadas');
-      return [];
-    }
-
-    console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
-    console.log('Provider services:', providerServices);
-
-    // Get provider profiles in a separate query
-    const providerIds = providerServices.map(ps => ps.provider_id);
-
-    // Fetch provider profiles separately to avoid recursion
-    const { data: providerProfiles, error: profilesError } = await supabase
+    // Buscar todos os prestadores por uma abordagem mais direta
+    const { data: providers, error: providersError } = await supabase
       .from('profiles')
-      .select('id, name, phone')
-      .in('id', providerIds);
+      .select('id, name, phone, role')
+      .eq('role', 'provider');
 
-    if (profilesError) {
-      console.error('Erro ao buscar perfis dos prestadores:', profilesError);
+    if (providersError) {
+      console.error('Erro ao buscar prestadores:', providersError);
       return [];
     }
 
-    // Create a map for quick lookup of profiles
-    const profilesMap = new Map();
-    if (providerProfiles) {
-      providerProfiles.forEach(profile => {
-        profilesMap.set(profile.id, profile);
-      });
+    console.log(`Encontrados ${providers?.length || 0} prestadores no total`);
+    
+    if (!providers || providers.length === 0) {
+      console.log('Nenhum prestador encontrado no sistema');
+      return [];
     }
 
-    // Get provider settings separately
+    // Obter os IDs dos prestadores para uso nas próximas consultas
+    const providerIds = providers.map(p => p.id);
+    
+    // Buscar serviços oferecidos por esses prestadores
+    const { data: providerServices, error: servicesError } = await supabase
+      .from('provider_services')
+      .select('*')
+      .in('provider_id', providerIds);
+      
+    if (servicesError) {
+      console.error('Erro ao buscar serviços dos prestadores:', servicesError);
+      return [];
+    }
+
+    console.log(`Encontrados ${providerServices?.length || 0} serviços oferecidos por prestadores`);
+    console.log('Serviços encontrados:', providerServices);
+    
+    if (!providerServices || providerServices.length === 0) {
+      console.log('Nenhum serviço cadastrado para os prestadores');
+      return [];
+    }
+
+    // Filtrar prestadores que oferecem o serviço/subserviço/especialidade solicitado
+    const matchingProviderServices = providerServices.filter(service => {
+      // Log para depuração - comparar IDs
+      console.log(`Comparando: service.specialty_id=${service.specialty_id} com specialty=${quoteDetails.specialtyId}, subService=${quoteDetails.subServiceId}, service=${quoteDetails.serviceId}`);
+      
+      // Match direto com especialidade, subserviço ou serviço
+      return (
+        service.specialty_id === quoteDetails.specialtyId || 
+        service.specialty_id === quoteDetails.subServiceId || 
+        service.specialty_id === quoteDetails.serviceId
+      );
+    });
+
+    console.log(`Encontrados ${matchingProviderServices.length} prestadores compatíveis com o serviço solicitado`);
+    
+    if (matchingProviderServices.length === 0) {
+      return [];
+    }
+
+    // Buscar configurações dos prestadores com localização
     const { data: providerSettings, error: settingsError } = await supabase
       .from('provider_settings')
       .select('*')
-      .in('provider_id', providerIds);
+      .in('provider_id', matchingProviderServices.map(ps => ps.provider_id));
 
     if (settingsError) {
       console.error('Erro ao buscar configurações dos prestadores:', settingsError);
     }
 
-    // Create a map for quick lookup
+    // Criar um mapa para acesso rápido
     const settingsMap = new Map();
     if (providerSettings) {
       providerSettings.forEach(settings => {
@@ -131,22 +98,11 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // Recuperar informações detalhadas sobre os serviços para calcular relevância
-    const { data: allSpecialtyInfo, error: allSpecialtyError } = await supabase
-      .from('specialties')
-      .select('id, name, sub_service_id')
-      .in('id', providerServices.map(ps => ps.specialty_id));
-      
-    if (allSpecialtyError) {
-      console.error('Erro ao buscar informações das especialidades:', allSpecialtyError);
-    }
-    
-    const specialtyMap = new Map();
-    if (allSpecialtyInfo) {
-      allSpecialtyInfo.forEach(specialty => {
-        specialtyMap.set(specialty.id, specialty);
-      });
-    }
+    // Criar um mapa para acessar rapidamente os dados do prestador
+    const providerMap = new Map();
+    providers.forEach(provider => {
+      providerMap.set(provider.id, provider);
+    });
 
     // 2. Geocodificar o endereço do cliente
     const fullAddress = `${quoteDetails.address.street}, ${quoteDetails.address.number}, ${quoteDetails.address.neighborhood}, ${quoteDetails.address.city}, ${quoteDetails.address.state}, ${quoteDetails.address.zipCode}`;
@@ -155,58 +111,34 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     if (!clientLocation) {
       console.error('Não foi possível geocodificar o endereço do cliente');
-      // Continuar mesmo sem coordenadas, apenas não poderemos calcular distâncias precisas
     } else {
       console.log('Coordenadas do cliente:', clientLocation);
     }
 
-    // 3. Buscar itens e medições para calcular preço
-    let itemPricesList: any[] = [];
+    // Array para armazenar os prestadores compatíveis
+    const matchedProviders: ProviderMatch[] = [];
     
-    if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
-      // Buscar preços específicos de itens que os prestadores oferecem
-      const { data: itemPrices, error: itemsError } = await supabase
-        .from('provider_item_prices')
-        .select('*')
-        .in('provider_id', providerIds)
-        .in('item_id', Object.keys(quoteDetails.items));
-        
-      if (itemsError) {
-        console.error('Erro ao buscar preços de itens:', itemsError);
-      } else if (itemPrices) {
-        itemPricesList = itemPrices;
-      }
-    }
-
-    // 4. Calcular distâncias e preços para cada prestador
-    const providers: ProviderMatch[] = [];
-    
-    for (const ps of providerServices) {
-      // Get provider profile from map
-      const profile = profilesMap.get(ps.provider_id);
+    // Processar cada prestador compatível
+    for (const service of matchingProviderServices) {
+      const providerId = service.provider_id;
+      const provider = providerMap.get(providerId);
       
-      if (!profile) {
-        console.log(`Perfil não encontrado para prestador ${ps.provider_id}`);
-        continue; // Skip this provider if no profile found
+      if (!provider) {
+        console.log(`Perfil não encontrado para prestador ${providerId}`);
+        continue;
       }
       
-      // Get provider settings from map
-      const settings = settingsMap.get(ps.provider_id);
+      const settings = settingsMap.get(providerId);
       
-      // Obter informações da especialidade
-      const specialty = specialtyMap.get(ps.specialty_id);
-      
-      // Calcular relevância do prestador (exata especialidade = maior relevância)
+      // Calcular relevância do prestador
       let relevanceScore = 1; // valor base
       
-      if (ps.specialty_id === quoteDetails.specialtyId) {
+      if (service.specialty_id === quoteDetails.specialtyId) {
         relevanceScore = 3; // Especialidade exata
-      } else if (ps.specialty_id === quoteDetails.subServiceId) {
+      } else if (service.specialty_id === quoteDetails.subServiceId) {
         relevanceScore = 2; // Sub-serviço 
-      } else if (ps.specialty_id === quoteDetails.serviceId) {
+      } else if (service.specialty_id === quoteDetails.serviceId) {
         relevanceScore = 1; // Apenas o serviço principal
-      } else if (specialty && specialtyInfo && specialty.sub_service_id === specialtyInfo.sub_service_id) {
-        relevanceScore = 2.5; // Especialidade relacionada no mesmo subserviço
       }
       
       // Calcular distância se possível
@@ -227,56 +159,54 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         // Se o raio for 0, o prestador atende todo o Brasil
         isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
         
-        console.log(`Prestador ${profile.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}, relevância: ${relevanceScore}`);
+        console.log(`Prestador ${provider.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}, relevância: ${relevanceScore}`);
       } else {
-        console.log(`Prestador ${profile.name}, não possui coordenadas de localização ou configuração de raio, relevância: ${relevanceScore}`);
+        console.log(`Prestador ${provider.name}, não possui coordenadas de localização ou configuração de raio, relevância: ${relevanceScore}`);
         // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
         isWithinRadius = true;
+        distance = 0; // Valor padrão quando não há coordenadas
       }
       
       // Calcular preço básico para o serviço
-      let totalPrice = ps.base_price || 0;
+      let totalPrice = service.base_price || 0;
       
-      // Adicionar preços de itens específicos
-      if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
-        Object.entries(quoteDetails.items).forEach(([itemId, quantity]) => {
-          // Encontrar o preço específico do prestador para este item
-          const itemPrice = itemPricesList.find(
-            (ip) => ip.provider_id === ps.provider_id && ip.item_id === itemId
-          );
+      // Buscar avaliações do prestador
+      let averageRating = 0;
+      try {
+        // Verificar se o campo rating existe na tabela quotes
+        const { data: ratings, error } = await supabase
+          .from('quotes')
+          .select('rating')
+          .eq('provider_id', providerId);
           
-          if (itemPrice) {
-            totalPrice += (itemPrice.price_per_unit * Number(quantity));
-          } else {
-            // Usar preço padrão se o prestador não tiver um preço específico
-            totalPrice += ps.base_price * Number(quantity);
+        if (!error && ratings && ratings.length > 0) {
+          // Filtrar ratings que têm um valor válido
+          const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+          
+          if (validRatings.length > 0) {
+            const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
+            averageRating = sum / validRatings.length;
           }
-        });
+        }
+      } catch (err) {
+        console.error('Erro ao processar avaliações:', err);
       }
       
-      // Adicionar preços por medições (metros quadrados/lineares)
-      if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
-        quoteDetails.measurements.forEach(measurement => {
-          // Calcular área ou comprimento
-          const area = measurement.area || (measurement.width * measurement.length);
-          totalPrice += ps.base_price * Number(area);
-        });
-      }
-      
-      // Cria um objeto ProviderProfile explicitamente para evitar problemas de tipagem
+      // Criar objeto ProviderProfile
       const providerProfile: ProviderProfile = {
-        userId: profile.id,
+        userId: provider.id,
         bio: settings?.bio || '',
-        averageRating: 0, // Será preenchido posteriormente
-        specialties: [], // Inicialmente vazia, será preenchida depois se necessário
-        name: profile.name,
-        phone: profile.phone,
+        averageRating: averageRating,
+        specialties: [], // Será preenchido se necessário
+        name: provider.name,
+        phone: provider.phone,
         city: settings?.city || '',
         neighborhood: settings?.neighborhood || '',
         relevanceScore: relevanceScore
       };
       
-      providers.push({
+      // Adicionar à lista de prestadores compatíveis
+      matchedProviders.push({
         provider: providerProfile,
         distance,
         totalPrice,
@@ -284,37 +214,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // 5. Buscar dados adicionais dos prestadores (avaliações)
-    for (const provider of providers) {
-      try {
-        // Verificar se o campo rating existe na tabela quotes
-        const { data: ratings, error } = await supabase
-          .from('quotes')
-          .select('rating')
-          .eq('provider_id', provider.provider.userId);
-          
-        if (error) {
-          console.error('Erro ao buscar avaliações:', error);
-          continue;
-        }
-        
-        // Verificar se temos ratings válidos
-        if (ratings && ratings.length > 0) {
-          // Filtrar ratings que têm um valor válido
-          const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
-          
-          if (validRatings.length > 0) {
-            const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
-            provider.provider.averageRating = sum / validRatings.length;
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao processar avaliações:', err);
-      }
-    }
-
     // Ordenar: primeiro os que estão dentro do raio e por relevância, depois os outros
-    providers.sort((a, b) => {
+    matchedProviders.sort((a, b) => {
       // Primeiro ordenar por "está no raio"
       if (a.isWithinRadius && !b.isWithinRadius) return -1;
       if (!a.isWithinRadius && b.isWithinRadius) return 1;
@@ -331,8 +232,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return a.distance - b.distance;
     });
 
-    console.log(`Retornando ${providers.length} prestadores, ${providers.filter(p => p.isWithinRadius).length} dentro do raio`);
-    return providers;
+    console.log(`Retornando ${matchedProviders.length} prestadores, ${matchedProviders.filter(p => p.isWithinRadius).length} dentro do raio`);
+    return matchedProviders;
   } catch (error) {
     console.error('Erro ao buscar prestadores correspondentes:', error);
     return [];
