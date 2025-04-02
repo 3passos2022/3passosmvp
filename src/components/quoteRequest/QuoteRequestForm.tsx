@@ -650,11 +650,7 @@ const ServiceDetailsStep: React.FC<{
             }
           </p>
         </div>
-        <Progress 
-          segments={requiredSteps.length} 
-          activeSegment={requiredSteps.indexOf(detailsSubStep)}
-          className="h-2"
-        />
+ 
       </div>
 
       {detailsSubStep === 'quiz' && (
