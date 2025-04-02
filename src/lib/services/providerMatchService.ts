@@ -7,9 +7,14 @@ import { Specialty, ServiceItem } from '@/lib/types';
 // Função para encontrar prestadores que atendem aos critérios
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[]> => {
   try {
-    console.log('Iniciando busca de prestadores com especialidade:', quoteDetails.specialtyId);
+    console.log('Iniciando busca de prestadores com serviço:', quoteDetails.serviceName);
+    console.log('Detalhes da busca:', {
+      serviceId: quoteDetails.serviceId,
+      subServiceId: quoteDetails.subServiceId,
+      specialtyId: quoteDetails.specialtyId
+    });
     
-    // 1. Encontrar prestadores que oferecem o serviço específico (sem join direto para profiles)
+    // 1. Encontrar prestadores que oferecem o serviço, sub-serviço ou especialidade específica
     const { data: providerServices, error: servicesError } = await supabase
       .from('provider_services')
       .select(`
@@ -18,7 +23,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         provider_id,
         specialty_id
       `)
-      .eq('specialty_id', quoteDetails.specialtyId);
+      .or(`specialty_id.eq.${quoteDetails.specialtyId}, specialty_id.eq.${quoteDetails.subServiceId}, specialty_id.eq.${quoteDetails.serviceId}`);
 
     if (servicesError) {
       console.error('Erro ao buscar serviços dos prestadores:', servicesError);
@@ -26,11 +31,11 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     if (!providerServices || providerServices.length === 0) {
-      console.log('Nenhum prestador encontrado para esta especialidade');
+      console.log('Nenhum prestador encontrado para este serviço ou suas categorias pai');
       return [];
     }
 
-    console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço`);
+    console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
 
     // Get provider profiles in a separate query to avoid recursion
     const providerIds = providerServices.map(ps => ps.provider_id);
@@ -69,6 +74,23 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     if (providerSettings) {
       providerSettings.forEach(settings => {
         settingsMap.set(settings.provider_id, settings);
+      });
+    }
+
+    // Recuperar informações detalhadas sobre os serviços para calcular relevância
+    const { data: specialtyInfo, error: specialtyError } = await supabase
+      .from('specialties')
+      .select('id, name, sub_service_id')
+      .in('id', providerServices.map(ps => ps.specialty_id));
+      
+    if (specialtyError) {
+      console.error('Erro ao buscar informações das especialidades:', specialtyError);
+    }
+    
+    const specialtyMap = new Map();
+    if (specialtyInfo) {
+      specialtyInfo.forEach(specialty => {
+        specialtyMap.set(specialty.id, specialty);
       });
     }
 
@@ -117,6 +139,18 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       // Get provider settings from map
       const settings = settingsMap.get(ps.provider_id);
       
+      // Calcular relevância do prestador (exata especialidade = maior relevância)
+      let relevanceScore = 1; // valor base
+      const specialty = specialtyMap.get(ps.specialty_id);
+      
+      if (ps.specialty_id === quoteDetails.specialtyId) {
+        relevanceScore = 3; // Especialidade exata
+      } else if (ps.specialty_id === quoteDetails.subServiceId) {
+        relevanceScore = 2; // Sub-serviço 
+      } else if (ps.specialty_id === quoteDetails.serviceId) {
+        relevanceScore = 1; // Apenas o serviço principal
+      }
+      
       // Calcular distância se possível
       let distance = 9999;
       let isWithinRadius = false;
@@ -135,9 +169,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         // Se o raio for 0, o prestador atende todo o Brasil
         isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
         
-        console.log(`Prestador ${profile.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
+        console.log(`Prestador ${profile.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}, relevância: ${relevanceScore}`);
       } else {
-        console.log(`Prestador ${profile.name}, não possui coordenadas de localização ou configuração de raio`);
+        console.log(`Prestador ${profile.name}, não possui coordenadas de localização ou configuração de raio, relevância: ${relevanceScore}`);
         // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
         isWithinRadius = true;
       }
@@ -180,7 +214,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           name: profile.name,
           phone: profile.phone,
           city: settings?.city || '',
-          neighborhood: settings?.neighborhood || ''
+          neighborhood: settings?.neighborhood || '',
+          relevanceScore: relevanceScore // Adicionando a pontuação de relevância
         },
         distance,
         totalPrice,
@@ -206,13 +241,21 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       }
     }
 
-    // Ordenar: primeiro os que estão dentro do raio, depois os outros
+    // Ordenar: primeiro os que estão dentro do raio e por relevância, depois os outros
     providers.sort((a, b) => {
       // Primeiro ordenar por "está no raio"
       if (a.isWithinRadius && !b.isWithinRadius) return -1;
       if (!a.isWithinRadius && b.isWithinRadius) return 1;
       
-      // Se ambos estão no mesmo grupo, ordenar por distância
+      // Se ambos estão no mesmo grupo, ordenar por relevância
+      const relevanceA = a.provider.relevanceScore || 0;
+      const relevanceB = b.provider.relevanceScore || 0;
+      
+      if (relevanceA !== relevanceB) {
+        return relevanceB - relevanceA; // Maior relevância primeiro
+      }
+      
+      // Se mesma relevância, ordenar por distância
       return a.distance - b.distance;
     });
 

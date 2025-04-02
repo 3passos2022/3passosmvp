@@ -75,6 +75,7 @@ export interface ProviderProfile {
   phone?: string;
   city?: string;
   neighborhood?: string;
+  relevanceScore?: number;
 }
 
 export interface ServiceQuestion {
