@@ -62,7 +62,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // 3. Buscar itens e medições para calcular preço
-    let totalItems: any[] = [];
+    let totalItems = [];
     
     if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
       // Buscar preços específicos de itens que os prestadores oferecem
@@ -80,7 +80,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // 4. Calcular distâncias e preços para cada prestador
-    const providers: ProviderMatch[] = providerServices.map(ps => {
+    const providers: ProviderMatch[] = [];
+    
+    for (const ps of providerServices) {
       // Get provider settings from map
       const settings = settingsMap.get(ps.provider_id);
       
@@ -111,7 +113,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         Object.entries(quoteDetails.items).forEach(([itemId, quantity]) => {
           // Encontrar o preço específico do prestador para este item
           const itemPrice = totalItems.find(
-            ip => ip.provider_id === ps.provider_id && ip.item_id === itemId
+            (ip: any) => ip.provider_id === ps.provider_id && ip.item_id === itemId
           );
           
           if (itemPrice) {
@@ -132,7 +134,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         });
       }
       
-      return {
+      providers.push({
         provider: {
           userId: ps.profiles.id,
           bio: settings?.bio || '',
@@ -146,8 +148,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         distance,
         totalPrice,
         isWithinRadius
-      };
-    });
+      });
+    }
 
     // 5. Buscar dados adicionais dos prestadores (localização e avaliações)
     for (const provider of providers) {
@@ -249,7 +251,7 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
         city: settings?.city || '',
         neighborhood: settings?.neighborhood || ''
       },
-      portfolioItems: portfolio ? portfolio.map(item => ({
+      portfolioItems: portfolio ? portfolio.map((item: any) => ({
         id: item.id,
         imageUrl: item.image_url,
         description: item.description

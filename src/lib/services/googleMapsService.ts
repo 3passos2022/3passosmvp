@@ -11,10 +11,11 @@ interface GeocodingResult {
 // Função para geocodificar um endereço (converter endereço em coordenadas)
 export const geocodeAddress = async (address: string): Promise<GeocodingResult | null> => {
   try {
-    // Verificar se a API do Google Maps está carregada
+    // Verificar se a API do Google Maps está disponível
     if (!window.google || !window.google.maps || !window.google.maps.Geocoder) {
       console.error('Google Maps API não está carregada');
-      return null;
+      // Usando uma API de geocodificação alternativa como fallback
+      return await geocodeFallback(address);
     }
 
     const geocoder = new window.google.maps.Geocoder();
@@ -30,12 +31,43 @@ export const geocodeAddress = async (address: string): Promise<GeocodingResult |
           });
         } else {
           console.error('Erro na geocodificação:', status);
-          reject(new Error(`Geocoding falhou com status: ${status}`));
+          // Em caso de falha, tentar geocodificação alternativa
+          geocodeFallback(address).then(resolve).catch(reject);
         }
       });
     });
   } catch (error) {
     console.error('Erro ao geocodificar endereço:', error);
+    // Em caso de exceção, tentar geocodificação alternativa
+    return await geocodeFallback(address);
+  }
+};
+
+// Função de fallback para geocodificar usando uma API pública
+const geocodeFallback = async (address: string): Promise<GeocodingResult | null> => {
+  try {
+    // Usar uma API de geocodificação gratuita como alternativa
+    // Neste exemplo, estamos usando a API de geocodificação do OpenStreetMap Nominatim
+    const encodedAddress = encodeURIComponent(address);
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1&addressdetails=1`);
+    
+    if (!response.ok) {
+      throw new Error(`Falha na geocodificação alternativa: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+        formattedAddress: data[0].display_name
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Erro na geocodificação alternativa:', error);
     return null;
   }
 };

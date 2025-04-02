@@ -112,20 +112,26 @@ const ProviderSettings: React.FC = () => {
     try {
       setGeocoding(true);
       const fullAddress = `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city}, ${formData.state}, ${formData.zipCode}`;
+      console.log('Tentando geocodificar endereço:', fullAddress);
+      
       const location = await geocodeAddress(fullAddress);
       
       if (!location) {
-        throw new Error('Não foi possível geocodificar o endereço');
+        toast.error('Não foi possível geocodificar o endereço. O endereço será salvo sem coordenadas.');
+        // Retornar objeto vazio para continuar o salvamento sem as coordenadas
+        return { latitude: null, longitude: null };
       }
 
+      console.log('Coordenadas obtidas:', location);
       return {
         latitude: location.lat,
         longitude: location.lng
       };
     } catch (error) {
       console.error('Error geocoding address:', error);
-      toast.error('Não foi possível obter as coordenadas do endereço. Verifique se as informações estão corretas.');
-      return null;
+      toast.error('Não foi possível obter as coordenadas do endereço. O endereço será salvo sem coordenadas.');
+      // Retornar objeto vazio para continuar o salvamento sem as coordenadas
+      return { latitude: null, longitude: null };
     } finally {
       setGeocoding(false);
     }
@@ -142,10 +148,10 @@ const ProviderSettings: React.FC = () => {
       const address = await fetchAddressByCep(zipCode);
       
       if (address) {
-        setValue('street', address.logradouro);
-        setValue('neighborhood', address.bairro);
-        setValue('city', address.localidade);
-        setValue('state', address.uf);
+        setValue('street', address.logradouro || '');
+        setValue('neighborhood', address.bairro || '');
+        setValue('city', address.localidade || '');
+        setValue('state', address.uf || '');
         
         if (address.complemento) {
           setValue('complement', address.complemento);
@@ -173,11 +179,7 @@ const ProviderSettings: React.FC = () => {
     try {
       // Geocodificar o endereço para obter latitude e longitude
       const coordinates = await handleGeocodeAddress(data);
-      if (!coordinates) {
-        setSaving(false);
-        return;
-      }
-
+      
       const settingsData = {
         provider_id: user.id,
         bio: data.bio,
@@ -189,8 +191,8 @@ const ProviderSettings: React.FC = () => {
         city: data.city,
         state: data.state,
         zip_code: data.zipCode,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: coordinates?.latitude,
+        longitude: coordinates?.longitude,
       };
       
       if (settings.id) {
