@@ -1,11 +1,29 @@
 
-import { ProviderProfile, QuoteMeasurement } from '@/lib/types';
+import { QuoteMeasurement } from '@/lib/types';
 
 export interface ProviderMatch {
   provider: ProviderProfile;
   distance: number;
   totalPrice: number;
   isWithinRadius: boolean;
+}
+
+export interface ProviderProfile {
+  userId: string;
+  bio: string;
+  averageRating: number;
+  specialties: ProviderSpecialty[];
+  name?: string;
+  phone?: string;
+  city?: string;
+  neighborhood?: string;
+  relevanceScore?: number;
+}
+
+export interface ProviderSpecialty {
+  id: string;
+  name: string;
+  price?: number;
 }
 
 export interface ProviderDetails extends ProviderMatch {

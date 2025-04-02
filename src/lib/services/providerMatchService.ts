@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { ProviderMatch, ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
+import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
 
 // Função para encontrar prestadores que atendem aos critérios
@@ -204,18 +204,20 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         });
       }
       
+      const providerProfile: ProviderProfile = {
+        userId: profile.id,
+        bio: settings?.bio || '',
+        averageRating: 0, // Será preenchido posteriormente
+        specialties: [],
+        name: profile.name,
+        phone: profile.phone,
+        city: settings?.city || '',
+        neighborhood: settings?.neighborhood || '',
+        relevanceScore: relevanceScore
+      };
+      
       providers.push({
-        provider: {
-          userId: profile.id,
-          bio: settings?.bio || '',
-          averageRating: 0, // Será preenchido posteriormente
-          specialties: [],
-          name: profile.name,
-          phone: profile.phone,
-          city: settings?.city || '',
-          neighborhood: settings?.neighborhood || '',
-          relevanceScore: relevanceScore
-        },
+        provider: providerProfile,
         distance,
         totalPrice,
         isWithinRadius
@@ -317,17 +319,19 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       }
     }
 
+    const providerProfile: ProviderProfile = {
+      userId: provider.id,
+      name: provider.name,
+      phone: provider.phone,
+      bio: settings?.bio || '',
+      averageRating,
+      specialties: [],
+      city: settings?.city || '',
+      neighborhood: settings?.neighborhood || ''
+    };
+
     return {
-      provider: {
-        userId: provider.id,
-        name: provider.name,
-        phone: provider.phone,
-        bio: settings?.bio || '',
-        averageRating,
-        specialties: [],
-        city: settings?.city || '',
-        neighborhood: settings?.neighborhood || ''
-      },
+      provider: providerProfile,
       portfolioItems: portfolio ? portfolio.map((item: any) => ({
         id: item.id,
         imageUrl: item.image_url,
