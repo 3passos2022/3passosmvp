@@ -81,10 +81,6 @@ const ProvidersFound: React.FC = () => {
       console.log('Buscando prestadores para o orçamento:', quoteDetails);
       
       try {
-        if (!isMapsLoaded) {
-          console.log('Aguardando carregamento da API do Google Maps...');
-        }
-        
         const matchingProviders = await findMatchingProviders(quoteDetails);
         console.log('Prestadores encontrados:', matchingProviders);
         setProviders(matchingProviders);
@@ -102,7 +98,7 @@ const ProvidersFound: React.FC = () => {
     };
     
     fetchProviders();
-  }, [quoteDetails, isMapsLoaded, toast]);
+  }, [quoteDetails, toast]);
   
   const handleFilterChange = (filter: FilterOption) => {
     setCurrentFilter(filter);

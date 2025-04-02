@@ -9,19 +9,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
   try {
     console.log('Iniciando busca de prestadores com especialidade:', quoteDetails.specialtyId);
     
-    // 1. Encontrar prestadores que oferecem o serviço específico
+    // 1. Encontrar prestadores que oferecem o serviço específico (sem join direto para profiles)
     const { data: providerServices, error: servicesError } = await supabase
       .from('provider_services')
       .select(`
         id, 
         base_price,
         provider_id,
-        specialty_id,
-        profiles!inner (
-          id, 
-          name, 
-          phone
-        )
+        specialty_id
       `)
       .eq('specialty_id', quoteDetails.specialtyId);
 
@@ -37,8 +32,29 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço`);
 
-    // Get provider settings separately to avoid join issues
+    // Get provider profiles in a separate query to avoid recursion
     const providerIds = providerServices.map(ps => ps.provider_id);
+
+    // Fetch provider profiles separately
+    const { data: providerProfiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name, phone')
+      .in('id', providerIds);
+
+    if (profilesError) {
+      console.error('Erro ao buscar perfis dos prestadores:', profilesError);
+      return [];
+    }
+
+    // Create a map for quick lookup of profiles
+    const profilesMap = new Map();
+    if (providerProfiles) {
+      providerProfiles.forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+    }
+
+    // Get provider settings separately to avoid join issues
     const { data: providerSettings, error: settingsError } = await supabase
       .from('provider_settings')
       .select('*')
@@ -63,10 +79,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     if (!clientLocation) {
       console.error('Não foi possível geocodificar o endereço do cliente');
-      return [];
+      // Continuar mesmo sem coordenadas, apenas não poderemos calcular distâncias precisas
+    } else {
+      console.log('Coordenadas do cliente:', clientLocation);
     }
-
-    console.log('Coordenadas do cliente:', clientLocation);
 
     // 3. Buscar itens e medições para calcular preço
     let totalItems = [];
@@ -76,7 +92,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       const { data: itemPrices, error: itemsError } = await supabase
         .from('provider_item_prices')
         .select('*')
-        .in('provider_id', providerServices.map(ps => ps.provider_id))
+        .in('provider_id', providerIds)
         .in('item_id', Object.keys(quoteDetails.items));
         
       if (itemsError) {
@@ -90,6 +106,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     const providers: ProviderMatch[] = [];
     
     for (const ps of providerServices) {
+      // Get provider profile from map
+      const profile = profilesMap.get(ps.provider_id);
+      
+      if (!profile) {
+        console.log(`Perfil não encontrado para prestador ${ps.provider_id}`);
+        continue; // Skip this provider if no profile found
+      }
+      
       // Get provider settings from map
       const settings = settingsMap.get(ps.provider_id);
       
@@ -106,14 +130,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         );
         
         // Definir o raio como o valor da configuração ou um valor padrão de 0 (todo o Brasil)
-        const serviceRadius = settings.service_radius_km || 0;
+        const serviceRadius = settings?.service_radius_km || 0;
         
         // Se o raio for 0, o prestador atende todo o Brasil
         isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
         
-        console.log(`Prestador ${ps.profiles.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
+        console.log(`Prestador ${profile.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
       } else {
-        console.log(`Prestador ${ps.profiles.name}, não possui coordenadas de localização ou configuração de raio`);
+        console.log(`Prestador ${profile.name}, não possui coordenadas de localização ou configuração de raio`);
         // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
         isWithinRadius = true;
       }
@@ -149,12 +173,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       
       providers.push({
         provider: {
-          userId: ps.profiles.id,
+          userId: profile.id,
           bio: settings?.bio || '',
           averageRating: 0, // Será preenchido posteriormente
           specialties: [],
-          name: ps.profiles.name,
-          phone: ps.profiles.phone,
+          name: profile.name,
+          phone: profile.phone,
           city: settings?.city || '',
           neighborhood: settings?.neighborhood || ''
         },
