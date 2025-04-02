@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -151,7 +150,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // Recuperar informações detalhadas sobre os serviços para calcular relevância
-    const { data: specialtyInfo: allSpecialtyInfo, error: specialtyError: allSpecialtyError } = await supabase
+    const { data: allSpecialtyInfo, error: allSpecialtyError } = await supabase
       .from('specialties')
       .select('id, name, sub_service_id')
       .in('id', providerServices.map(ps => ps.specialty_id));
