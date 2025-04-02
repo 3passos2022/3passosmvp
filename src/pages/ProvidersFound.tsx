@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -11,6 +12,7 @@ import { useGoogleMaps } from '@/lib/services/googleMapsService';
 import ProviderCard from '@/components/providerMatch/ProviderCard';
 import ProviderDetailsModal from '@/components/providerMatch/ProviderDetailsModal';
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
+import { toast as sonnerToast } from 'sonner';
 
 const ProvidersFound: React.FC = () => {
   const location = useLocation();
@@ -83,6 +85,14 @@ const ProvidersFound: React.FC = () => {
       try {
         const matchingProviders = await findMatchingProviders(quoteDetails);
         console.log('Prestadores encontrados:', matchingProviders);
+        
+        if (matchingProviders.length === 0) {
+          sonnerToast.warning('Nenhum prestador encontrado', {
+            description: 'Não encontramos prestadores para este serviço no momento.',
+            duration: 5000
+          });
+        }
+        
         setProviders(matchingProviders);
         setFilteredProviders(matchingProviders);
       } catch (error) {

@@ -14,7 +14,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     });
     
     // 1. Encontrar prestadores que oferecem o serviço, sub-serviço ou especialidade específica
-    // Fazemos consultas separadas para evitar recursão infinita
     const { data: providerServices, error: servicesError } = await supabase
       .from('provider_services')
       .select(`
@@ -204,11 +203,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         });
       }
       
+      // Cria um objeto ProviderProfile explicitamente para evitar problemas de tipagem
       const providerProfile: ProviderProfile = {
         userId: profile.id,
         bio: settings?.bio || '',
         averageRating: 0, // Será preenchido posteriormente
-        specialties: [],
+        specialties: [], // Inicialmente vazia, será preenchida depois se necessário
         name: profile.name,
         phone: profile.phone,
         city: settings?.city || '',
@@ -319,13 +319,14 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       }
     }
 
+    // Criar explicitamente um objeto ProviderProfile para evitar problemas de tipagem
     const providerProfile: ProviderProfile = {
       userId: provider.id,
       name: provider.name,
       phone: provider.phone,
       bio: settings?.bio || '',
       averageRating,
-      specialties: [],
+      specialties: [], // Array vazio inicial
       city: settings?.city || '',
       neighborhood: settings?.neighborhood || ''
     };

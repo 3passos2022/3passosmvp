@@ -23,6 +23,7 @@ const RequestQuote: React.FC = () => {
   // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0);
+    console.log("RequestQuote: Component mounted");
   }, []);
 
   // Display a welcome toast for non-logged in users
@@ -35,8 +36,16 @@ const RequestQuote: React.FC = () => {
           id: "anonymous-quote-info" // Prevent duplicate toasts
         }
       );
+    } else {
+      console.log("RequestQuote: User is logged in", user.id);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (services) {
+      console.log("RequestQuote: Services loaded", services.length);
+    }
+  }, [services]);
 
   return (
     <div className="min-h-screen flex flex-col">

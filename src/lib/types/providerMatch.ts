@@ -26,13 +26,17 @@ export interface ProviderSpecialty {
   price?: number;
 }
 
-export interface ProviderDetails extends ProviderMatch {
+export interface ProviderDetails {
+  provider: ProviderProfile;
   portfolioItems: {
     id: string;
     imageUrl: string;
     description?: string;
   }[];
   rating: number;
+  distance: number;
+  totalPrice: number;
+  isWithinRadius: boolean;
 }
 
 export interface QuoteDetails {
