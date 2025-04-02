@@ -299,6 +299,15 @@ const ServiceStep: React.FC<{
     const subServiceName = subServices.find(s => s.id === selectedSubService)?.name;
     const specialtyName = specialties.find(s => s.id === selectedSpecialty)?.name;
     
+    console.log('Seleções do usuário:',  {
+      serviceId: selectedService,
+      serviceName, 
+      subServiceId: selectedSubService, 
+      subServiceName,
+      specialtyId: selectedSpecialty,
+      specialtyName
+    });
+    
     updateFormData({
       serviceId: selectedService,
       subServiceId: selectedSubService || undefined,
@@ -937,6 +946,22 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
     
     try {
       console.log("Enviando dados de cotação via RPC...");
+      console.log("Dados que serão enviados:", {
+        service_id: formData.serviceId,
+        sub_service_id: formData.subServiceId,
+        specialty_id: formData.specialtyId,
+        description: formData.description,
+        address: {
+          street: formData.street, 
+          number: formData.number,
+          complement: formData.complement,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode
+        },
+        is_anonymous: !user
+      });
       
       const { data: quoteId, error } = await supabase.rpc(
         "submit_quote" as any,

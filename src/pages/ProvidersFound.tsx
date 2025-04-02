@@ -66,6 +66,8 @@ const ProvidersFound: React.FC = () => {
         });
         
         navigate('/request-quote');
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -83,6 +85,13 @@ const ProvidersFound: React.FC = () => {
       console.log('Buscando prestadores para o orçamento:', quoteDetails);
       
       try {
+        // Verificar os IDs dos serviços para depuração
+        console.log(`Buscando prestadores para: 
+          Serviço: ${quoteDetails.serviceName} (${quoteDetails.serviceId})
+          Subserviço: ${quoteDetails.subServiceName || 'Nenhum'} (${quoteDetails.subServiceId || 'Nenhum'})
+          Especialidade: ${quoteDetails.specialtyName || 'Nenhum'} (${quoteDetails.specialtyId || 'Nenhum'})
+        `);
+        
         const matchingProviders = await findMatchingProviders(quoteDetails);
         console.log('Prestadores encontrados:', matchingProviders);
         

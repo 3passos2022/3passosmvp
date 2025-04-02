@@ -13,16 +13,89 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       specialtyId: quoteDetails.specialtyId
     });
     
-    // 1. Encontrar prestadores que oferecem o serviço, sub-serviço ou especialidade específica
-    const { data: providerServices, error: servicesError } = await supabase
+    // Primeiro, vamos verificar se a especialidade existe e obter informações sobre ela
+    let specialtyInfo = null;
+    if (quoteDetails.specialtyId) {
+      const { data: specialty, error: specialtyError } = await supabase
+        .from('specialties')
+        .select('id, name, sub_service_id')
+        .eq('id', quoteDetails.specialtyId)
+        .maybeSingle();
+      
+      if (specialtyError) {
+        console.error('Erro ao buscar informações da especialidade:', specialtyError);
+      } else if (specialty) {
+        specialtyInfo = specialty;
+        console.log('Especialidade encontrada:', specialtyInfo);
+      }
+    }
+    
+    // Agora, vamos verificar se o subserviço existe e obter informações sobre ele
+    let subServiceInfo = null;
+    if (quoteDetails.subServiceId) {
+      const { data: subService, error: subServiceError } = await supabase
+        .from('sub_services')
+        .select('id, name, service_id')
+        .eq('id', quoteDetails.subServiceId)
+        .maybeSingle();
+      
+      if (subServiceError) {
+        console.error('Erro ao buscar informações do subserviço:', subServiceError);
+      } else if (subService) {
+        subServiceInfo = subService;
+        console.log('Subserviço encontrado:', subServiceInfo);
+      }
+    }
+    
+    // Construir uma consulta mais abrangente para encontrar prestadores
+    // Vamos buscar prestadores que oferecem a especialidade, o subserviço ou o serviço principal
+    let query = supabase
       .from('provider_services')
       .select(`
         id, 
         base_price,
         provider_id,
         specialty_id
-      `)
-      .or(`specialty_id.eq.${quoteDetails.specialtyId},specialty_id.eq.${quoteDetails.subServiceId},specialty_id.eq.${quoteDetails.serviceId}`);
+      `);
+    
+    // Adicionar filtros OR para cada nível de serviço
+    let filters = [];
+    
+    if (quoteDetails.specialtyId) {
+      filters.push(`specialty_id.eq.${quoteDetails.specialtyId}`);
+    }
+    
+    if (quoteDetails.subServiceId) {
+      filters.push(`specialty_id.eq.${quoteDetails.subServiceId}`);
+    }
+    
+    if (quoteDetails.serviceId) {
+      filters.push(`specialty_id.eq.${quoteDetails.serviceId}`);
+    }
+    
+    // Verificar se temos especialidades relacionadas no mesmo subserviço
+    if (specialtyInfo && specialtyInfo.sub_service_id) {
+      const { data: relatedSpecialties } = await supabase
+        .from('specialties')
+        .select('id')
+        .eq('sub_service_id', specialtyInfo.sub_service_id);
+        
+      if (relatedSpecialties && relatedSpecialties.length > 0) {
+        relatedSpecialties.forEach(spec => {
+          if (spec.id !== quoteDetails.specialtyId) {
+            filters.push(`specialty_id.eq.${spec.id}`);
+          }
+        });
+      }
+    }
+    
+    // Aplicar todos os filtros com OR
+    if (filters.length > 0) {
+      query = query.or(filters.join(','));
+    }
+    
+    // Executar a consulta
+    const { data: providerServices, error: servicesError } = await query;
 
     if (servicesError) {
       console.error('Erro ao buscar serviços dos prestadores:', servicesError);
@@ -30,11 +103,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     if (!providerServices || providerServices.length === 0) {
-      console.log('Nenhum prestador encontrado para este serviço ou suas categorias pai');
+      console.log('Nenhum prestador encontrado para este serviço ou suas categorias relacionadas');
       return [];
     }
 
     console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
+    console.log('Provider services:', providerServices);
 
     // Get provider profiles in a separate query
     const providerIds = providerServices.map(ps => ps.provider_id);
@@ -77,18 +151,18 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // Recuperar informações detalhadas sobre os serviços para calcular relevância
-    const { data: specialtyInfo, error: specialtyError } = await supabase
+    const { data: specialtyInfo: allSpecialtyInfo, error: specialtyError: allSpecialtyError } = await supabase
       .from('specialties')
       .select('id, name, sub_service_id')
       .in('id', providerServices.map(ps => ps.specialty_id));
       
-    if (specialtyError) {
-      console.error('Erro ao buscar informações das especialidades:', specialtyError);
+    if (allSpecialtyError) {
+      console.error('Erro ao buscar informações das especialidades:', allSpecialtyError);
     }
     
     const specialtyMap = new Map();
-    if (specialtyInfo) {
-      specialtyInfo.forEach(specialty => {
+    if (allSpecialtyInfo) {
+      allSpecialtyInfo.forEach(specialty => {
         specialtyMap.set(specialty.id, specialty);
       });
     }
@@ -138,6 +212,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       // Get provider settings from map
       const settings = settingsMap.get(ps.provider_id);
       
+      // Obter informações da especialidade
+      const specialty = specialtyMap.get(ps.specialty_id);
+      
       // Calcular relevância do prestador (exata especialidade = maior relevância)
       let relevanceScore = 1; // valor base
       
@@ -147,6 +224,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         relevanceScore = 2; // Sub-serviço 
       } else if (ps.specialty_id === quoteDetails.serviceId) {
         relevanceScore = 1; // Apenas o serviço principal
+      } else if (specialty && specialtyInfo && specialty.sub_service_id === specialtyInfo.sub_service_id) {
+        relevanceScore = 2.5; // Especialidade relacionada no mesmo subserviço
       }
       
       // Calcular distância se possível
