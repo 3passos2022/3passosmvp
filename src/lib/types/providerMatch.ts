@@ -1,5 +1,5 @@
 
-import { ProviderProfile, Service, SubService, Specialty, QuoteMeasurement, QuoteItem } from '@/lib/types';
+import { ProviderProfile, QuoteMeasurement } from '@/lib/types';
 
 export interface ProviderMatch {
   provider: ProviderProfile;

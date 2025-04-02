@@ -2,7 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
-import { Specialty, ServiceItem } from '@/lib/types';
 
 // Função para encontrar prestadores que atendem aos critérios
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[]> => {
@@ -15,6 +14,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     });
     
     // 1. Encontrar prestadores que oferecem o serviço, sub-serviço ou especialidade específica
+    // Fazemos consultas separadas para evitar recursão infinita
     const { data: providerServices, error: servicesError } = await supabase
       .from('provider_services')
       .select(`
@@ -23,7 +23,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         provider_id,
         specialty_id
       `)
-      .or(`specialty_id.eq.${quoteDetails.specialtyId}, specialty_id.eq.${quoteDetails.subServiceId}, specialty_id.eq.${quoteDetails.serviceId}`);
+      .or(`specialty_id.eq.${quoteDetails.specialtyId},specialty_id.eq.${quoteDetails.subServiceId},specialty_id.eq.${quoteDetails.serviceId}`);
 
     if (servicesError) {
       console.error('Erro ao buscar serviços dos prestadores:', servicesError);
@@ -37,10 +37,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     console.log(`Encontrados ${providerServices.length} prestadores que oferecem este serviço ou categorias relacionadas`);
 
-    // Get provider profiles in a separate query to avoid recursion
+    // Get provider profiles in a separate query
     const providerIds = providerServices.map(ps => ps.provider_id);
 
-    // Fetch provider profiles separately
+    // Fetch provider profiles separately to avoid recursion
     const { data: providerProfiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, name, phone')
@@ -59,7 +59,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // Get provider settings separately to avoid join issues
+    // Get provider settings separately
     const { data: providerSettings, error: settingsError } = await supabase
       .from('provider_settings')
       .select('*')
@@ -141,7 +141,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       
       // Calcular relevância do prestador (exata especialidade = maior relevância)
       let relevanceScore = 1; // valor base
-      const specialty = specialtyMap.get(ps.specialty_id);
       
       if (ps.specialty_id === quoteDetails.specialtyId) {
         relevanceScore = 3; // Especialidade exata
@@ -215,7 +214,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           phone: profile.phone,
           city: settings?.city || '',
           neighborhood: settings?.neighborhood || '',
-          relevanceScore: relevanceScore // Adicionando a pontuação de relevância
+          relevanceScore: relevanceScore
         },
         distance,
         totalPrice,
@@ -273,11 +272,7 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
     // 1. Buscar informações básicas do prestador
     const { data: provider, error: providerError } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        name,
-        phone
-      `)
+      .select('id, name, phone')
       .eq('id', providerId)
       .single();
 
@@ -360,7 +355,7 @@ export const sendQuoteToProvider = async (
       return { success: false, message: 'ID do orçamento não fornecido', requiresLogin: false };
     }
 
-    // 2. Associar o orçamento ao prestador
+    // Associar o orçamento ao prestador
     const { error: providerQuoteError } = await supabase
       .from('quote_providers')
       .insert({
