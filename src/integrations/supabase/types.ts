@@ -685,6 +685,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_quote_answer: {
+        Args: {
+          p_quote_id: string
+          p_question_id: string
+          p_option_id: string
+        }
+        Returns: string
+      }
+      add_quote_item: {
+        Args: {
+          p_quote_id: string
+          p_item_id: string
+          p_quantity: number
+        }
+        Returns: string
+      }
+      add_quote_measurement: {
+        Args: {
+          p_quote_id: string
+          p_room_name: string
+          p_width: number
+          p_length: number
+          p_height?: number
+        }
+        Returns: string
+      }
       create_user_profile: {
         Args: {
           user_id: string
