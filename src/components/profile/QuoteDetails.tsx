@@ -113,16 +113,15 @@ const QuoteDetails: React.FC<QuoteDetailsProps> = ({ quote, refreshQuotes, isPro
 
       if (deleteError) throw deleteError;
 
-      // 4. Salvar a avaliação
-      const { error: ratingError } = await supabase.rpc(
-        "add_provider_rating",
-        {
-          p_provider_id: providerId,
-          p_quote_id: quote.id,
-          p_rating: rating,
-          p_comment: comment || null
-        }
-      );
+      // 4. Salvar a avaliação usando insert diretamente na tabela
+      const { error: ratingError } = await supabase
+        .from('provider_ratings')
+        .insert({
+          provider_id: providerId,
+          quote_id: quote.id,
+          rating: rating,
+          comment: comment || null
+        });
 
       if (ratingError) throw ratingError;
 

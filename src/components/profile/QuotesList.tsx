@@ -15,12 +15,10 @@ const QuotesList: React.FC = () => {
   const [quotes, setQuotes] = useState<QuoteWithProviders[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
-  const [selectedQuote, setSelectedQuote] = useState<{
-    quoteId: string;
-    providerId: string;
-    providerName: string;
-  } | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteWithProviders | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('');
+  const [selectedProviderName, setSelectedProviderName] = useState<string>('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -38,7 +36,11 @@ const QuotesList: React.FC = () => {
           status, 
           description, 
           city, 
-          neighborhood, 
+          neighborhood,
+          street,
+          number,
+          complement,
+          state,
           created_at,
           services!service_id (name),
           sub_services!sub_service_id (name),
@@ -70,10 +72,14 @@ const QuotesList: React.FC = () => {
             description: quote.description,
             city: quote.city,
             neighborhood: quote.neighborhood,
+            street: quote.street,
+            number: quote.number,
+            complement: quote.complement,
+            state: quote.state,
             created_at: quote.created_at,
             serviceName: quote.services?.name || 'Serviço não encontrado',
-            subServiceName: quote.sub_services?.name || 'Subserviço não encontrado',
-            specialtyName: quote.specialties?.name || 'Especialidade não encontrada',
+            subServiceName: quote.sub_services?.name || '',
+            specialtyName: quote.specialties?.name || '',
             providers: providersData.map(provider => ({
               id: provider.id,
               providerId: provider.provider_id,
@@ -97,15 +103,11 @@ const QuotesList: React.FC = () => {
     }
   };
 
-  const openModal = (quoteId: string, providerId: string, providerName: string) => {
-    setSelectedQuote({ quoteId, providerId, providerName });
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedQuote(null);
-    fetchQuotes(); // Atualizar a lista após fechar o modal
+  const showQuoteDetails = (quote: QuoteWithProviders, providerId: string, providerName: string) => {
+    setSelectedQuote(quote);
+    setSelectedProviderId(providerId);
+    setSelectedProviderName(providerName);
+    setShowDetailsModal(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -154,7 +156,7 @@ const QuotesList: React.FC = () => {
                           {getStatusBadge(quote.status)}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {quote.serviceName} &gt; {quote.subServiceName}
+                          {quote.serviceName} {quote.subServiceName ? ` > ${quote.subServiceName}` : ''}
                         </p>
                         <p className="text-sm">
                           {quote.neighborhood}, {quote.city}
@@ -180,7 +182,7 @@ const QuotesList: React.FC = () => {
                                   {quote.status === 'pending' && provider.status === 'accepted' && (
                                     <Button 
                                       size="sm"
-                                      onClick={() => openModal(quote.id, provider.providerId, provider.providerName)}
+                                      onClick={() => showQuoteDetails(quote, provider.providerId, provider.providerName)}
                                     >
                                       Finalizar
                                     </Button>
@@ -210,13 +212,15 @@ const QuotesList: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {selectedQuote && (
+      {selectedQuote && showDetailsModal && (
         <QuoteDetails
-          isOpen={modalOpen}
-          onClose={closeModal}
-          quoteId={selectedQuote.quoteId}
-          providerId={selectedQuote.providerId}
-          providerName={selectedQuote.providerName}
+          quote={{
+            ...selectedQuote,
+            provider_id: selectedProviderId,
+            provider_name: selectedProviderName
+          }}
+          refreshQuotes={fetchQuotes}
+          isProvider={false}
         />
       )}
     </div>
