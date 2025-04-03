@@ -14,7 +14,7 @@ interface ProviderCardProps {
 const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) => {
   const { provider: providerData, distance, totalPrice, isWithinRadius, priceDetails = [] } = provider;
   
-  // Debug the price information with additional context
+  // Debug the price information
   console.log(`Provider ${providerData.name} (${providerData.userId}) price details:`, priceDetails);
   console.log(`Provider ${providerData.name} (${providerData.userId}) total price:`, totalPrice);
   
@@ -26,8 +26,36 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
       );
     }
 
+    // If there's only one item and it's a base price, show it as such
+    if (priceDetails.length === 1 && (priceDetails[0].itemId === 'base-price' || priceDetails[0].itemId === 'default-price')) {
+      return (
+        <p className="text-xs text-muted-foreground">{priceDetails[0].itemName}</p>
+      );
+    }
+
     return (
-      <p className="text-xs text-muted-foreground">Valor calculado</p>
+      <div>
+        <p className="text-xs text-muted-foreground mb-1">Detalhes do preço:</p>
+        {priceDetails.length > 0 && (
+          <div className="space-y-1 text-xs">
+            {priceDetails.slice(0, 2).map((detail, index) => (
+              <div key={index} className="flex justify-between">
+                <span className="truncate mr-2">
+                  {detail.itemName || `Item ${index + 1}`}
+                  {detail.quantity > 0 && ` (${detail.quantity}x)`}
+                  {detail.area > 0 && ` (${detail.area.toFixed(1)} m²)`}
+                </span>
+                <span className="font-medium">{formatCurrency(detail.total)}</span>
+              </div>
+            ))}
+            {priceDetails.length > 2 && (
+              <p className="text-xs text-muted-foreground italic">
+                + mais {priceDetails.length - 2} {priceDetails.length - 2 === 1 ? 'item' : 'itens'}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     );
   };
   
@@ -94,25 +122,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
             {renderPriceBreakdown()}
           </div>
         </div>
-
-        {/* Price details section */}
-        {priceDetails && priceDetails.length > 0 && (
-          <div className="mt-3 pt-2 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-600 mb-1">Detalhes do preço:</p>
-            <div className="space-y-1 text-xs">
-              {priceDetails.map((detail, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <span>
-                    {detail.itemName || `Item ${detail.itemId}`}
-                    {detail.quantity > 0 ? ` (${detail.quantity}x)` : ''}
-                    {detail.area ? ` (${detail.area.toFixed(1)} m²)` : ''}
-                  </span>
-                  <span>{formatCurrency(detail.total || 0)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
       
       <CardFooter className="p-4 pt-0">

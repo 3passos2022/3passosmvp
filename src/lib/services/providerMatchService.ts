@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty, PriceDetail } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -27,7 +28,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     console.log('Quote items:', quoteDetails.items);
     console.log('Quote measurements:', quoteDetails.measurements);
 
-    // Fetch all providers - we'll filter them later
+    // Fetch all providers first
     const { data: allProviders, error: providersError } = await supabase
       .rpc('get_all_providers');
       
@@ -38,7 +39,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     console.log('Total available providers:', allProviders?.length);
     
-    // For debugging, check if we have any providers at all
     if (!allProviders || allProviders.length === 0) {
       console.error('No providers found in the database');
       return [];
@@ -65,7 +65,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // Fetch provider item prices
+    // IMPORTANT: Fetch provider item prices - This is where prices come from
     const { data: providerItemPrices, error: itemPricesError } = await supabase
       .from('provider_item_prices')
       .select('*');
@@ -173,7 +173,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       try {
         const providerId = providerData.id;
         
-        console.log('Processing provider:', providerData.name, 'ID:', providerId);
+        console.log('\n===== Processing provider:', providerData.name, '(ID:', providerId, ') =====');
         
         const settings = settingsMap.get(providerId);
         const serviceRadiusKm = settings?.service_radius_km || 0;
@@ -213,6 +213,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           for (const itemId in quoteDetails.items) {
             const quantity = quoteDetails.items[itemId];
             const key = `${providerId}-${itemId}`;
+            
+            // Log the exact key we're looking for
+            console.log(`Looking for price with key: ${key}`);
+            
             const pricePerUnit = itemPricesMap.get(key);
             const itemInfo = serviceItemsMap.get(itemId);
             
@@ -233,6 +237,15 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
               });
             } else {
               console.log(`Provider ${providerData.name}: No price found for item ${itemId} (${itemInfo?.name || 'unknown'})`);
+              
+              // Check if there are any prices at all for this provider
+              const providerPrices = providerItemPrices?.filter(price => price.provider_id === providerId);
+              console.log(`Available prices for this provider: ${providerPrices?.length || 0}`);
+              if (providerPrices && providerPrices.length > 0) {
+                providerPrices.forEach(price => {
+                  console.log(`- Item ${price.item_id}: ${price.price_per_unit}`);
+                });
+              }
             }
           }
         } else {
@@ -289,10 +302,36 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           console.log(`Provider ${providerData.name}: No measurements in quote`);
         }
         
-        // Only use default price if no prices were calculated
+        // This is where we assign the default price - we need to ensure we don't reach here incorrectly
         if (!hasCalculatedPrice) {
-          totalPrice = 100; // Default price
-          console.log(`Using default price (${totalPrice}) for provider ${providerData.name} because no price could be calculated`);
+          // Instead of just using a default price, look for ANY price this provider has
+          const providerPrices = providerItemPrices?.filter(price => price.provider_id === providerId);
+          
+          if (providerPrices && providerPrices.length > 0) {
+            // Calculate average price of all items this provider has defined
+            const avgPrice = providerPrices.reduce((sum, price) => sum + price.price_per_unit, 0) / providerPrices.length;
+            totalPrice = avgPrice * 3; // Multiplying by 3 as a base estimate
+            console.log(`Using average base price (${avgPrice} × 3 = ${totalPrice}) for provider ${providerData.name}`);
+            priceDetails.push({
+              itemId: "base-price",
+              itemName: "Valor base (estimado)",
+              quantity: 1,
+              pricePerUnit: totalPrice,
+              total: totalPrice
+            });
+          } else {
+            totalPrice = 150; // Higher default price than before
+            console.log(`Using default price (${totalPrice}) for provider ${providerData.name} because no prices were found`);
+            priceDetails.push({
+              itemId: "default-price",
+              itemName: "Valor base (aproximado)",
+              quantity: 1,
+              pricePerUnit: totalPrice,
+              total: totalPrice
+            });
+          }
+          
+          hasCalculatedPrice = true;
         } else {
           console.log(`Calculated final price for provider ${providerData.name}: ${totalPrice.toFixed(2)}`);
         }
@@ -325,6 +364,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         });
         
         console.log(`Provider added: ${provider.name}, price: ${totalPrice.toFixed(2)}, distance: ${distance?.toFixed(2) || 'unknown'}, within radius: ${isWithinRadius}`);
+        console.log(`Price details for ${provider.name}: `, priceDetails);
       } catch (providerError) {
         console.error('Error processing provider:', providerError);
       }
@@ -352,10 +392,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       if (a.distance !== null && b.distance !== null) {
         return a.distance - b.distance;
       }
-      
-      // If one has distance and the other doesn't, prioritize the one with distance
-      if (a.distance !== null && b.distance === null) return -1;
-      if (a.distance === null && b.distance !== null) return 1;
       
       return 0;
     });
