@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -85,64 +86,64 @@ const ProvidersFound: React.FC = () => {
   useEffect(() => {
     const fetchProviders = async () => {
       if (!quoteDetails) {
-        console.log('Aguardando detalhes do orçamento');
+        console.log('Waiting for quote details');
         return;
       }
       
       setIsLoading(true);
       setErrorMessage(null);
-      console.log('Buscando prestadores para o orçamento:', quoteDetails);
+      console.log('Searching providers for quote:', quoteDetails);
       
       try {
-        // Verificar os IDs dos serviços para depuração
-        console.log(`Buscando prestadores para: 
-          Serviço: ${quoteDetails.serviceName} (${quoteDetails.serviceId})
-          Subserviço: ${quoteDetails.subServiceName || 'Nenhum'} (${quoteDetails.subServiceId || 'Nenhum'})
-          Especialidade: ${quoteDetails.specialtyName || 'Nenhum'} (${quoteDetails.specialtyId || 'Nenhum'})
+        // Verify service IDs for debugging
+        console.log(`Searching providers for: 
+          Service: ${quoteDetails.serviceName} (${quoteDetails.serviceId})
+          Subservice: ${quoteDetails.subServiceName || 'None'} (${quoteDetails.subServiceId || 'None'})
+          Specialty: ${quoteDetails.specialtyName || 'None'} (${quoteDetails.specialtyId || 'None'})
         `);
         
-        // Validar os dados do orçamento
+        // Validate quote data
         if (!quoteDetails.serviceId) {
-          throw new Error('ID do serviço não fornecido');
+          throw new Error('Service ID not provided');
         }
         
-        // Buscar todos os prestadores disponíveis com tratamento de erro aprimorado
+        // Search for all available providers with improved error handling
         try {
           const matchingProviders = await findMatchingProviders(quoteDetails);
-          console.log('Prestadores encontrados:', matchingProviders);
+          console.log('Providers found:', matchingProviders);
           
           if (!matchingProviders || matchingProviders.length === 0) {
-            sonnerToast.warning('Nenhum prestador encontrado', {
-              description: 'Não encontramos prestadores para este serviço no momento.',
+            sonnerToast.warning('No providers found', {
+              description: 'We couldn\'t find providers for this service at the moment. We\'re working on adding more providers.',
               duration: 5000
             });
           }
           
-          // Garantir que estamos lidando com arrays válidos
+          // Ensure we're dealing with valid arrays
           setProviders(matchingProviders || []);
           setFilteredProviders(matchingProviders || []);
         } catch (providerError: any) {
-          console.error('Erro específico ao buscar prestadores:', providerError);
+          console.error('Specific error when searching providers:', providerError);
           
-          // Log adicional para debugging
+          // Additional logging for debugging
           if (providerError.code) {
-            console.error('Código de erro:', providerError.code);
+            console.error('Error code:', providerError.code);
           }
           if (providerError.details) {
-            console.error('Detalhes do erro:', providerError.details);
+            console.error('Error details:', providerError.details);
           }
           
-          throw new Error(`Falha ao encontrar prestadores: ${providerError.message}`);
+          throw new Error(`Failed to find providers: ${providerError.message}`);
         }
       } catch (error: any) {
-        console.error('Erro ao buscar prestadores:', error);
+        console.error('Error searching for providers:', error);
         
-        // Exibir mensagem de erro específica
-        setErrorMessage("Não foi possível encontrar prestadores. Verifique sua conexão e tente novamente.");
+        // Show specific error message
+        setErrorMessage("Couldn't find providers. Please check your connection and try again.");
         
         toast({
-          title: "Erro ao buscar prestadores",
-          description: error.message || "Não foi possível encontrar prestadores para seu orçamento.",
+          title: "Error searching for providers",
+          description: error.message || "Couldn't find providers for your quote.",
           variant: "destructive",
         });
       } finally {
@@ -261,7 +262,7 @@ const ProvidersFound: React.FC = () => {
     if (errorMessage) {
       return (
         <div className="text-center py-10">
-          <h3 className="text-xl font-semibold mb-2">Erro</h3>
+          <h3 className="text-xl font-semibold mb-2">Error</h3>
           <p className="text-muted-foreground">{errorMessage}</p>
         </div>
       );
@@ -272,9 +273,10 @@ const ProvidersFound: React.FC = () => {
     if (providers.length === 0) {
       return (
         <div className="text-center py-10">
-          <h3 className="text-xl font-semibold mb-2">Nenhum prestador encontrado</h3>
+          <h3 className="text-xl font-semibold mb-2">No providers found</h3>
           <p className="text-muted-foreground">
-            Não encontramos prestadores disponíveis para este serviço no momento.
+            We are still growing our network of service providers.
+            Please check back later or try another service.
           </p>
         </div>
       );
@@ -283,9 +285,9 @@ const ProvidersFound: React.FC = () => {
     if (inRadiusProviders.length === 0) {
       return (
         <div className="text-center py-6 mb-4 bg-amber-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">Não foram encontrados prestadores de serviço que atendam sua região</h3>
+          <h3 className="text-lg font-semibold mb-2">No service providers were found that serve your area</h3>
           <p className="text-muted-foreground">
-            Confira abaixo outros prestadores próximos que talvez possam atender seu orçamento.
+            Check out other nearby providers below who might be able to accommodate your quote.
           </p>
         </div>
       );
