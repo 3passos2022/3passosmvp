@@ -166,7 +166,12 @@ const ProvidersFound: React.FC = () => {
     
     switch (filter) {
       case 'distance':
-        sorted = sorted.sort((a, b) => a.distance - b.distance);
+        sorted = sorted.sort((a, b) => {
+          if (a.distance === null && b.distance === null) return 0;
+          if (a.distance === null) return 1;
+          if (b.distance === null) return -1;
+          return a.distance - b.distance;
+        });
         break;
       case 'price':
         sorted = sorted.sort((a, b) => a.totalPrice - b.totalPrice);
@@ -187,7 +192,11 @@ const ProvidersFound: React.FC = () => {
             return relevanceB - relevanceA;  // Higher score first
           }
           
-          return a.distance - b.distance;
+          if (a.distance !== null && b.distance !== null) {
+            return a.distance - b.distance;
+          }
+          
+          return 0;
         });
         break;
     }
@@ -268,8 +277,6 @@ const ProvidersFound: React.FC = () => {
       );
     }
     
-    const inRadiusProviders = providers.filter(p => p.isWithinRadius);
-    
     if (providers.length === 0) {
       return (
         <div className="text-center py-10">
@@ -282,7 +289,9 @@ const ProvidersFound: React.FC = () => {
       );
     }
     
-    if (inRadiusProviders.length === 0) {
+    const inRadiusProviders = providers.filter(p => p.isWithinRadius);
+    
+    if (inRadiusProviders.length === 0 && providers.length > 0) {
       return (
         <div className="text-center py-6 mb-4 bg-amber-50 rounded-lg">
           <h3 className="text-lg font-semibold mb-2">No service providers were found that serve your area</h3>

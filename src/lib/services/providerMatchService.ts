@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -42,10 +43,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return [];
     }
 
-    // IMPORTANT: Since there are no provider_services entries yet, we'll match all providers as a fallback
-    // This ensures users can see providers even before they've fully configured their services
-    console.log('Using fallback provider matching (all providers for service type)');
-    
     // Get provider settings
     const { data: providerSettings, error: settingsError } = await supabase
       .from('provider_settings')
@@ -55,7 +52,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       console.error('Error fetching provider settings:', settingsError);
     }
     
-    console.log('Provider settings:', providerSettings?.length || 0);
+    console.log('Provider settings fetched:', providerSettings?.length || 0);
     
     // Create map for settings
     const settingsMap = new Map();
@@ -66,6 +63,38 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         }
       });
     }
+
+    // Fetch provider item prices
+    const { data: providerItemPrices, error: itemPricesError } = await supabase
+      .from('provider_item_prices')
+      .select('*');
+      
+    if (itemPricesError) {
+      console.error('Error fetching provider item prices:', itemPricesError);
+    }
+    
+    console.log('Provider item prices fetched:', providerItemPrices?.length || 0);
+    
+    // Create map for item prices
+    const itemPricesMap = new Map();
+    if (providerItemPrices) {
+      providerItemPrices.forEach(price => {
+        const key = `${price.provider_id}-${price.item_id}`;
+        itemPricesMap.set(key, price.price_per_unit);
+      });
+    }
+
+    // Fetch service items
+    const { data: serviceItems, error: serviceItemsError } = await supabase
+      .from('service_items')
+      .select('*')
+      .or(`service_id.eq.${quoteDetails.serviceId},sub_service_id.eq.${quoteDetails.subServiceId || null},specialty_id.eq.${quoteDetails.specialtyId || null}`);
+      
+    if (serviceItemsError) {
+      console.error('Error fetching service items:', serviceItemsError);
+    }
+    
+    console.log('Service items fetched:', serviceItems?.length || 0);
 
     // Fetch provider ratings
     const ratingsMap = new Map<string, number>();
@@ -103,7 +132,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       console.error('Error geocoding address:', geoError);
     }
     
-    // Process each provider (fallback approach)
+    // Process each provider
     const matchedProviders: ProviderMatch[] = [];
     
     for (const providerData of allProviders) {
@@ -114,8 +143,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
         const settings = settingsMap.get(providerId);
         
-        // Calculate provider relevance (simplified for fallback)
-        // In the fallback mode, all providers have the same base relevance
+        // Calculate provider relevance (simplified for now)
         let relevanceScore = 1;
         
         // Calculate distance if possible
@@ -138,8 +166,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           // If provider has defined radius and is not within it, skip
           if (serviceRadius > 0 && !isWithinRadius) {
             console.log(`Provider ${providerData.name} is outside service radius. Distance: ${distance.toFixed(2)}km, radius: ${serviceRadius}km`);
-            // Don't skip providers for now, just mark them as outside radius
-            // continue;
+            continue; // Skip this provider since they are outside their service radius
           }
         } else {
           console.log(`Provider ${providerData.name} has no coordinates or radius configuration`);
@@ -147,8 +174,54 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           isWithinRadius = true;
         }
         
-        // Set a default base price for the service
-        let totalPrice = 100; // Default price - this would be replaced with proper pricing when available
+        // Calculate price based on items and measurements
+        let totalPrice = 0;
+        
+        // Add prices for each item if quantity is specified
+        if (quoteDetails.items && serviceItems) {
+          for (const itemId in quoteDetails.items) {
+            const quantity = quoteDetails.items[itemId];
+            const key = `${providerId}-${itemId}`;
+            const pricePerUnit = itemPricesMap.get(key) || 0;
+            
+            const itemTotal = pricePerUnit * quantity;
+            totalPrice += itemTotal;
+            
+            console.log(`Item ${itemId}: ${quantity} units × ${pricePerUnit} = ${itemTotal}`);
+          }
+        }
+        
+        // Add prices for measurements (square meters) if specified
+        if (quoteDetails.measurements && serviceItems) {
+          // Find square meter items
+          const squareMeterItems = serviceItems.filter(item => item.type === 'square_meter');
+          
+          // Calculate total area from all measurements
+          let totalArea = 0;
+          for (const measurement of quoteDetails.measurements) {
+            const area = measurement.area || (measurement.width * measurement.length);
+            totalArea += area;
+          }
+          
+          // Apply area to each square meter item
+          for (const item of squareMeterItems) {
+            const key = `${providerId}-${item.id}`;
+            const pricePerUnit = itemPricesMap.get(key) || 0;
+            
+            const areaTotal = pricePerUnit * totalArea;
+            totalPrice += areaTotal;
+            
+            console.log(`Square meter item ${item.id}: ${totalArea} m² × ${pricePerUnit} = ${areaTotal}`);
+          }
+        }
+        
+        // If no items or measurements were calculated, set a default price
+        if (totalPrice === 0) {
+          totalPrice = 100; // Default price
+          console.log(`Using default price (${totalPrice}) for provider ${providerData.name}`);
+        } else {
+          console.log(`Calculated price for provider ${providerData.name}: ${totalPrice}`);
+        }
         
         // Get average rating from map
         const averageRating = ratingsMap.get(providerId) || 0;
@@ -175,13 +248,20 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           isWithinRadius
         });
         
-        console.log(`Provider added: ${provider.name}`);
+        console.log(`Provider added: ${provider.name}, price: ${totalPrice}, distance: ${distance || 'unknown'}`);
       } catch (providerError) {
         console.error('Error processing provider:', providerError);
       }
     }
 
     console.log(`Found ${matchedProviders.length} compatible providers total`);
+
+    if (matchedProviders.length === 0) {
+      console.log('No providers found within service radius, showing all providers as fallback');
+      
+      // Fall back to showing all providers ignoring radius
+      return await findMatchingProviders_ignoreRadius(quoteDetails);
+    }
 
     // Sort: first those within radius and by relevance, then the others
     matchedProviders.sort((a, b) => {
@@ -214,6 +294,180 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
   } catch (error) {
     console.error('Error finding matching providers:', error);
     return []; // Return empty array in case of error to avoid breaking the UI
+  }
+};
+
+// Fallback function to find providers ignoring service radius
+const findMatchingProviders_ignoreRadius = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[]> => {
+  try {
+    if (!quoteDetails || !quoteDetails.serviceId) {
+      return [];
+    }
+
+    // Fetch all providers - we'll filter them later
+    const { data: allProviders, error: providersError } = await supabase
+      .rpc('get_all_providers');
+      
+    if (providersError || !allProviders) {
+      console.error('Error fetching provider list:', providersError);
+      return [];
+    }
+    
+    // Get provider settings
+    const { data: providerSettings } = await supabase
+      .from('provider_settings')
+      .select('*');
+    
+    // Create map for settings
+    const settingsMap = new Map();
+    if (providerSettings) {
+      providerSettings.forEach(settings => {
+        if (settings && settings.provider_id) {
+          settingsMap.set(settings.provider_id, settings);
+        }
+      });
+    }
+
+    // Fetch provider item prices
+    const { data: providerItemPrices } = await supabase
+      .from('provider_item_prices')
+      .select('*');
+    
+    // Create map for item prices
+    const itemPricesMap = new Map();
+    if (providerItemPrices) {
+      providerItemPrices.forEach(price => {
+        const key = `${price.provider_id}-${price.item_id}`;
+        itemPricesMap.set(key, price.price_per_unit);
+      });
+    }
+
+    // Fetch service items
+    const { data: serviceItems } = await supabase
+      .from('service_items')
+      .select('*')
+      .or(`service_id.eq.${quoteDetails.serviceId},sub_service_id.eq.${quoteDetails.subServiceId || null},specialty_id.eq.${quoteDetails.specialtyId || null}`);
+
+    // Fetch provider ratings
+    const ratingsMap = new Map<string, number>();
+    for (const provider of allProviders) {
+      const { data: avgRating } = await supabase.rpc(
+        'get_provider_average_rating',
+        { p_provider_id: provider.id }
+      );
+      
+      ratingsMap.set(provider.id, avgRating || 0);
+    }
+
+    // Geocode client address
+    let clientLocation = null;
+    if (quoteDetails.address.street && quoteDetails.address.city) {
+      const fullAddress = `${quoteDetails.address.street}, ${quoteDetails.address.number || ''}, ${quoteDetails.address.neighborhood || ''}, ${quoteDetails.address.city}, ${quoteDetails.address.state || ''}, ${quoteDetails.address.zipCode || ''}`;
+      
+      clientLocation = await geocodeAddress(fullAddress).catch(() => null);
+    }
+    
+    // Process each provider
+    const matchedProviders: ProviderMatch[] = [];
+    
+    for (const providerData of allProviders) {
+      try {
+        const providerId = providerData.id;
+        const settings = settingsMap.get(providerId);
+        
+        // Calculate distance if possible
+        let distance = null;
+        
+        if (settings && settings.latitude && settings.longitude && clientLocation) {
+          distance = calculateDistance(
+            clientLocation.lat, 
+            clientLocation.lng, 
+            settings.latitude, 
+            settings.longitude
+          );
+        }
+        
+        // Calculate price based on items and measurements
+        let totalPrice = 0;
+        
+        // Add prices for each item if quantity is specified
+        if (quoteDetails.items && serviceItems) {
+          for (const itemId in quoteDetails.items) {
+            const quantity = quoteDetails.items[itemId];
+            const key = `${providerId}-${itemId}`;
+            const pricePerUnit = itemPricesMap.get(key) || 0;
+            
+            totalPrice += pricePerUnit * quantity;
+          }
+        }
+        
+        // Add prices for measurements (square meters) if specified
+        if (quoteDetails.measurements && serviceItems) {
+          // Find square meter items
+          const squareMeterItems = serviceItems.filter(item => item.type === 'square_meter');
+          
+          // Calculate total area from all measurements
+          let totalArea = 0;
+          for (const measurement of quoteDetails.measurements) {
+            const area = measurement.area || (measurement.width * measurement.length);
+            totalArea += area;
+          }
+          
+          // Apply area to each square meter item
+          for (const item of squareMeterItems) {
+            const key = `${providerId}-${item.id}`;
+            const pricePerUnit = itemPricesMap.get(key) || 0;
+            
+            totalPrice += pricePerUnit * totalArea;
+          }
+        }
+        
+        // If no items or measurements were calculated, set a default price
+        if (totalPrice === 0) {
+          totalPrice = 100; // Default price
+        }
+        
+        // Get average rating from map
+        const averageRating = ratingsMap.get(providerId) || 0;
+        
+        // Create ProviderProfile object
+        const provider: ProviderProfile = {
+          userId: providerId,
+          bio: settings?.bio || '',
+          averageRating,
+          specialties: [], // Would be populated if needed
+          name: providerData.name || 'No name',
+          phone: providerData.phone || '',
+          city: settings?.city || '',
+          neighborhood: settings?.neighborhood || '',
+          hasAddress: !!(settings?.latitude && settings?.longitude)
+        };
+        
+        // All providers are considered within radius in the fallback
+        matchedProviders.push({
+          provider,
+          distance,
+          totalPrice,
+          isWithinRadius: false // All are marked as outside radius in fallback
+        });
+      } catch (providerError) {
+        console.error('Error processing provider in fallback:', providerError);
+      }
+    }
+
+    // Sort by distance if possible, otherwise by name
+    matchedProviders.sort((a, b) => {
+      if (a.distance !== null && b.distance !== null) {
+        return a.distance - b.distance;
+      }
+      
+      return (a.provider.name || '').localeCompare(b.provider.name || '');
+    });
+
+    return matchedProviders;
+  } catch (error) {
+    console.error('Error in fallback provider search:', error);
+    return [];
   }
 };
 
