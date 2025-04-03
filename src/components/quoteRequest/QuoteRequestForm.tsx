@@ -990,57 +990,57 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       console.log("Cotação criada com sucesso. ID:", quoteId);
       
       if (formData.answers && Object.keys(formData.answers).length > 0) {
-        const answersToInsert = Object.entries(formData.answers).map(([questionId, optionId]) => ({
-          quote_id: quoteId as string,
-          question_id: questionId,
-          option_id: optionId,
-        }));
-        
-        const { error: answersError } = await supabase
-          .from('quote_answers')
-          .insert(answersToInsert);
-        
-        if (answersError) {
-          console.error('Erro ao salvar respostas:', answersError);
+        for (const [questionId, optionId] of Object.entries(formData.answers)) {
+          const { error: answerError } = await supabase.rpc(
+            "add_quote_answer",
+            {
+              p_quote_id: quoteId as string,
+              p_question_id: questionId,
+              p_option_id: optionId
+            }
+          );
+          
+          if (answerError) {
+            console.error('Erro ao salvar resposta:', answerError);
+          }
         }
       }
       
       if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
-        const itemsToInsert = Object.entries(formData.itemQuantities)
-          .filter(([_, quantity]) => quantity > 0)
-          .map(([itemId, quantity]) => ({
-            quote_id: quoteId as string,
-            item_id: itemId,
-            quantity,
-          }));
-        
-        if (itemsToInsert.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('quote_items')
-            .insert(itemsToInsert);
-          
-          if (itemsError) {
-            console.error('Erro ao salvar quantidades de itens:', itemsError);
+        for (const [itemId, quantity] of Object.entries(formData.itemQuantities)) {
+          if (quantity > 0) {
+            const { error: itemError } = await supabase.rpc(
+              "add_quote_item",
+              {
+                p_quote_id: quoteId as string, 
+                p_item_id: itemId,
+                p_quantity: quantity
+              }
+            );
+            
+            if (itemError) {
+              console.error('Erro ao salvar item:', itemError);
+            }
           }
         }
       }
       
       if (formData.measurements && formData.measurements.length > 0) {
-        const measurementsToInsert = formData.measurements.map(m => ({
-          quote_id: quoteId as string,
-          room_name: m.roomName,
-          width: m.width,
-          length: m.length,
-          height: m.height || null,
-          area: m.width * m.length,
-        }));
-        
-        const { error: measurementsError } = await supabase
-          .from('quote_measurements')
-          .insert(measurementsToInsert);
-        
-        if (measurementsError) {
-          console.error('Erro ao salvar medidas:', measurementsError);
+        for (const measurement of formData.measurements) {
+          const { error: measurementError } = await supabase.rpc(
+            "add_quote_measurement",
+            {
+              p_quote_id: quoteId as string,
+              p_room_name: measurement.roomName,
+              p_width: measurement.width,
+              p_length: measurement.length,
+              p_height: measurement.height || null
+            }
+          );
+          
+          if (measurementError) {
+            console.error('Erro ao salvar medida:', measurementError);
+          }
         }
       }
       

@@ -69,9 +69,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     console.log(`Encontrados ${allProviders.length || 0} prestadores no total`);
 
     // Obter os IDs dos prestadores para uso nas próximas consultas
-    // Modificação: Extrair os IDs dos objetos JSON retornados pelo RPC
     const providerIds = allProviders.map(p => {
-      // Verificar se é um objeto ou uma string JSON
       if (typeof p === 'string') {
         try {
           const parsed = JSON.parse(p);
@@ -84,7 +82,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         return p.id;
       }
       return null;
-    }).filter(Boolean); // Remover valores nulos
+    }).filter(Boolean);
     
     if (providerIds.length === 0) {
       console.log('Nenhum ID de prestador foi obtido');
@@ -96,24 +94,24 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Buscar serviços oferecidos por esses prestadores
     let providerServices = [];
     try {
-      // Consulta modificada: Usar .in() corretamente para cada providerID
-      const { data, error: servicesError } = await supabase
-        .from('provider_services')
-        .select('*')
-        .in('provider_id', providerIds);
-        
-      if (servicesError) {
-        console.error('Erro ao buscar serviços dos prestadores:', servicesError);
-        return [];
+      // Verificar se há IDs válidos antes de fazer a consulta
+      if (providerIds.length > 0) {
+        const { data, error: servicesError } = await supabase
+          .from('provider_services')
+          .select('*')
+          .in('provider_id', providerIds);
+          
+        if (servicesError) {
+          console.error('Erro ao buscar serviços dos prestadores:', servicesError);
+        } else {
+          providerServices = data || [];
+          console.log('Serviços retornados da consulta:', providerServices);
+        }
       }
-      
-      providerServices = data || [];
-      console.log('Serviços retornados da consulta:', providerServices);
     } catch (err) {
       console.error('Exceção ao buscar serviços dos prestadores:', err);
-      return [];
     }
-
+    
     // Filtrar prestadores que oferecem o serviço/subserviço/especialidade solicitado
     const matchingProviderServices = providerServices.filter(service => {
       // Log para depuração - comparar IDs
@@ -171,17 +169,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Criar um mapa para acessar rapidamente os dados do prestador
     const providerMap = new Map();
     allProviders.forEach(provider => {
-      if (provider && provider.id) {
-        providerMap.set(provider.id, provider);
-      } else if (typeof provider === 'string') {
-        try {
-          const parsedProvider = JSON.parse(provider);
-          if (parsedProvider && parsedProvider.id) {
-            providerMap.set(parsedProvider.id, parsedProvider);
-          }
-        } catch (e) {
-          console.error('Erro ao processar provider como string JSON:', e);
+      // Processar provider como objeto ou string JSON
+      try {
+        const providerObj = typeof provider === 'string' ? JSON.parse(provider) : provider;
+        if (providerObj && providerObj.id) {
+          providerMap.set(providerObj.id, providerObj);
         }
+      } catch (e) {
+        console.error('Erro ao processar dados do prestador:', e);
       }
     });
 
