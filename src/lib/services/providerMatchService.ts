@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -6,6 +5,11 @@ import { calculateDistance, geocodeAddress } from './googleMapsService';
 // Função para encontrar prestadores que atendem aos critérios
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[]> => {
   try {
+    if (!quoteDetails || !quoteDetails.serviceId) {
+      console.error('Detalhes do orçamento inválidos:', quoteDetails);
+      return [];
+    }
+
     console.log('Iniciando busca de prestadores com detalhes:', {
       serviceId: quoteDetails.serviceId,
       serviceName: quoteDetails.serviceName,
@@ -16,6 +20,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     });
     
     // Vamos registrar o endereço para verificar se os dados estão corretos
+    if (!quoteDetails.address) {
+      console.error('Endereço não fornecido no orçamento');
+      return [];
+    }
     console.log('Endereço do cliente:', quoteDetails.address);
 
     // Primeiro, vamos buscar todos os prestadores com seus serviços
@@ -42,21 +50,34 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Obter os IDs dos prestadores para uso nas próximas consultas
     const providerIds = providers.map(p => p.id);
     
+    if (providerIds.length === 0) {
+      console.log('Nenhum ID de prestador foi obtido');
+      return [];
+    }
+    
     // Buscar serviços oferecidos por esses prestadores
-    const { data: providerServices, error: servicesError } = await supabase
-      .from('provider_services')
-      .select('*')
-      .in('provider_id', providerIds);
+    let providerServices = [];
+    try {
+      const { data, error: servicesError } = await supabase
+        .from('provider_services')
+        .select('*')
+        .in('provider_id', providerIds);
+        
+      if (servicesError) {
+        console.error('Erro ao buscar serviços dos prestadores:', servicesError);
+        return [];
+      }
       
-    if (servicesError) {
-      console.error('Erro ao buscar serviços dos prestadores:', servicesError);
+      providerServices = data || [];
+    } catch (err) {
+      console.error('Exceção ao buscar serviços dos prestadores:', err);
       return [];
     }
 
-    console.log(`Encontrados ${providerServices?.length || 0} serviços oferecidos por prestadores`);
+    console.log(`Encontrados ${providerServices.length} serviços oferecidos por prestadores`);
     console.log('Serviços encontrados:', providerServices);
     
-    if (!providerServices || providerServices.length === 0) {
+    if (providerServices.length === 0) {
       console.log('Nenhum serviço cadastrado para os prestadores');
       return [];
     }
@@ -68,9 +89,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       
       // Match direto com especialidade, subserviço ou serviço
       return (
-        service.specialty_id === quoteDetails.specialtyId || 
-        service.specialty_id === quoteDetails.subServiceId || 
-        service.specialty_id === quoteDetails.serviceId
+        (quoteDetails.specialtyId && service.specialty_id === quoteDetails.specialtyId) || 
+        (quoteDetails.subServiceId && service.specialty_id === quoteDetails.subServiceId) || 
+        (quoteDetails.serviceId && service.specialty_id === quoteDetails.serviceId)
       );
     });
 
@@ -81,38 +102,68 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     // Buscar configurações dos prestadores com localização
-    const { data: providerSettings, error: settingsError } = await supabase
-      .from('provider_settings')
-      .select('*')
-      .in('provider_id', matchingProviderServices.map(ps => ps.provider_id));
+    let providerSettings = [];
+    try {
+      const matchingProviderIds = matchingProviderServices.map(ps => ps.provider_id);
+      
+      if (matchingProviderIds.length === 0) {
+        console.log('Nenhum ID de prestador correspondente foi obtido');
+        return [];
+      }
+      
+      const { data, error: settingsError } = await supabase
+        .from('provider_settings')
+        .select('*')
+        .in('provider_id', matchingProviderIds);
 
-    if (settingsError) {
-      console.error('Erro ao buscar configurações dos prestadores:', settingsError);
+      if (settingsError) {
+        console.error('Erro ao buscar configurações dos prestadores:', settingsError);
+        // Continuar mesmo sem configurações, apenas com dados básicos
+      }
+      
+      providerSettings = data || [];
+    } catch (err) {
+      console.error('Exceção ao buscar configurações dos prestadores:', err);
+      // Continuar mesmo sem configurações, apenas com dados básicos
+      providerSettings = [];
     }
 
     // Criar um mapa para acesso rápido
     const settingsMap = new Map();
-    if (providerSettings) {
-      providerSettings.forEach(settings => {
+    providerSettings.forEach(settings => {
+      if (settings && settings.provider_id) {
         settingsMap.set(settings.provider_id, settings);
-      });
-    }
+      }
+    });
 
     // Criar um mapa para acessar rapidamente os dados do prestador
     const providerMap = new Map();
     providers.forEach(provider => {
-      providerMap.set(provider.id, provider);
+      if (provider && provider.id) {
+        providerMap.set(provider.id, provider);
+      }
     });
 
     // 2. Geocodificar o endereço do cliente
-    const fullAddress = `${quoteDetails.address.street}, ${quoteDetails.address.number}, ${quoteDetails.address.neighborhood}, ${quoteDetails.address.city}, ${quoteDetails.address.state}, ${quoteDetails.address.zipCode}`;
-    console.log('Geocodificando endereço do cliente:', fullAddress);
-    const clientLocation = await geocodeAddress(fullAddress);
-
-    if (!clientLocation) {
-      console.error('Não foi possível geocodificar o endereço do cliente');
-    } else {
-      console.log('Coordenadas do cliente:', clientLocation);
+    let clientLocation = null;
+    try {
+      if (quoteDetails.address.street && quoteDetails.address.city) {
+        const fullAddress = `${quoteDetails.address.street}, ${quoteDetails.address.number || ''}, ${quoteDetails.address.neighborhood || ''}, ${quoteDetails.address.city}, ${quoteDetails.address.state || ''}, ${quoteDetails.address.zipCode || ''}`;
+        console.log('Geocodificando endereço do cliente:', fullAddress);
+        
+        clientLocation = await geocodeAddress(fullAddress);
+        
+        if (clientLocation) {
+          console.log('Coordenadas do cliente:', clientLocation);
+        } else {
+          console.warn('Não foi possível geocodificar o endereço do cliente');
+        }
+      } else {
+        console.warn('Endereço incompleto para geocodificação');
+      }
+    } catch (geoError) {
+      console.error('Erro ao geocodificar endereço:', geoError);
+      // Continuamos mesmo se a geocodificação falhar
     }
 
     // Array para armazenar os prestadores compatíveis
@@ -120,73 +171,73 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     // Processar cada prestador compatível
     for (const service of matchingProviderServices) {
-      const providerId = service.provider_id;
-      const provider = providerMap.get(providerId);
-      
-      if (!provider) {
-        console.log(`Perfil não encontrado para prestador ${providerId}`);
-        continue;
-      }
-      
-      const settings = settingsMap.get(providerId);
-      
-      // Calcular relevância do prestador
-      let relevanceScore = 1; // valor base
-      
-      if (service.specialty_id === quoteDetails.specialtyId) {
-        relevanceScore = 3; // Especialidade exata
-      } else if (service.specialty_id === quoteDetails.subServiceId) {
-        relevanceScore = 2; // Sub-serviço 
-      } else if (service.specialty_id === quoteDetails.serviceId) {
-        relevanceScore = 1; // Apenas o serviço principal
-      }
-      
-      // Calcular distância se possível
-      let distance = 9999;
-      let isWithinRadius = false;
-      
-      if (settings && settings.latitude && settings.longitude && clientLocation) {
-        distance = calculateDistance(
-          clientLocation.lat, 
-          clientLocation.lng, 
-          settings.latitude, 
-          settings.longitude
-        );
-        
-        // Definir o raio como o valor da configuração ou um valor padrão de 0 (todo o Brasil)
-        const serviceRadius = settings.service_radius_km || 0;
-        
-        // Se o raio for 0, o prestador atende todo o Brasil
-        isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
-        
-        console.log(`Prestador ${provider.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}, relevância: ${relevanceScore}`);
-      } else {
-        console.log(`Prestador ${provider.name}, não possui coordenadas de localização ou configuração de raio, relevância: ${relevanceScore}`);
-        // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
-        isWithinRadius = true;
-        distance = 0; // Valor padrão quando não há coordenadas
-      }
-      
-      // Calcular preço básico para o serviço
-      let totalPrice = service.base_price || 0;
-      
-      // Buscar avaliações do prestador
-      let averageRating = 0;
       try {
-        // Consultar se há avaliações (modificado para não usar mais o campo 'rating')
-        const { data: ratings, error } = await supabase
-          .from('quotes')
-          .select('id')  // Removendo a referência ao campo 'rating'
-          .eq('provider_id', providerId);
+        const providerId = service.provider_id;
+        if (!providerId) {
+          console.log('Serviço sem provider_id válido');
+          continue;
+        }
+        
+        const provider = providerMap.get(providerId);
+        
+        if (!provider) {
+          console.log(`Perfil não encontrado para prestador ${providerId}`);
+          continue;
+        }
+        
+        const settings = settingsMap.get(providerId);
+        
+        // Calcular relevância do prestador
+        let relevanceScore = 1; // valor base
+        
+        if (quoteDetails.specialtyId && service.specialty_id === quoteDetails.specialtyId) {
+          relevanceScore = 3; // Especialidade exata
+        } else if (quoteDetails.subServiceId && service.specialty_id === quoteDetails.subServiceId) {
+          relevanceScore = 2; // Sub-serviço 
+        } else if (quoteDetails.serviceId && service.specialty_id === quoteDetails.serviceId) {
+          relevanceScore = 1; // Apenas o serviço principal
+        }
+        
+        // Calcular distância se possível
+        let distance = 9999;
+        let isWithinRadius = false;
+        
+        if (settings && settings.latitude && settings.longitude && clientLocation) {
+          distance = calculateDistance(
+            clientLocation.lat, 
+            clientLocation.lng, 
+            settings.latitude, 
+            settings.longitude
+          );
           
-        if (!error && ratings) {
-          // Como não temos o campo rating, vamos simplesmente contar o número de orçamentos
-          // Idealmente, você deve adicionar um campo de rating na tabela quotes 
-          // ou criar uma tabela separada para avaliações
-          const numberOfQuotes = ratings.length;
+          // Definir o raio como o valor da configuração ou um valor padrão de 0 (todo o Brasil)
+          const serviceRadius = settings?.service_radius_km || 0;
+          
+          // Se o raio for 0, o prestador atende todo o Brasil
+          isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
+          
+          console.log(`Prestador ${provider.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}, relevância: ${relevanceScore}`);
+        } else {
+          console.log(`Prestador ${provider.name}, não possui coordenadas de localização ou configuração de raio, relevância: ${relevanceScore}`);
+          // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
+          isWithinRadius = true;
+          distance = 0; // Valor padrão quando não há coordenadas
+        }
+        
+        // Calcular preço básico para o serviço
+        let totalPrice = service.base_price || 0;
+        
+        // Buscar avaliações do prestador
+        let averageRating = 0;
+        try {
+          const { count } = await supabase
+            .from('quote_providers')
+            .select('*', { count: 'exact', head: true })
+            .eq('provider_id', providerId);
+            
+          const numberOfQuotes = count || 0;
           
           // Aqui estamos apenas atribuindo uma classificação fictícia baseada no número de orçamentos
-          // Esta é uma solução temporária até que você tenha uma tabela adequada para avaliações
           if (numberOfQuotes > 10) {
             averageRating = 4.5;
           } else if (numberOfQuotes > 5) {
@@ -196,31 +247,35 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           } else {
             averageRating = 0; // Sem avaliações
           }
+        } catch (err) {
+          console.error('Erro ao processar avaliações:', err);
+          averageRating = 0; // Valor padrão em caso de erro
         }
-      } catch (err) {
-        console.error('Erro ao processar avaliações:', err);
+        
+        // Criar objeto ProviderProfile
+        const providerProfile: ProviderProfile = {
+          userId: provider.id,
+          bio: settings?.bio || '',
+          averageRating: averageRating,
+          specialties: [], // Será preenchido se necessário
+          name: provider.name || 'Sem nome',
+          phone: provider.phone || '',
+          city: settings?.city || '',
+          neighborhood: settings?.neighborhood || '',
+          relevanceScore: relevanceScore
+        };
+        
+        // Adicionar à lista de prestadores compatíveis
+        matchedProviders.push({
+          provider: providerProfile,
+          distance,
+          totalPrice,
+          isWithinRadius
+        });
+      } catch (providerError) {
+        console.error('Erro ao processar prestador:', providerError);
+        // Continuar com o próximo prestador
       }
-      
-      // Criar objeto ProviderProfile
-      const providerProfile: ProviderProfile = {
-        userId: provider.id,
-        bio: settings?.bio || '',
-        averageRating: averageRating,
-        specialties: [], // Será preenchido se necessário
-        name: provider.name,
-        phone: provider.phone,
-        city: settings?.city || '',
-        neighborhood: settings?.neighborhood || '',
-        relevanceScore: relevanceScore
-      };
-      
-      // Adicionar à lista de prestadores compatíveis
-      matchedProviders.push({
-        provider: providerProfile,
-        distance,
-        totalPrice,
-        isWithinRadius
-      });
     }
 
     // Ordenar: primeiro os que estão dentro do raio e por relevância, depois os outros
@@ -245,7 +300,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     return matchedProviders;
   } catch (error) {
     console.error('Erro ao buscar prestadores correspondentes:', error);
-    return [];
+    return []; // Retornar array vazio em caso de erro para evitar quebra da UI
   }
 };
 

@@ -29,6 +29,7 @@ const ProvidersFound: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
   const [currentFilter, setCurrentFilter] = useState<FilterOption>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const googleMapsApiKey = 'AIzaSyCz60dsmYx6T6qHNCs1OZtA7suJGA7xVW8';
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
@@ -36,6 +37,7 @@ const ProvidersFound: React.FC = () => {
   useEffect(() => {
     const fetchQuoteDetails = async () => {
       setIsLoading(true);
+      setErrorMessage(null);
       
       try {
         if (location.state?.quoteDetails) {
@@ -47,8 +49,14 @@ const ProvidersFound: React.FC = () => {
         const storedQuote = sessionStorage.getItem('currentQuote');
         if (storedQuote) {
           console.log('Detalhes do orçamento encontrados no sessionStorage');
-          setQuoteDetails(JSON.parse(storedQuote));
-          return;
+          try {
+            const parsedQuote = JSON.parse(storedQuote);
+            setQuoteDetails(parsedQuote);
+            return;
+          } catch (parseError) {
+            console.error('Erro ao parsear orçamento do sessionStorage:', parseError);
+            // Continuar para mensagem de erro
+          }
         }
         
         toast({
@@ -60,13 +68,13 @@ const ProvidersFound: React.FC = () => {
         navigate('/request-quote');
       } catch (error) {
         console.error('Erro ao carregar detalhes do orçamento:', error);
+        setErrorMessage("Erro ao carregar detalhes do orçamento");
+        
         toast({
           title: "Erro ao carregar orçamento",
           description: "Ocorreu um erro ao processar seu orçamento.",
           variant: "destructive",
         });
-        
-        navigate('/request-quote');
       } finally {
         setIsLoading(false);
       }
@@ -83,6 +91,7 @@ const ProvidersFound: React.FC = () => {
       }
       
       setIsLoading(true);
+      setErrorMessage(null);
       console.log('Buscando prestadores para o orçamento:', quoteDetails);
       
       try {
@@ -93,21 +102,30 @@ const ProvidersFound: React.FC = () => {
           Especialidade: ${quoteDetails.specialtyName || 'Nenhum'} (${quoteDetails.specialtyId || 'Nenhum'})
         `);
         
+        // Validar os dados do orçamento
+        if (!quoteDetails.serviceId) {
+          throw new Error('ID do serviço não fornecido');
+        }
+        
         // Buscar todos os prestadores disponíveis
         const matchingProviders = await findMatchingProviders(quoteDetails);
         console.log('Prestadores encontrados:', matchingProviders);
         
-        if (matchingProviders.length === 0) {
+        if (!matchingProviders || matchingProviders.length === 0) {
           sonnerToast.warning('Nenhum prestador encontrado', {
             description: 'Não encontramos prestadores para este serviço no momento.',
             duration: 5000
           });
         }
         
-        setProviders(matchingProviders);
-        setFilteredProviders(matchingProviders);
+        setProviders(matchingProviders || []);
+        setFilteredProviders(matchingProviders || []);
       } catch (error) {
         console.error('Erro ao buscar prestadores:', error);
+        
+        // Exibir mensagem de erro específica
+        setErrorMessage("Não foi possível encontrar prestadores. Verifique sua conexão e tente novamente.");
+        
         toast({
           title: "Erro ao buscar prestadores",
           description: "Não foi possível encontrar prestadores para seu orçamento.",
@@ -124,7 +142,7 @@ const ProvidersFound: React.FC = () => {
   const handleFilterChange = (filter: FilterOption) => {
     setCurrentFilter(filter);
     
-    if (!filter) {
+    if (!filter || !providers.length) {
       setFilteredProviders([...providers].sort((a, b) => {
         if (a.isWithinRadius && !b.isWithinRadius) return -1;
         if (!a.isWithinRadius && b.isWithinRadius) return 1;
@@ -151,6 +169,10 @@ const ProvidersFound: React.FC = () => {
   };
   
   const handleViewDetails = (providerId: string) => {
+    if (!providerId) {
+      console.error('ID do prestador não fornecido');
+      return;
+    }
     setSelectedProviderId(providerId);
   };
   
@@ -162,8 +184,14 @@ const ProvidersFound: React.FC = () => {
 
   const handleLoginRedirect = () => {
     if (quoteDetails) {
-      sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
+      try {
+        sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
+      } catch (storageError) {
+        console.error('Erro ao armazenar orçamento:', storageError);
+      }
+      
       sessionStorage.setItem('redirectAfterLogin', '/prestadoresencontrados');
+      
       if (selectedProviderId) {
         sessionStorage.setItem('selectedProviderId', selectedProviderId);
       }
@@ -187,6 +215,8 @@ const ProvidersFound: React.FC = () => {
           
           setSelectedProvider(details);
           setIsModalOpen(true);
+        } else {
+          throw new Error('Não foi possível obter detalhes do prestador');
         }
       } catch (error) {
         console.error('Erro ao carregar detalhes do prestador:', error);
@@ -202,6 +232,15 @@ const ProvidersFound: React.FC = () => {
   }, [selectedProviderId, providers, toast]);
   
   const renderNoProvidersMessage = () => {
+    if (errorMessage) {
+      return (
+        <div className="text-center py-10">
+          <h3 className="text-xl font-semibold mb-2">Erro</h3>
+          <p className="text-muted-foreground">{errorMessage}</p>
+        </div>
+      );
+    }
+    
     const inRadiusProviders = providers.filter(p => p.isWithinRadius);
     
     if (providers.length === 0) {
