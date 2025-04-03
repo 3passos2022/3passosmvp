@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty, PriceDetail } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -78,10 +79,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     // Log all item prices for debugging
     if (providerItemPrices && providerItemPrices.length > 0) {
-      console.log('Sample of provider item prices:');
-      providerItemPrices.slice(0, 5).forEach(price => {
+      console.log('All provider item prices:');
+      providerItemPrices.forEach(price => {
         console.log(`Provider ${price.provider_id}, Item ${price.item_id}: ${price.price_per_unit}`);
       });
+    } else {
+      console.warn('No provider item prices found in the database!');
     }
     
     // Create map for item prices
@@ -122,8 +125,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     console.log('Relevant service items for this quote:', relevantItems?.length);
     
     if (relevantItems && relevantItems.length > 0) {
-      console.log('Relevant service items sample:');
-      relevantItems.slice(0, 5).forEach(item => {
+      console.log('Relevant service items:');
+      relevantItems.forEach(item => {
         console.log(`Item ${item.id}: ${item.name}, Type: ${item.type}, Service: ${item.service_id}, SubService: ${item.sub_service_id}, Specialty: ${item.specialty_id}`);
       });
     }
@@ -188,28 +191,21 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
             settings.longitude
           );
           
-          // If service radius is 0, provider serves anywhere
-          // Otherwise, check if client is within radius
-          isWithinRadius = serviceRadiusKm === 0 || distance <= serviceRadiusKm;
+          console.log(`Provider ${providerData.name}: distance=${distance?.toFixed(2)}km, radius=${serviceRadiusKm}km`);
           
-          console.log(`Provider ${providerData.name}: distance=${distance?.toFixed(2)}km, radius=${serviceRadiusKm}km, within radius=${isWithinRadius}`);
-          
-          // Skip this provider if they are outside their service radius
-          // Only skip if the provider has set a service radius (not 0 and not null)
-          if (serviceRadiusKm > 0 && !isWithinRadius) {
-            console.log(`Provider ${providerData.name} is outside service radius. Distance: ${distance.toFixed(2)}km, radius: ${serviceRadiusKm}km. SKIPPING.`);
-            continue; // Skip this provider
+          // If service radius is set (greater than 0), check if client is within radius
+          if (serviceRadiusKm > 0) {
+            isWithinRadius = distance <= serviceRadiusKm;
+            console.log(`Provider ${providerData.name}: within radius=${isWithinRadius}`);
           }
         } else {
           console.log(`Provider ${providerData.name} has no coordinates or radius configuration`);
-          // Still consider them as within radius if we cannot calculate distance
-          isWithinRadius = true;
-          distance = null;
         }
         
         // Calculate price based on items and measurements
         let totalPrice = 0;
         const priceDetails: PriceDetail[] = [];
+        let hasCalculatedPrice = false;
         
         // Process quote items
         if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
@@ -221,11 +217,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
             const pricePerUnit = itemPricesMap.get(key);
             const itemInfo = serviceItemsMap.get(itemId);
             
-            console.log(`Item ${itemId}: quantity=${quantity}, pricePerUnit=${pricePerUnit}, name=${itemInfo?.name || 'unknown'}`);
+            console.log(`Item ${itemId} (${itemInfo?.name || 'unknown'}): quantity=${quantity}, pricePerUnit=${pricePerUnit}`);
 
             if (pricePerUnit !== undefined) {
               const itemTotal = pricePerUnit * quantity;
               totalPrice += itemTotal;
+              hasCalculatedPrice = true;
 
               console.log(`Provider ${providerData.name}: Item ${itemId} (${itemInfo?.name || 'unknown'}): ${quantity} × ${pricePerUnit} = ${itemTotal}`);
               priceDetails.push({
@@ -272,6 +269,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
               if (pricePerUnit !== undefined && pricePerUnit > 0) {
                 const areaTotal = pricePerUnit * totalArea;
                 totalPrice += areaTotal;
+                hasCalculatedPrice = true;
                 
                 console.log(`Provider ${providerData.name}: Square meter item ${item.id} (${item.name}): ${totalArea.toFixed(2)} m² × ${pricePerUnit} = ${areaTotal.toFixed(2)}`);
                 priceDetails.push({
@@ -293,7 +291,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         }
         
         // Only use default price if no prices were calculated
-        if (totalPrice === 0) {
+        if (!hasCalculatedPrice) {
           totalPrice = 100; // Default price
           console.log(`Using default price (${totalPrice}) for provider ${providerData.name} because no price could be calculated`);
         } else {
@@ -334,6 +332,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
 
     console.log(`Found ${matchedProviders.length} compatible providers total`);
+    console.log(`Providers within radius: ${matchedProviders.filter(p => p.isWithinRadius).length}`);
 
     if (matchedProviders.length === 0) {
       console.log('No providers found within service radius, showing all providers as fallback');
@@ -368,6 +367,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     });
 
     console.log(`Returning ${matchedProviders.length} providers, ${matchedProviders.filter(p => p.isWithinRadius).length} within radius`);
+    console.log('Provider details:', JSON.stringify(matchedProviders, null, 2));
     return matchedProviders;
   } catch (error) {
     console.error('Error finding matching providers:', error);

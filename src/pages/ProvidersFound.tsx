@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -13,7 +12,6 @@ import ProviderCard from '@/components/providerMatch/ProviderCard';
 import ProviderDetailsModal from '@/components/providerMatch/ProviderDetailsModal';
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
 import { toast as sonnerToast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 const ProvidersFound: React.FC = () => {
   const location = useLocation();
@@ -118,6 +116,9 @@ const ProvidersFound: React.FC = () => {
               duration: 5000
             });
           }
+          
+          // Filter out providers outside of their service radius
+          // Note: We're keeping them in the array but they'll be sorted at the end
           
           // Ensure we're dealing with valid arrays
           setProviders(matchingProviders || []);

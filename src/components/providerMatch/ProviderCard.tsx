@@ -32,7 +32,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
       <CardHeader className="p-4">
         <div className="flex items-center gap-3">
           <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-            {/* Avatar placeholder, pode ser substituído por uma imagem real */}
+            {/* Avatar placeholder */}
             <span className="text-2xl font-semibold text-gray-500">
               {providerData.name?.charAt(0) || "P"}
             </span>
@@ -67,7 +67,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
         {!isWithinRadius && (
           <div className="mb-3 p-2 bg-amber-50 rounded-md flex items-center gap-1 text-amber-600">
             <AlertTriangle className="h-4 w-4" />
-            <span className="text-xs">Este prestador está fora do seu raio de cobertura (raio: {providerData.serviceRadiusKm}km)</span>
+            <span className="text-xs">Este prestador está fora do seu raio de cobertura {providerData.serviceRadiusKm > 0 ? `(raio: ${providerData.serviceRadiusKm}km)` : ''}</span>
           </div>
         )}
         
@@ -88,7 +88,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
           </div>
         </div>
 
-        {/* Optional: Price details section */}
+        {/* Price details section */}
         {priceDetails && priceDetails.length > 0 && (
           <div className="mt-3 pt-2 border-t border-gray-100">
             <p className="text-xs font-medium text-gray-600 mb-1">Detalhes do preço:</p>
