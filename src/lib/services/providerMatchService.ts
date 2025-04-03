@@ -151,6 +151,29 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         });
       }
 
+      // Buscar avaliações dos prestadores
+      const { data: providerRatings, error: ratingsError } = await supabase
+        .from('provider_ratings')
+        .select('provider_id, rating')
+        .in('provider_id', providerIds);
+        
+      if (ratingsError) {
+        console.error('Erro ao buscar avaliações dos prestadores:', ratingsError);
+      }
+      
+      // Calcular média de avaliações por prestador
+      const ratingsMap = new Map<string, {sum: number, count: number}>();
+      if (providerRatings && providerRatings.length > 0) {
+        providerRatings.forEach(rating => {
+          if (!ratingsMap.has(rating.provider_id)) {
+            ratingsMap.set(rating.provider_id, {sum: 0, count: 0});
+          }
+          const current = ratingsMap.get(rating.provider_id)!;
+          current.sum += rating.rating;
+          current.count += 1;
+        });
+      }
+
       // Geocodificar o endereço do cliente
       let clientLocation = null;
       try {
@@ -203,7 +226,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           
           // Calcular distância se possível
           let distance = null;
-          let isWithinRadius = false;
+          let isWithinRadius = true;
           
           if (settings && settings.latitude && settings.longitude && clientLocation) {
             distance = calculateDistance(
@@ -225,20 +248,34 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
             }
           } else {
             console.log(`Prestador ${providerData.name} não possui coordenadas ou configuração de raio`);
-            // Se o prestador não tem localização configurada, não incluir distância
+            // Se o prestador não tem localização configurada
             distance = null;
-            // Sem localização, consideramos que não tem restrição de raio
+            // Sem localização, verificamos se tem configuração de raio
+            if (settings && settings.service_radius_km && settings.service_radius_km > 0) {
+              // Se tem configuração de raio mas não tem endereço, não incluímos
+              console.log(`Prestador ${providerData.name} tem raio de atendimento mas não tem endereço. Pulando.`);
+              continue;
+            }
             isWithinRadius = true;
           }
           
           // Calcular preço básico para o serviço
           let totalPrice = service.base_price || 0;
           
+          // Calcular média de avaliações
+          let averageRating = 0;
+          if (ratingsMap.has(providerId)) {
+            const ratings = ratingsMap.get(providerId)!;
+            if (ratings.count > 0) {
+              averageRating = ratings.sum / ratings.count;
+            }
+          }
+          
           // Criar objeto ProviderProfile
           const provider: ProviderProfile = {
             userId: providerId,
             bio: settings?.bio || '',
-            averageRating: 0, // Iniciar com zero, será atualizado se houver avaliações
+            averageRating,
             specialties: [], // Será preenchido se necessário
             name: providerData.name || 'Sem nome',
             phone: providerData.phone || '',
@@ -340,13 +377,30 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       console.error('Erro ao buscar portfólio:', portfolioError);
     }
 
+    // Buscar avaliações do prestador
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('provider_ratings')
+      .select('rating')
+      .eq('provider_id', providerId);
+      
+    if (ratingsError) {
+      console.error('Erro ao buscar avaliações:', ratingsError);
+    }
+    
+    // Calcular média de avaliação
+    let averageRating = 0;
+    if (ratings && ratings.length > 0) {
+      const sum = ratings.reduce((acc, curr) => acc + curr.rating, 0);
+      averageRating = sum / ratings.length;
+    }
+
     // Criar explicitamente um objeto ProviderProfile para evitar problemas de tipagem
     const providerProfile: ProviderProfile = {
       userId: provider.id,
       name: provider.name,
       phone: provider.phone,
       bio: settings?.bio || '',
-      averageRating: 0, // Começar com zero, será atualizado se houverem avaliações
+      averageRating, // Usar a média calculada
       specialties: [], // Array vazio inicial
       city: settings?.city || '',
       neighborhood: settings?.neighborhood || '',
@@ -370,7 +424,7 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       })) : [],
       distance,
       totalPrice: 0, // Será calculado quando necessário
-      rating: 0, // Valor real, não fictício
+      rating: averageRating, // Usar a média calculada
       isWithinRadius
     };
   } catch (error) {

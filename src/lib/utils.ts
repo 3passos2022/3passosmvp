@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -19,6 +18,20 @@ export function parseCurrencyInput(value: string): number {
   const number = parseFloat(sanitized);
   return isNaN(number) ? 0 : number;
 }
+
+// Format date to a readable string
+export const formatDate = (dateString: string): string => {
+  if (!dateString) return '';
+  
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+};
 
 // Add Google Maps types to fix TypeScript errors
 declare global {

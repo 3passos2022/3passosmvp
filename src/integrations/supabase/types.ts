@@ -104,6 +104,48 @@ export type Database = {
           },
         ]
       }
+      provider_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          provider_id: string
+          quote_id: string
+          rating: number
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id: string
+          quote_id: string
+          rating: number
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id?: string
+          quote_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_provider_ratings_provider"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_provider_ratings_quote"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_services: {
         Row: {
           base_price: number
@@ -727,6 +769,12 @@ export type Database = {
           phone: string
           role: string
         }[]
+      }
+      get_provider_average_rating: {
+        Args: {
+          p_provider_id: string
+        }
+        Returns: number
       }
       get_user_role: {
         Args: {

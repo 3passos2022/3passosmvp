@@ -72,3 +72,30 @@ export interface ProviderServiceItemPrice {
   level: 'service' | 'subService' | 'specialty';
   parentName: string;
 }
+
+export interface ProviderRating {
+  id: string;
+  provider_id: string;
+  quote_id: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+export interface QuoteWithProviders {
+  id: string;
+  status: string;
+  description: string;
+  city: string;
+  neighborhood: string;
+  created_at: string;
+  serviceName: string;
+  subServiceName: string;
+  specialtyName: string;
+  providers: {
+    id: string;
+    providerId: string;
+    providerName: string;
+    status: string;
+  }[];
+}

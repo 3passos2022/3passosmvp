@@ -1,282 +1,222 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { formatDate } from '@/lib/utils';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { UserRole } from '@/lib/types';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/lib/utils';
+import { QuoteWithProviders } from '@/lib/types/providerMatch';
 import QuoteDetails from './QuoteDetails';
-
-interface QuoteProvider {
-  id: string;
-  provider_id: string;
-  status: string;
-  provider: {
-    name: string;
-    phone: string;
-  };
-}
-
-interface Quote {
-  id: string;
-  service_name: string;
-  sub_service_name: string;
-  specialty_name: string;
-  status: string;
-  created_at: string;
-  description?: string;
-  city: string;
-  neighborhood: string;
-  providers?: QuoteProvider[];
-}
 
 const QuotesList: React.FC = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quotes, setQuotes] = useState<QuoteWithProviders[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedQuoteProvider, setSelectedQuoteProvider] = useState<{
+  const [tab, setTab] = useState('all');
+  const [selectedQuote, setSelectedQuote] = useState<{
     quoteId: string;
     providerId: string;
     providerName: string;
   } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (user) {
+      fetchQuotes();
+    }
+  }, [user, tab]);
 
-    const fetchQuotes = async () => {
-      setLoading(true);
-      try {
-        // Query diferente dependendo do tipo de usuário
-        if (user.role === UserRole.CLIENT) {
-          const { data, error } = await supabase
-            .from('quotes')
+  const fetchQuotes = async () => {
+    setLoading(true);
+    try {
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select(`
+          id, 
+          status, 
+          description, 
+          city, 
+          neighborhood, 
+          created_at,
+          services!service_id (name),
+          sub_services!sub_service_id (name),
+          specialties!specialty_id (name)
+        `)
+        .eq('client_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (quotesError) throw quotesError;
+
+      // Get providers for each quote
+      const quotesWithProviders = await Promise.all(
+        quotesData.map(async (quote) => {
+          const { data: providersData, error: providersError } = await supabase
+            .from('quote_providers')
             .select(`
               id,
+              provider_id,
               status,
-              description,
-              city,
-              neighborhood,
-              created_at,
-              service_name:services(name),
-              sub_service_name:sub_services(name),
-              specialty_name:specialties(name),
-              providers:quote_providers(
-                id,
-                provider_id,
-                status,
-                provider:profiles(name, phone)
-              )
+              profiles!provider_id (name)
             `)
-            .eq('client_id', user.id)
-            .order('created_at', { ascending: false });
+            .eq('quote_id', quote.id);
 
-          if (error) throw error;
+          if (providersError) throw providersError;
 
-          const formattedQuotes = data.map((quote: any) => ({
+          return {
             id: quote.id,
-            service_name: quote.service_name?.name || 'Serviço não disponível',
-            sub_service_name: quote.sub_service_name?.name || 'Subserviço não disponível',
-            specialty_name: quote.specialty_name?.name || 'Especialidade não disponível',
             status: quote.status,
-            created_at: quote.created_at,
             description: quote.description,
             city: quote.city,
             neighborhood: quote.neighborhood,
-            providers: quote.providers || []
-          }));
+            created_at: quote.created_at,
+            serviceName: quote.services?.name || 'Serviço não encontrado',
+            subServiceName: quote.sub_services?.name || 'Subserviço não encontrado',
+            specialtyName: quote.specialties?.name || 'Especialidade não encontrada',
+            providers: providersData.map(provider => ({
+              id: provider.id,
+              providerId: provider.provider_id,
+              providerName: provider.profiles?.name || 'Nome não encontrado',
+              status: provider.status
+            }))
+          };
+        })
+      );
 
-          setQuotes(formattedQuotes);
-        } else {
-          const { data, error } = await supabase
-            .from('quotes')
-            .select(`
-              id,
-              status,
-              description,
-              city,
-              neighborhood,
-              created_at,
-              service_name:services(name),
-              sub_service_name:sub_services(name),
-              specialty_name:specialties(name)
-            `)
-            .eq('client_id', user.id)
-            .order('created_at', { ascending: false });
+      // Filter quotes by tab
+      const filteredQuotes = tab === 'all' 
+        ? quotesWithProviders 
+        : quotesWithProviders.filter(quote => quote.status === tab);
 
-          if (error) throw error;
+      setQuotes(filteredQuotes);
+    } catch (error) {
+      console.error('Erro ao buscar orçamentos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          setQuotes(data || []);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar orçamentos:', error);
-        toast({
-          title: "Erro ao carregar orçamentos",
-          description: "Não foi possível carregar seus orçamentos.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const openModal = (quoteId: string, providerId: string, providerName: string) => {
+    setSelectedQuote({ quoteId, providerId, providerName });
+    setModalOpen(true);
+  };
 
-    fetchQuotes();
-  }, [user, toast]);
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedQuote(null);
+    fetchQuotes(); // Atualizar a lista após fechar o modal
+  };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!quotes.length) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium">Nenhum orçamento encontrado</h3>
-        <p className="text-muted-foreground mt-2">
-          {user?.role === UserRole.CLIENT 
-            ? "Você ainda não solicitou nenhum orçamento." 
-            : "Você ainda não tem orçamentos."}
-        </p>
-        
-        {user?.role === UserRole.CLIENT && (
-          <Button className="mt-4" onClick={() => window.location.href = '/request-quote'}>
-            Solicitar Orçamento
-          </Button>
-        )}
-      </div>
-    );
-  }
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pendente</Badge>;
+      case 'completed':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Concluído</Badge>;
+      case 'accepted':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Aceito</Badge>;
+      case 'rejected':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejeitado</Badge>;
+      default:
+        return <Badge variant="outline">Desconhecido</Badge>;
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Meus Orçamentos</h2>
-      
-      <div className="grid grid-cols-1 gap-6">
-        {quotes.map((quote) => (
-          <Card key={quote.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-lg">
-                  {quote.service_name} &gt; {quote.sub_service_name} &gt; {quote.specialty_name}
-                </CardTitle>
-                
-                <Badge 
-                  variant={quote.status === 'completed' ? 'default' : 'outline'}
-                  className={
-                    quote.status === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' : 
-                    quote.status === 'completed' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 
-                    'bg-gray-100 text-gray-800 hover:bg-gray-100'
-                  }
-                >
-                  {quote.status === 'pending' ? 'Pendente' : 
-                   quote.status === 'completed' ? 'Concluído' : 
-                   quote.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            
-            <CardContent>
-              <div className="text-sm text-muted-foreground">
-                <p>Local: {quote.neighborhood}, {quote.city}</p>
-                <p>Data: {formatDate(quote.created_at)}</p>
-              </div>
-              
-              {quote.description && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-md text-sm">
-                  <p>{quote.description}</p>
-                </div>
-              )}
-              
-              {user?.role === UserRole.CLIENT && quote.providers && quote.providers.length > 0 && (
-                <Collapsible className="mt-4">
-                  <CollapsibleTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Ver prestadores ({quote.providers.length})
-                    </Button>
-                  </CollapsibleTrigger>
-                  
-                  <CollapsibleContent className="mt-3 space-y-3">
-                    {quote.providers.map((provider) => (
-                      <div 
-                        key={provider.id} 
-                        className="p-3 border rounded-md flex justify-between items-center"
-                      >
-                        <div>
-                          <p className="font-medium">{provider.provider.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {provider.provider.phone || 'Sem telefone'}
-                          </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <h2 className="text-2xl font-bold tracking-tight">Meus Orçamentos</h2>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">Todos</TabsTrigger>
+          <TabsTrigger value="pending">Pendentes</TabsTrigger>
+          <TabsTrigger value="accepted">Aceitos</TabsTrigger>
+          <TabsTrigger value="completed">Concluídos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={tab}>
+          <div className="grid grid-cols-1 gap-4">
+            {loading ? (
+              <p>Carregando orçamentos...</p>
+            ) : quotes.length === 0 ? (
+              <p className="text-muted-foreground">Nenhum orçamento encontrado.</p>
+            ) : (
+              quotes.map((quote) => (
+                <Card key={quote.id} className="overflow-hidden">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <h3 className="text-lg font-semibold">{quote.specialtyName}</h3>
+                          {getStatusBadge(quote.status)}
                         </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Badge variant={
-                            provider.status === 'pending' ? 'outline' :
-                            provider.status === 'accepted' ? 'default' :
-                            provider.status === 'rejected' ? 'destructive' :
-                            provider.status === 'completed' ? 'secondary' : 'outline'
-                          }>
-                            {provider.status === 'pending' ? 'Pendente' :
-                             provider.status === 'accepted' ? 'Aceito' :
-                             provider.status === 'rejected' ? 'Rejeitado' :
-                             provider.status === 'completed' ? 'Finalizado' : provider.status}
-                          </Badge>
-                          
-                          {provider.status === 'accepted' && quote.status !== 'completed' && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="ml-2"
-                              onClick={() => setSelectedQuoteProvider({
-                                quoteId: quote.id,
-                                providerId: provider.provider_id,
-                                providerName: provider.provider.name
-                              })}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" /> Finalizar
-                            </Button>
+                        <p className="text-sm text-muted-foreground">
+                          {quote.serviceName} &gt; {quote.subServiceName}
+                        </p>
+                        <p className="text-sm">
+                          {quote.neighborhood}, {quote.city}
+                        </p>
+                        {quote.description && (
+                          <p className="text-sm line-clamp-2">{quote.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Criado em {formatDate(quote.created_at)}
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Prestadores:</h4>
+                          {quote.providers.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhum prestador atribuído</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {quote.providers.map((provider) => (
+                                <div key={provider.id} className="flex items-center justify-between gap-4">
+                                  <span className="text-sm">{provider.providerName}</span>
+                                  {quote.status === 'pending' && provider.status === 'accepted' && (
+                                    <Button 
+                                      size="sm"
+                                      onClick={() => openModal(quote.id, provider.providerId, provider.providerName)}
+                                    >
+                                      Finalizar
+                                    </Button>
+                                  )}
+                                  {provider.status !== 'pending' && (
+                                    <Badge variant="outline" className={
+                                      provider.status === 'completed' ? "bg-green-50 text-green-700" :
+                                      provider.status === 'accepted' ? "bg-blue-50 text-blue-700" :
+                                      "bg-red-50 text-red-700"
+                                    }>
+                                      {provider.status === 'completed' ? 'Concluído' :
+                                       provider.status === 'accepted' ? 'Aceito' : 'Rejeitado'}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </div>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </CardContent>
-            
-            <CardFooter className="flex justify-between">
-              <div className="text-xs text-muted-foreground">
-                ID: {quote.id}
-              </div>
-              
-              {user?.role === UserRole.CLIENT && quote.status === 'pending' && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => window.location.href = `/request-quote?edit=${quote.id}`}
-                >
-                  Editar
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
-      
-      {selectedQuoteProvider && (
-        <QuoteDetails 
-          isOpen={!!selectedQuoteProvider}
-          onClose={() => setSelectedQuoteProvider(null)}
-          quoteId={selectedQuoteProvider.quoteId}
-          providerId={selectedQuoteProvider.providerId}
-          providerName={selectedQuoteProvider.providerName}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {selectedQuote && (
+        <QuoteDetails
+          isOpen={modalOpen}
+          onClose={closeModal}
+          quoteId={selectedQuote.quoteId}
+          providerId={selectedQuote.providerId}
+          providerName={selectedQuote.providerName}
         />
       )}
     </div>

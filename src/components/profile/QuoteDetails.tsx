@@ -76,14 +76,12 @@ const QuoteDetails: React.FC<QuoteDetailsProps> = ({ isOpen, onClose, quoteId, p
 
     setIsSubmitting(true);
     try {
-      // Salvar a avaliação do prestador
-      const { error } = await supabase
-        .from('provider_ratings')
-        .insert({
-          provider_id: providerId,
-          quote_id: quoteId,
-          rating: rating,
-        });
+      // Salvar a avaliação do prestador usando RPC para evitar problemas com tipo de tabela
+      const { error } = await supabase.rpc('add_provider_rating', {
+        p_provider_id: providerId,
+        p_quote_id: quoteId,
+        p_rating: rating
+      });
 
       if (error) throw error;
 

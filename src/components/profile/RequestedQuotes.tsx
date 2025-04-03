@@ -1,219 +1,209 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, X } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface RequestedQuote {
   id: string;
-  quote_id: string;
+  quoteId: string;
   status: string;
   created_at: string;
   quote: {
     id: string;
+    service: string;
+    subService: string;
+    specialty: string;
     description: string;
-    service_id: string;
-    sub_service_id: string;
-    specialty_id: string;
     city: string;
     neighborhood: string;
     created_at: string;
-    service: {
-      name: string;
-    };
-    sub_service: {
-      name: string;
-    };
-    specialty: {
-      name: string;
-    };
-    client: {
-      name: string;
-    };
   };
 }
 
 const RequestedQuotes: React.FC = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [quotes, setQuotes] = useState<RequestedQuote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [tab, setTab] = useState('pending');
 
   useEffect(() => {
+    if (user) {
+      fetchQuotes();
+    }
+  }, [user, tab]);
+
+  const fetchQuotes = async () => {
     if (!user) return;
     
-    const fetchRequestedQuotes = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('quote_providers')
-          .select(`
-            id, 
-            quote_id, 
-            status,
-            created_at,
-            quote:quotes (
-              id, 
-              description,
-              service_id, 
-              sub_service_id, 
-              specialty_id, 
-              city, 
-              neighborhood, 
-              created_at,
-              service:services (name),
-              sub_service:sub_services (name),
-              specialty:specialties (name),
-              client:profiles (name)
-            )
-          `)
-          .eq('provider_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        setQuotes(data || []);
-      } catch (error) {
-        console.error('Erro ao buscar orçamentos:', error);
-        toast({
-          title: "Erro ao carregar orçamentos",
-          description: "Não foi possível carregar seus orçamentos.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRequestedQuotes();
-  }, [user, toast]);
-
-  const handleUpdateStatus = async (quoteProviderId: string, status: 'accepted' | 'rejected') => {
+    setLoading(true);
     try {
-      const { error } = await supabase
+      const { data: quoteProviders, error: quoteProvidersError } = await supabase
         .from('quote_providers')
-        .update({ status })
-        .eq('id', quoteProviderId);
+        .select(`
+          id,
+          quote_id,
+          status,
+          created_at,
+          quotes!quote_id (
+            id,
+            description,
+            city,
+            neighborhood,
+            created_at,
+            services:service_id (name),
+            sub_services:sub_service_id (name),
+            specialties:specialty_id (name)
+          )
+        `)
+        .eq('provider_id', user.id)
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+      if (quoteProvidersError) throw quoteProvidersError;
 
-      // Atualizar o estado local
-      setQuotes(prev => 
-        prev.map(item => 
-          item.id === quoteProviderId 
-            ? { ...item, status } 
-            : item
-        )
-      );
+      // Transform the data
+      const transformedData: RequestedQuote[] = quoteProviders.map((item) => ({
+        id: item.id,
+        quoteId: item.quote_id,
+        status: item.status,
+        created_at: item.created_at,
+        quote: {
+          id: item.quotes?.id || '',
+          service: item.quotes?.services?.name || 'Serviço não encontrado',
+          subService: item.quotes?.sub_services?.name || 'Subserviço não encontrado',
+          specialty: item.quotes?.specialties?.name || 'Especialidade não encontrada',
+          description: item.quotes?.description || '',
+          city: item.quotes?.city || '',
+          neighborhood: item.quotes?.neighborhood || '',
+          created_at: item.quotes?.created_at || '',
+        }
+      }));
 
-      toast({
-        title: status === 'accepted' ? "Orçamento aceito" : "Orçamento rejeitado",
-        description: status === 'accepted' 
-          ? "Você aceitou este orçamento. O cliente será notificado." 
-          : "Você rejeitou este orçamento.",
-      });
+      // Filter by tab
+      const filteredQuotes = tab === 'all' 
+        ? transformedData 
+        : transformedData.filter(quote => quote.status === tab);
+
+      setQuotes(filteredQuotes);
     } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      toast({
-        title: "Erro ao atualizar status",
-        description: "Não foi possível atualizar o status do orçamento.",
-        variant: "destructive",
-      });
+      console.error('Erro ao buscar orçamentos solicitados:', error);
+      toast.error('Erro ao carregar orçamentos. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const handleAction = async (quoteProviderId: string, action: 'accepted' | 'rejected') => {
+    setActionLoading(quoteProviderId);
+    try {
+      const { error } = await supabase
+        .from('quote_providers')
+        .update({ status: action })
+        .eq('id', quoteProviderId);
 
-  if (quotes.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium">Nenhum orçamento solicitado</h3>
-        <p className="text-muted-foreground mt-2">
-          Você ainda não recebeu solicitações de orçamento.
-        </p>
-      </div>
-    );
-  }
+      if (error) throw error;
+
+      toast.success(`Orçamento ${action === 'accepted' ? 'aceito' : 'rejeitado'} com sucesso!`);
+      fetchQuotes();
+    } catch (error) {
+      console.error('Erro ao atualizar orçamento:', error);
+      toast.error('Erro ao processar sua solicitação. Tente novamente.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pendente</Badge>;
+      case 'completed':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Concluído</Badge>;
+      case 'accepted':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Aceito</Badge>;
+      case 'rejected':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejeitado</Badge>;
+      default:
+        return <Badge variant="outline">Desconhecido</Badge>;
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Orçamentos Solicitados</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {quotes.map((item) => (
-          <Card key={item.id} className="overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-medium text-lg">
-                    {item.quote.service?.name || 'Serviço'} &gt; {item.quote.sub_service?.name || 'Subserviço'} &gt; {item.quote.specialty?.name || 'Especialidade'}
-                  </h3>
-                  
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Cliente: {item.quote.client?.name || 'Cliente anônimo'}
-                  </p>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    Local: {item.quote.neighborhood}, {item.quote.city}
-                  </p>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    Recebido em: {formatDate(item.created_at)}
-                  </p>
-                </div>
-                
-                <div className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100">
-                  {item.status === 'pending' ? 'Pendente' : 
-                   item.status === 'accepted' ? 'Aceito' :
-                   item.status === 'rejected' ? 'Rejeitado' : 
-                   item.status === 'completed' ? 'Concluído' : 'Status desconhecido'}
-                </div>
-              </div>
-              
-              {item.quote.description && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                  <p className="text-sm">
-                    {item.quote.description}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-            
-            {item.status === 'pending' && (
-              <CardFooter className="p-4 bg-gray-50 flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleUpdateStatus(item.id, 'rejected')}
-                >
-                  <X className="h-4 w-4 mr-1" /> Recusar
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleUpdateStatus(item.id, 'accepted')}
-                >
-                  <Check className="h-4 w-4 mr-1" /> Aceitar
-                </Button>
-              </CardFooter>
-            )}
-          </Card>
-        ))}
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <h2 className="text-2xl font-bold tracking-tight">Orçamentos Solicitados</h2>
       </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">Todos</TabsTrigger>
+          <TabsTrigger value="pending">Pendentes</TabsTrigger>
+          <TabsTrigger value="accepted">Aceitos</TabsTrigger>
+          <TabsTrigger value="rejected">Rejeitados</TabsTrigger>
+          <TabsTrigger value="completed">Concluídos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={tab}>
+          <div className="grid grid-cols-1 gap-4">
+            {loading ? (
+              <p>Carregando orçamentos...</p>
+            ) : quotes.length === 0 ? (
+              <p className="text-muted-foreground">Nenhum orçamento encontrado.</p>
+            ) : (
+              quotes.map((quoteProvider) => (
+                <Card key={quoteProvider.id} className="overflow-hidden">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <h3 className="text-lg font-semibold">{quoteProvider.quote.specialty}</h3>
+                          {getStatusBadge(quoteProvider.status)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {quoteProvider.quote.service} &gt; {quoteProvider.quote.subService}
+                        </p>
+                        <p className="text-sm">
+                          {quoteProvider.quote.neighborhood}, {quoteProvider.quote.city}
+                        </p>
+                        {quoteProvider.quote.description && (
+                          <p className="text-sm line-clamp-2">{quoteProvider.quote.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Solicitado em {formatDate(quoteProvider.created_at)}
+                        </p>
+                      </div>
+
+                      {quoteProvider.status === 'pending' && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button 
+                            variant="outline"
+                            disabled={!!actionLoading}
+                            onClick={() => handleAction(quoteProvider.id, 'rejected')}
+                          >
+                            {actionLoading === quoteProvider.id ? 'Processando...' : 'Rejeitar'}
+                          </Button>
+                          <Button
+                            disabled={!!actionLoading}
+                            onClick={() => handleAction(quoteProvider.id, 'accepted')}
+                          >
+                            {actionLoading === quoteProvider.id ? 'Processando...' : 'Aceitar'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

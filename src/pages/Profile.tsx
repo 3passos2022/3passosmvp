@@ -64,7 +64,7 @@ const Profile: React.FC = () => {
               </div>
               
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="mb-6">
+                <TabsList className="mb-6 flex flex-wrap">
                   <TabsTrigger value="quotes">Meus Orçamentos</TabsTrigger>
                   
                   {user.role === UserRole.PROVIDER && (

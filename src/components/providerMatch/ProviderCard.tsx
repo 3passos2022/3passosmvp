@@ -26,14 +26,14 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
           </div>
           <div>
             <h3 className="text-lg font-semibold">{providerData.name}</h3>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>
-                {providerData.city && providerData.neighborhood 
-                  ? `${providerData.neighborhood}, ${providerData.city}` 
-                  : 'Localização não disponível'}
-              </span>
-            </div>
+            {(providerData.city && providerData.neighborhood) && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span>
+                  {`${providerData.neighborhood}, ${providerData.city}`}
+                </span>
+              </div>
+            )}
             <div className="flex items-center mt-1">
               <Star className={`h-4 w-4 ${providerData.averageRating > 0 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
               <span className="ml-1 text-sm">
@@ -52,7 +52,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
         </div>
         
         <div className="flex justify-between items-center mt-4">
-          {distance !== null && (
+          {distance !== null && providerData.hasAddress && (
             <div>
               <p className="text-sm text-muted-foreground">Distância:</p>
               <p className={`font-medium ${isWithinRadius ? 'text-green-600' : 'text-amber-600'}`}>
@@ -61,7 +61,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
             </div>
           )}
           
-          <div className={`text-${distance !== null ? 'right' : 'left'}`}>
+          <div className={`text-${(distance !== null && providerData.hasAddress) ? 'right' : 'left'}`}>
             <p className="text-sm text-muted-foreground">Valor estimado:</p>
             <p className="font-bold text-lg text-primary">{formatCurrency(totalPrice)}</p>
           </div>
