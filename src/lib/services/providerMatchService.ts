@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -32,8 +31,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     // Modificação: Usar RPC para evitar recursão infinita nas políticas RLS
     const { data: providers, error: providersError } = await supabase.rpc(
-      'get_all_providers',
-      {}
+      'get_all_providers'
     );
 
     if (providersError) {

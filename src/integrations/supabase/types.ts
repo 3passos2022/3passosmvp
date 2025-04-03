@@ -693,6 +693,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_all_providers: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          phone: string
+          role: string
+        }[]
+      }
       get_user_role: {
         Args: {
           user_id: string
