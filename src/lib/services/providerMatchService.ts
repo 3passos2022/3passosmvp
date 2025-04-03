@@ -111,55 +111,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     console.log('Total de serviços compatíveis encontrados:', matchingServices.length);
     
-    // MODO EMERGÊNCIA: Se não encontrou nenhum serviço, mas temos prestadores, vamos criar um prestador virtual para debug
     const matchedProviders: ProviderMatch[] = [];
     
-    if (!matchingServices.length && allProviders && allProviders.length > 0) {
-      console.log('MODO EMERGÊNCIA: Exibindo prestadores disponíveis mesmo sem serviços correspondentes (para debug)');
-      
-      // Usar o primeiro prestador como exemplo
-      for (const provider of allProviders) {
-        try {
-          console.log(`Processando prestador para debug: ${provider.name} (ID: ${provider.id})`);
-          
-          // Buscar settings do prestador
-          const { data: settings } = await supabase
-            .from('provider_settings')
-            .select('*')
-            .eq('provider_id', provider.id)
-            .maybeSingle();
-            
-          // Geocodificar o endereço do cliente
-          let distance = 5; // Valor padrão para modo debug
-          let isWithinRadius = true; // Consideramos dentro do raio para debug
-          
-          // Criar providerProfile
-          const providerProfile: ProviderProfile = {
-            userId: provider.id,
-            name: provider.name || 'Prestador',
-            bio: settings?.bio || 'Prestador disponível para este serviço.',
-            averageRating: 4.5, // Rating fictício para debug
-            specialties: [],
-            phone: provider.phone || '',
-            city: settings?.city || 'São Paulo',
-            neighborhood: settings?.neighborhood || 'Centro',
-            relevanceScore: 3 // Alta relevância para debug
-          };
-          
-          // Adicionar o prestador à lista
-          matchedProviders.push({
-            provider: providerProfile,
-            distance,
-            totalPrice: 100, // Preço fictício para debug
-            isWithinRadius
-          });
-          
-          console.log(`Prestador adicionado para debug: ${providerProfile.name}`);
-        } catch (providerError) {
-          console.error('Erro ao processar prestador para debug:', providerError);
-        }
-      }
-    } else if (matchingServices.length > 0) {
+    if (matchingServices.length > 0) {
       // Processamento normal se temos serviços
       // Lista de IDs de prestadores encontrados
       const providerIds = matchingServices.map(service => service.provider_id);
@@ -248,7 +202,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           }
           
           // Calcular distância se possível
-          let distance = 9999;
+          let distance = null;
           let isWithinRadius = false;
           
           if (settings && settings.latitude && settings.longitude && clientLocation) {
@@ -263,33 +217,35 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
             isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
             
             console.log(`Prestador ${providerData.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
+            
+            // Se o prestador tem raio definido e não está dentro do raio, pular
+            if (serviceRadius > 0 && !isWithinRadius) {
+              console.log(`Prestador ${providerData.name} fora do raio de atendimento. Distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km`);
+              continue;
+            }
           } else {
             console.log(`Prestador ${providerData.name} não possui coordenadas ou configuração de raio`);
-            // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
+            // Se o prestador não tem localização configurada, não incluir distância
+            distance = null;
+            // Sem localização, consideramos que não tem restrição de raio
             isWithinRadius = true;
-            distance = 0;
           }
           
           // Calcular preço básico para o serviço
           let totalPrice = service.base_price || 0;
           
-          // Simular avaliação do prestador
-          let averageRating = Math.random() * 3 + 2; // Entre 2 e 5 estrelas
-          if (Math.random() > 0.8) {
-            averageRating = 0; // 20% dos prestadores são novos sem avaliação
-          }
-          
           // Criar objeto ProviderProfile
           const provider: ProviderProfile = {
             userId: providerId,
             bio: settings?.bio || '',
-            averageRating: averageRating,
+            averageRating: 0, // Iniciar com zero, será atualizado se houver avaliações
             specialties: [], // Será preenchido se necessário
             name: providerData.name || 'Sem nome',
             phone: providerData.phone || '',
             city: settings?.city || '',
             neighborhood: settings?.neighborhood || '',
-            relevanceScore: relevanceScore
+            relevanceScore: relevanceScore,
+            hasAddress: !!(settings?.latitude && settings?.longitude)
           };
           
           // Adicionar à lista de prestadores compatíveis
@@ -323,8 +279,16 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         return relevanceB - relevanceA; // Maior relevância primeiro
       }
       
-      // Se mesma relevância, ordenar por distância
-      return a.distance - b.distance;
+      // Se mesma relevância e ambos tem distância, ordenar por distância
+      if (a.distance !== null && b.distance !== null) {
+        return a.distance - b.distance;
+      }
+      
+      // Se um tem distância e outro não, priorizar o que tem distância
+      if (a.distance !== null && b.distance === null) return -1;
+      if (a.distance === null && b.distance !== null) return 1;
+      
+      return 0;
     });
 
     console.log(`Retornando ${matchedProviders.length} prestadores, ${matchedProviders.filter(p => p.isWithinRadius).length} dentro do raio`);
@@ -382,11 +346,20 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       name: provider.name,
       phone: provider.phone,
       bio: settings?.bio || '',
-      averageRating: 4.0, // Valor fictício para exemplo
+      averageRating: 0, // Começar com zero, será atualizado se houverem avaliações
       specialties: [], // Array vazio inicial
       city: settings?.city || '',
-      neighborhood: settings?.neighborhood || ''
+      neighborhood: settings?.neighborhood || '',
+      hasAddress: !!(settings?.latitude && settings?.longitude)
     };
+
+    // Calcular distância se coordenadas disponíveis
+    let distance = null;
+    let isWithinRadius = true;
+    
+    if (settings && settings.latitude && settings.longitude) {
+      distance = 0; // Será calculado quando necessário
+    }
 
     return {
       provider: providerProfile,
@@ -395,10 +368,10 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
         imageUrl: item.image_url,
         description: item.description
       })) : [],
-      distance: 0, // Será calculado quando necessário
+      distance,
       totalPrice: 0, // Será calculado quando necessário
-      rating: 4.0, // Valor fictício para exemplo
-      isWithinRadius: false // Será calculado quando necessário
+      rating: 0, // Valor real, não fictício
+      isWithinRadius
     };
   } catch (error) {
     console.error('Erro ao buscar detalhes completos do prestador:', error);

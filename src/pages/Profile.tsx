@@ -11,6 +11,7 @@ import ProviderSettings from '@/components/profile/ProviderSettings';
 import ProviderPortfolio from '@/components/profile/ProviderPortfolio';
 import ProviderServices from '@/components/profile/ProviderServices';
 import QuotesList from '@/components/profile/QuotesList';
+import RequestedQuotes from '@/components/profile/RequestedQuotes';
 
 const Profile: React.FC = () => {
   const { user, loading } = useAuth();
@@ -68,6 +69,7 @@ const Profile: React.FC = () => {
                   
                   {user.role === UserRole.PROVIDER && (
                     <>
+                      <TabsTrigger value="requested">Orçamentos Solicitados</TabsTrigger>
                       <TabsTrigger value="services">Meus Serviços</TabsTrigger>
                       <TabsTrigger value="portfolio">Portfólio</TabsTrigger>
                       <TabsTrigger value="settings">Configurações</TabsTrigger>
@@ -81,6 +83,10 @@ const Profile: React.FC = () => {
                 
                 {user.role === UserRole.PROVIDER && (
                   <>
+                    <TabsContent value="requested">
+                      <RequestedQuotes />
+                    </TabsContent>
+                    
                     <TabsContent value="services">
                       <ProviderServices />
                     </TabsContent>

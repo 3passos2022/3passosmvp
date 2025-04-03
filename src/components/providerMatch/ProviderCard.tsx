@@ -35,7 +35,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
               </span>
             </div>
             <div className="flex items-center mt-1">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <Star className={`h-4 w-4 ${providerData.averageRating > 0 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
               <span className="ml-1 text-sm">
                 {providerData.averageRating > 0 
                   ? providerData.averageRating.toFixed(1) 
@@ -52,14 +52,16 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
         </div>
         
         <div className="flex justify-between items-center mt-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Distância:</p>
-            <p className={`font-medium ${isWithinRadius ? 'text-green-600' : 'text-amber-600'}`}>
-              {distance.toFixed(1)} km
-            </p>
-          </div>
+          {distance !== null && (
+            <div>
+              <p className="text-sm text-muted-foreground">Distância:</p>
+              <p className={`font-medium ${isWithinRadius ? 'text-green-600' : 'text-amber-600'}`}>
+                {distance.toFixed(1)} km
+              </p>
+            </div>
+          )}
           
-          <div className="text-right">
+          <div className={`text-${distance !== null ? 'right' : 'left'}`}>
             <p className="text-sm text-muted-foreground">Valor estimado:</p>
             <p className="font-bold text-lg text-primary">{formatCurrency(totalPrice)}</p>
           </div>

@@ -3,7 +3,7 @@ import { QuoteMeasurement } from '@/lib/types';
 
 export interface ProviderMatch {
   provider: ProviderProfile;
-  distance: number;
+  distance: number | null;
   totalPrice: number;
   isWithinRadius: boolean;
 }
@@ -18,6 +18,7 @@ export interface ProviderProfile {
   city?: string;
   neighborhood?: string;
   relevanceScore?: number;
+  hasAddress?: boolean;
 }
 
 export interface ProviderSpecialty {
@@ -34,7 +35,7 @@ export interface ProviderDetails {
     description?: string;
   }[];
   rating: number;
-  distance: number;
+  distance: number | null;
   totalPrice: number;
   isWithinRadius: boolean;
 }
