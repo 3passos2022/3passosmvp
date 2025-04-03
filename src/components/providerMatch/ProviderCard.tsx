@@ -14,9 +14,9 @@ interface ProviderCardProps {
 const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) => {
   const { provider: providerData, distance, totalPrice, isWithinRadius, priceDetails = [] } = provider;
   
-  // Debug the price information
-  console.log(`Provider ${providerData.name} price details:`, priceDetails);
-  console.log(`Provider ${providerData.name} total price:`, totalPrice);
+  // Debug the price information with additional context
+  console.log(`Provider ${providerData.name} (${providerData.userId}) price details:`, priceDetails);
+  console.log(`Provider ${providerData.name} (${providerData.userId}) total price:`, totalPrice);
   
   // Helper function to display price breakdown
   const renderPriceBreakdown = () => {
@@ -72,9 +72,8 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
           <div className="mb-3 p-2 bg-amber-50 rounded-md flex items-center gap-1 text-amber-600">
             <AlertTriangle className="h-4 w-4" />
             <span className="text-xs">
-              Este prestador está fora do seu raio de cobertura
+              Prestador a {distance !== null ? `${distance.toFixed(1)}km` : 'distância desconhecida'} de distância
               {providerData.serviceRadiusKm > 0 ? ` (raio: ${providerData.serviceRadiusKm}km)` : ''}
-              {distance !== null ? ` - distância: ${distance.toFixed(1)}km` : ''}
             </span>
           </div>
         )}
@@ -105,7 +104,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
                 <div key={index} className="flex justify-between items-center">
                   <span>
                     {detail.itemName || `Item ${detail.itemId}`}
-                    {detail.quantity ? ` (${detail.quantity}x)` : ''}
+                    {detail.quantity > 0 ? ` (${detail.quantity}x)` : ''}
                     {detail.area ? ` (${detail.area.toFixed(1)} m²)` : ''}
                   </span>
                   <span>{formatCurrency(detail.total || 0)}</span>

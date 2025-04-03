@@ -117,12 +117,12 @@ const ProvidersFound: React.FC = () => {
             });
           }
           
-          // Filter out providers outside of their service radius
-          // Note: We're keeping them in the array but they'll be sorted at the end
-          
-          // Ensure we're dealing with valid arrays
+          // Store all providers, including those outside service radius
           setProviders(matchingProviders || []);
           setFilteredProviders(matchingProviders || []);
+          
+          // Apply initial filter
+          handleFilterChange('relevance');
         } catch (providerError: any) {
           console.error('Specific error when searching providers:', providerError);
           
