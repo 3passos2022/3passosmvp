@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -64,16 +65,34 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     console.log(`Encontrados ${providers?.length || 0} prestadores no total`);
 
     // Obter os IDs dos prestadores para uso nas próximas consultas
-    const providerIds = providers.map(p => p.id);
+    // Modificação: Extrair os IDs dos objetos JSON retornados pelo RPC
+    const providerIds = providers.map(p => {
+      // Verificar se é um objeto ou uma string JSON
+      if (typeof p === 'string') {
+        try {
+          const parsed = JSON.parse(p);
+          return parsed.id;
+        } catch (e) {
+          console.error('Erro ao analisar JSON do prestador:', e);
+          return null;
+        }
+      } else if (p && p.id) {
+        return p.id;
+      }
+      return null;
+    }).filter(Boolean); // Remover valores nulos
     
     if (providerIds.length === 0) {
       console.log('Nenhum ID de prestador foi obtido');
       return [];
     }
+
+    console.log('IDs de prestadores encontrados:', providerIds);
     
     // Buscar serviços oferecidos por esses prestadores
     let providerServices = [];
     try {
+      // Consulta modificada: Usar .in() corretamente para cada providerID
       const { data, error: servicesError } = await supabase
         .from('provider_services')
         .select('*')
@@ -85,6 +104,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       }
       
       providerServices = data || [];
+      console.log('Serviços retornados da consulta:', providerServices);
     } catch (err) {
       console.error('Exceção ao buscar serviços dos prestadores:', err);
       return [];
