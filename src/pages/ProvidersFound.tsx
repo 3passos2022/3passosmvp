@@ -107,20 +107,35 @@ const ProvidersFound: React.FC = () => {
           throw new Error('ID do serviço não fornecido');
         }
         
-        // Buscar todos os prestadores disponíveis
-        const matchingProviders = await findMatchingProviders(quoteDetails);
-        console.log('Prestadores encontrados:', matchingProviders);
-        
-        if (!matchingProviders || matchingProviders.length === 0) {
-          sonnerToast.warning('Nenhum prestador encontrado', {
-            description: 'Não encontramos prestadores para este serviço no momento.',
-            duration: 5000
-          });
+        // Buscar todos os prestadores disponíveis com tratamento de erro aprimorado
+        try {
+          const matchingProviders = await findMatchingProviders(quoteDetails);
+          console.log('Prestadores encontrados:', matchingProviders);
+          
+          if (!matchingProviders || matchingProviders.length === 0) {
+            sonnerToast.warning('Nenhum prestador encontrado', {
+              description: 'Não encontramos prestadores para este serviço no momento.',
+              duration: 5000
+            });
+          }
+          
+          // Garantir que estamos lidando com arrays válidos
+          setProviders(matchingProviders || []);
+          setFilteredProviders(matchingProviders || []);
+        } catch (providerError: any) {
+          console.error('Erro específico ao buscar prestadores:', providerError);
+          
+          // Log adicional para debugging
+          if (providerError.code) {
+            console.error('Código de erro:', providerError.code);
+          }
+          if (providerError.details) {
+            console.error('Detalhes do erro:', providerError.details);
+          }
+          
+          throw new Error(`Falha ao encontrar prestadores: ${providerError.message}`);
         }
-        
-        setProviders(matchingProviders || []);
-        setFilteredProviders(matchingProviders || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao buscar prestadores:', error);
         
         // Exibir mensagem de erro específica
@@ -128,7 +143,7 @@ const ProvidersFound: React.FC = () => {
         
         toast({
           title: "Erro ao buscar prestadores",
-          description: "Não foi possível encontrar prestadores para seu orçamento.",
+          description: error.message || "Não foi possível encontrar prestadores para seu orçamento.",
           variant: "destructive",
         });
       } finally {

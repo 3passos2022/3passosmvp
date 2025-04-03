@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -29,23 +30,40 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Primeiro, vamos buscar todos os prestadores com seus serviços
     console.log('Buscando prestadores disponíveis...');
     
-    // Buscar todos os prestadores por uma abordagem mais direta
-    const { data: providers, error: providersError } = await supabase
-      .from('profiles')
-      .select('id, name, phone, role')
-      .eq('role', 'provider');
+    // Modificação: Usar RPC para evitar recursão infinita nas políticas RLS
+    const { data: providers, error: providersError } = await supabase.rpc(
+      'get_all_providers',
+      {}
+    );
 
     if (providersError) {
-      console.error('Erro ao buscar prestadores:', providersError);
-      return [];
+      console.error('Erro ao buscar prestadores via RPC:', providersError);
+      // Fallback: tentar busca direta sem RLS
+      try {
+        const { data: fallbackProviders, error: fallbackError } = await supabase
+          .from('profiles')
+          .select('id, name, phone, role')
+          .eq('role', 'provider');
+
+        if (fallbackError) {
+          console.error('Erro no fallback ao buscar prestadores:', fallbackError);
+          return [];
+        }
+
+        console.log(`Encontrados ${fallbackProviders?.length || 0} prestadores no fallback`);
+        providers = fallbackProviders;
+      } catch (fallbackException) {
+        console.error('Exceção no fallback ao buscar prestadores:', fallbackException);
+        return [];
+      }
     }
 
-    console.log(`Encontrados ${providers?.length || 0} prestadores no total`);
-    
     if (!providers || providers.length === 0) {
       console.log('Nenhum prestador encontrado no sistema');
       return [];
     }
+
+    console.log(`Encontrados ${providers?.length || 0} prestadores no total`);
 
     // Obter os IDs dos prestadores para uso nas próximas consultas
     const providerIds = providers.map(p => p.id);
@@ -230,11 +248,15 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         // Buscar avaliações do prestador
         let averageRating = 0;
         try {
-          const { count } = await supabase
+          const { count, error: countError } = await supabase
             .from('quote_providers')
             .select('*', { count: 'exact', head: true })
             .eq('provider_id', providerId);
             
+          if (countError) {
+            console.error('Erro ao contar orçamentos do prestador:', countError);
+          }
+          
           const numberOfQuotes = count || 0;
           
           // Aqui estamos apenas atribuindo uma classificação fictícia baseada no número de orçamentos
