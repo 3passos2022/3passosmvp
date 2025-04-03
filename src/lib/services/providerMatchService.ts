@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -30,8 +29,11 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     // Primeiro, vamos buscar todos os prestadores com seus serviços
     console.log('Buscando prestadores disponíveis...');
     
+    // Usar variáveis separadas para armazenar os resultados da busca
+    let allProviders = [];
+    
     // Modificação: Usar RPC para evitar recursão infinita nas políticas RLS
-    const { data: providers, error: providersError } = await supabase.rpc(
+    const { data: rpcProviders, error: providersError } = await supabase.rpc(
       'get_all_providers'
     );
 
@@ -50,23 +52,25 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         }
 
         console.log(`Encontrados ${fallbackProviders?.length || 0} prestadores no fallback`);
-        providers = fallbackProviders;
+        allProviders = fallbackProviders || [];
       } catch (fallbackException) {
         console.error('Exceção no fallback ao buscar prestadores:', fallbackException);
         return [];
       }
+    } else {
+      allProviders = rpcProviders || [];
     }
 
-    if (!providers || providers.length === 0) {
+    if (!allProviders || allProviders.length === 0) {
       console.log('Nenhum prestador encontrado no sistema');
       return [];
     }
 
-    console.log(`Encontrados ${providers?.length || 0} prestadores no total`);
+    console.log(`Encontrados ${allProviders.length || 0} prestadores no total`);
 
     // Obter os IDs dos prestadores para uso nas próximas consultas
     // Modificação: Extrair os IDs dos objetos JSON retornados pelo RPC
-    const providerIds = providers.map(p => {
+    const providerIds = allProviders.map(p => {
       // Verificar se é um objeto ou uma string JSON
       if (typeof p === 'string') {
         try {
@@ -107,14 +111,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       console.log('Serviços retornados da consulta:', providerServices);
     } catch (err) {
       console.error('Exceção ao buscar serviços dos prestadores:', err);
-      return [];
-    }
-
-    console.log(`Encontrados ${providerServices.length} serviços oferecidos por prestadores`);
-    console.log('Serviços encontrados:', providerServices);
-    
-    if (providerServices.length === 0) {
-      console.log('Nenhum serviço cadastrado para os prestadores');
       return [];
     }
 
@@ -174,9 +170,18 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     // Criar um mapa para acessar rapidamente os dados do prestador
     const providerMap = new Map();
-    providers.forEach(provider => {
+    allProviders.forEach(provider => {
       if (provider && provider.id) {
         providerMap.set(provider.id, provider);
+      } else if (typeof provider === 'string') {
+        try {
+          const parsedProvider = JSON.parse(provider);
+          if (parsedProvider && parsedProvider.id) {
+            providerMap.set(parsedProvider.id, parsedProvider);
+          }
+        } catch (e) {
+          console.error('Erro ao processar provider como string JSON:', e);
+        }
       }
     });
 

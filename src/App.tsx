@@ -13,10 +13,11 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import MakeAndreAdmin from "./pages/makeAndreAdmin";
+// Import ProvidersFound directly instead of lazy loading since it's causing issues
+import ProvidersFound from "./pages/ProvidersFound";
 
 // Lazy loaded pages for better performance
 const RequestQuote = lazy(() => import("./pages/RequestQuote"));
-const ProvidersFound = lazy(() => import("./pages/ProvidersFound"));
 const Services = lazy(() => import("./pages/Services"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Admin = lazy(() => import("./pages/Admin"));
