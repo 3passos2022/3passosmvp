@@ -173,19 +173,28 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       // Buscar avaliações do prestador
       let averageRating = 0;
       try {
-        // Verificar se o campo rating existe na tabela quotes
+        // Consultar se há avaliações (modificado para não usar mais o campo 'rating')
         const { data: ratings, error } = await supabase
           .from('quotes')
-          .select('rating')
+          .select('id')  // Removendo a referência ao campo 'rating'
           .eq('provider_id', providerId);
           
-        if (!error && ratings && ratings.length > 0) {
-          // Filtrar ratings que têm um valor válido
-          const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
+        if (!error && ratings) {
+          // Como não temos o campo rating, vamos simplesmente contar o número de orçamentos
+          // Idealmente, você deve adicionar um campo de rating na tabela quotes 
+          // ou criar uma tabela separada para avaliações
+          const numberOfQuotes = ratings.length;
           
-          if (validRatings.length > 0) {
-            const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
-            averageRating = sum / validRatings.length;
+          // Aqui estamos apenas atribuindo uma classificação fictícia baseada no número de orçamentos
+          // Esta é uma solução temporária até que você tenha uma tabela adequada para avaliações
+          if (numberOfQuotes > 10) {
+            averageRating = 4.5;
+          } else if (numberOfQuotes > 5) {
+            averageRating = 4.0;
+          } else if (numberOfQuotes > 0) {
+            averageRating = 3.5;
+          } else {
+            averageRating = 0; // Sem avaliações
           }
         }
       } catch (err) {
@@ -276,19 +285,24 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       console.error('Erro ao buscar portfólio:', portfolioError);
     }
 
-    // 3. Buscar avaliações do prestador
+    // 3. Buscar avaliações do prestador (modificado para não usar mais o campo 'rating')
     let averageRating = 0;
     try {
-      const { data: ratings, error: ratingError } = await supabase
+      const { data: quotes, error: quotesError } = await supabase
         .from('quotes')
-        .select('rating')
+        .select('id')  // Removendo a referência ao campo 'rating'
         .eq('provider_id', providerId);
 
-      if (!ratingError && ratings && ratings.length > 0) {
-        const validRatings = ratings.filter(r => r.rating !== null && r.rating !== undefined);
-        if (validRatings.length > 0) {
-          const sum = validRatings.reduce((acc, curr) => acc + (Number(curr.rating) || 0), 0);
-          averageRating = sum / validRatings.length;
+      if (!quotesError && quotes) {
+        // Atribuição de classificação fictícia baseada no número de orçamentos
+        const numberOfQuotes = quotes.length;
+        
+        if (numberOfQuotes > 10) {
+          averageRating = 4.5;
+        } else if (numberOfQuotes > 5) {
+          averageRating = 4.0;
+        } else if (numberOfQuotes > 0) {
+          averageRating = 3.5;
         }
       }
     } catch (err) {
