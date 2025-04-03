@@ -64,6 +64,14 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
           <div className={`text-${(distance !== null && providerData.hasAddress) ? 'right' : 'left'}`}>
             <p className="text-sm text-muted-foreground">Valor estimado:</p>
             <p className="font-bold text-lg text-primary">{formatCurrency(totalPrice)}</p>
+            
+            {/* Show if this is a calculated or default price */}
+            {totalPrice === 100 && provider.priceDetails?.length === 0 && (
+              <p className="text-xs text-muted-foreground">Valor base (aproximado)</p>
+            )}
+            {provider.priceDetails && provider.priceDetails.length > 0 && (
+              <p className="text-xs text-muted-foreground">Valor calculado</p>
+            )}
           </div>
         </div>
       </CardContent>

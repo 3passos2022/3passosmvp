@@ -1,11 +1,20 @@
 
 import { QuoteMeasurement } from '@/lib/types';
 
+export interface PriceDetail {
+  itemId: string;
+  quantity?: number;
+  area?: number;
+  pricePerUnit: number;
+  total: number;
+}
+
 export interface ProviderMatch {
   provider: ProviderProfile;
   distance: number | null;
   totalPrice: number;
   isWithinRadius: boolean;
+  priceDetails?: PriceDetail[];
 }
 
 export interface ProviderProfile {

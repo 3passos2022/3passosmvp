@@ -25,6 +25,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return [];
     }
     console.log('Client address:', quoteDetails.address);
+    console.log('Quote items:', quoteDetails.items);
+    console.log('Quote measurements:', quoteDetails.measurements);
 
     // Fetch all providers - we'll filter them later
     const { data: allProviders, error: providersError } = await supabase
@@ -75,6 +77,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     
     console.log('Provider item prices fetched:', providerItemPrices?.length || 0);
     
+    // Log all item prices for debugging
+    if (providerItemPrices && providerItemPrices.length > 0) {
+      console.log('Sample of provider item prices:');
+      providerItemPrices.slice(0, 5).forEach(price => {
+        console.log(`Provider ${price.provider_id}, Item ${price.item_id}: ${price.price_per_unit}`);
+      });
+    }
+    
     // Create map for item prices
     const itemPricesMap = new Map();
     if (providerItemPrices) {
@@ -92,9 +102,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       
     if (serviceItemsError) {
       console.error('Error fetching service items:', serviceItemsError);
+    } else if (serviceItems) {
+      console.log('Service items fetched:', serviceItems.length);
+      
+      // Log service items for debugging
+      serviceItems.forEach(item => {
+        console.log(`Service item: ${item.id}, ${item.name}, ${item.type}, Service: ${item.service_id}, SubService: ${item.sub_service_id}, Specialty: ${item.specialty_id}`);
+      });
     }
-    
-    console.log('Service items fetched:', serviceItems?.length || 0);
 
     // Fetch provider ratings
     const ratingsMap = new Map<string, number>();
@@ -164,63 +179,99 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           console.log(`Provider ${providerData.name}, distance: ${distance?.toFixed(2)}km, radius: ${serviceRadius}km, within radius: ${isWithinRadius}`);
           
           // If provider has defined radius and is not within it, skip
-          if (serviceRadius > 0 && !isWithinRadius) {
+          if (serviceRadius > 0 && !isWithinRadius && serviceRadius !== null) {
             console.log(`Provider ${providerData.name} is outside service radius. Distance: ${distance.toFixed(2)}km, radius: ${serviceRadius}km`);
             continue; // Skip this provider since they are outside their service radius
           }
         } else {
           console.log(`Provider ${providerData.name} has no coordinates or radius configuration`);
           distance = null;
+          // Still consider them as within radius if we cannot calculate distance
           isWithinRadius = true;
         }
         
         // Calculate price based on items and measurements
         let totalPrice = 0;
+        let priceDetails = [];
         
         // Add prices for each item if quantity is specified
-        if (quoteDetails.items && serviceItems) {
+        if (quoteDetails.items && serviceItems && Object.keys(quoteDetails.items).length > 0) {
           for (const itemId in quoteDetails.items) {
             const quantity = quoteDetails.items[itemId];
             const key = `${providerId}-${itemId}`;
-            const pricePerUnit = itemPricesMap.get(key) || 0;
-            
-            const itemTotal = pricePerUnit * quantity;
-            totalPrice += itemTotal;
-            
-            console.log(`Item ${itemId}: ${quantity} units × ${pricePerUnit} = ${itemTotal}`);
+            const pricePerUnit = itemPricesMap.get(key);
+
+            // Only log if there's an actual price for this item
+            if (pricePerUnit !== undefined) {
+              const itemTotal = pricePerUnit * quantity;
+              totalPrice += itemTotal;
+
+              console.log(`Provider ${providerData.name}: Item ${itemId}: ${quantity} units × ${pricePerUnit} = ${itemTotal}`);
+              priceDetails.push({
+                itemId,
+                quantity,
+                pricePerUnit,
+                total: itemTotal
+              });
+            } else {
+              console.log(`Provider ${providerData.name}: No price found for item ${itemId}`);
+            }
           }
+        } else {
+          console.log(`Provider ${providerData.name}: No items in quote or no service items found`);
         }
         
         // Add prices for measurements (square meters) if specified
-        if (quoteDetails.measurements && serviceItems) {
+        if (quoteDetails.measurements && quoteDetails.measurements.length > 0 && serviceItems) {
           // Find square meter items
           const squareMeterItems = serviceItems.filter(item => item.type === 'square_meter');
           
-          // Calculate total area from all measurements
-          let totalArea = 0;
-          for (const measurement of quoteDetails.measurements) {
-            const area = measurement.area || (measurement.width * measurement.length);
-            totalArea += area;
-          }
-          
-          // Apply area to each square meter item
-          for (const item of squareMeterItems) {
-            const key = `${providerId}-${item.id}`;
-            const pricePerUnit = itemPricesMap.get(key) || 0;
+          if (squareMeterItems.length > 0) {
+            console.log(`Provider ${providerData.name}: Found ${squareMeterItems.length} square meter items`);
             
-            const areaTotal = pricePerUnit * totalArea;
-            totalPrice += areaTotal;
+            // Calculate total area from all measurements
+            let totalArea = 0;
+            for (const measurement of quoteDetails.measurements) {
+              const area = measurement.area || (measurement.width * measurement.length);
+              totalArea += area;
+              console.log(`Measurement: ${measurement.roomName || 'Room'} - ${area} m²`);
+            }
             
-            console.log(`Square meter item ${item.id}: ${totalArea} m² × ${pricePerUnit} = ${areaTotal}`);
+            console.log(`Provider ${providerData.name}: Total area from measurements: ${totalArea} m²`);
+            
+            // Apply area to each square meter item
+            for (const item of squareMeterItems) {
+              const key = `${providerId}-${item.id}`;
+              const pricePerUnit = itemPricesMap.get(key);
+              
+              if (pricePerUnit !== undefined) {
+                const areaTotal = pricePerUnit * totalArea;
+                totalPrice += areaTotal;
+                
+                console.log(`Provider ${providerData.name}: Square meter item ${item.id}: ${totalArea} m² × ${pricePerUnit} = ${areaTotal}`);
+                priceDetails.push({
+                  itemId: item.id,
+                  area: totalArea,
+                  pricePerUnit,
+                  total: areaTotal
+                });
+              } else {
+                console.log(`Provider ${providerData.name}: No price found for square meter item ${item.id}`);
+              }
+            }
+          } else {
+            console.log(`Provider ${providerData.name}: No square meter items found for this service`);
           }
+        } else {
+          console.log(`Provider ${providerData.name}: No measurements in quote or no service items found`);
         }
         
         // If no items or measurements were calculated, set a default price
         if (totalPrice === 0) {
           totalPrice = 100; // Default price
-          console.log(`Using default price (${totalPrice}) for provider ${providerData.name}`);
+          console.log(`Using default price (${totalPrice}) for provider ${providerData.name} because no price could be calculated`);
         } else {
-          console.log(`Calculated price for provider ${providerData.name}: ${totalPrice}`);
+          console.log(`Calculated final price for provider ${providerData.name}: ${totalPrice}`);
         }
         
         // Get average rating from map
@@ -245,7 +296,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           provider,
           distance,
           totalPrice,
-          isWithinRadius
+          isWithinRadius,
+          priceDetails // Add price details for debugging
         });
         
         console.log(`Provider added: ${provider.name}, price: ${totalPrice}, distance: ${distance || 'unknown'}`);
@@ -303,6 +355,8 @@ const findMatchingProviders_ignoreRadius = async (quoteDetails: QuoteDetails): P
     if (!quoteDetails || !quoteDetails.serviceId) {
       return [];
     }
+
+    console.log("FALLBACK: Finding providers ignoring service radius");
 
     // Fetch all providers - we'll filter them later
     const { data: allProviders, error: providersError } = await supabase
@@ -389,15 +443,27 @@ const findMatchingProviders_ignoreRadius = async (quoteDetails: QuoteDetails): P
         
         // Calculate price based on items and measurements
         let totalPrice = 0;
+        let priceDetails = [];
         
         // Add prices for each item if quantity is specified
         if (quoteDetails.items && serviceItems) {
           for (const itemId in quoteDetails.items) {
             const quantity = quoteDetails.items[itemId];
             const key = `${providerId}-${itemId}`;
-            const pricePerUnit = itemPricesMap.get(key) || 0;
+            const pricePerUnit = itemPricesMap.get(key);
             
-            totalPrice += pricePerUnit * quantity;
+            if (pricePerUnit !== undefined) {
+              const itemTotal = pricePerUnit * quantity;
+              totalPrice += itemTotal;
+              
+              console.log(`FALLBACK: Provider ${providerData.name}: Item ${itemId}: ${quantity} units × ${pricePerUnit} = ${itemTotal}`);
+              priceDetails.push({
+                itemId,
+                quantity,
+                pricePerUnit,
+                total: itemTotal
+              });
+            }
           }
         }
         
@@ -406,19 +472,32 @@ const findMatchingProviders_ignoreRadius = async (quoteDetails: QuoteDetails): P
           // Find square meter items
           const squareMeterItems = serviceItems.filter(item => item.type === 'square_meter');
           
-          // Calculate total area from all measurements
-          let totalArea = 0;
-          for (const measurement of quoteDetails.measurements) {
-            const area = measurement.area || (measurement.width * measurement.length);
-            totalArea += area;
-          }
-          
-          // Apply area to each square meter item
-          for (const item of squareMeterItems) {
-            const key = `${providerId}-${item.id}`;
-            const pricePerUnit = itemPricesMap.get(key) || 0;
+          if (squareMeterItems.length > 0) {
+            // Calculate total area from all measurements
+            let totalArea = 0;
+            for (const measurement of quoteDetails.measurements) {
+              const area = measurement.area || (measurement.width * measurement.length);
+              totalArea += area;
+            }
             
-            totalPrice += pricePerUnit * totalArea;
+            // Apply area to each square meter item
+            for (const item of squareMeterItems) {
+              const key = `${providerId}-${item.id}`;
+              const pricePerUnit = itemPricesMap.get(key);
+              
+              if (pricePerUnit !== undefined) {
+                const areaTotal = pricePerUnit * totalArea;
+                totalPrice += areaTotal;
+                
+                console.log(`FALLBACK: Provider ${providerData.name}: Square meter item ${item.id}: ${totalArea} m² × ${pricePerUnit} = ${areaTotal}`);
+                priceDetails.push({
+                  itemId: item.id,
+                  area: totalArea,
+                  pricePerUnit,
+                  total: areaTotal
+                });
+              }
+            }
           }
         }
         
@@ -448,7 +527,8 @@ const findMatchingProviders_ignoreRadius = async (quoteDetails: QuoteDetails): P
           provider,
           distance,
           totalPrice,
-          isWithinRadius: false // All are marked as outside radius in fallback
+          isWithinRadius: false, // All are marked as outside radius in fallback
+          priceDetails // Add price details for debugging
         });
       } catch (providerError) {
         console.error('Error processing provider in fallback:', providerError);
