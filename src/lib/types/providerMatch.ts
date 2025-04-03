@@ -43,11 +43,11 @@ export interface ProviderDetails {
 export interface QuoteDetails {
   id?: string;
   serviceId: string;
-  subServiceId: string;
-  specialtyId: string;
+  subServiceId?: string;
+  specialtyId?: string;
   serviceName: string;
-  subServiceName: string;
-  specialtyName: string;
+  subServiceName?: string;
+  specialtyName?: string;
   items?: Record<string, number>;
   measurements?: QuoteMeasurement[];
   address: {

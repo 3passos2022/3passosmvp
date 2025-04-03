@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
+import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty, ProviderRating } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
 
 // Função para encontrar prestadores que atendem aos critérios
@@ -14,10 +13,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     console.log('Iniciando busca de prestadores com detalhes:', {
       serviceId: quoteDetails.serviceId,
       serviceName: quoteDetails.serviceName,
-      subServiceId: quoteDetails.subServiceId,
-      subServiceName: quoteDetails.subServiceName,
-      specialtyId: quoteDetails.specialtyId,
-      specialtyName: quoteDetails.specialtyName
+      subServiceId: quoteDetails.subServiceId || 'não especificado',
+      subServiceName: quoteDetails.subServiceName || 'não especificado',
+      specialtyId: quoteDetails.specialtyId || 'não especificado',
+      specialtyName: quoteDetails.specialtyName || 'não especificado'
     });
     
     if (!quoteDetails.address) {
@@ -58,22 +57,26 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       }
     }
     
-    // Buscar serviços prestados para a especialidade solicitada
-    console.log(`Buscando serviços com specialty_id=${quoteDetails.specialtyId}`);
-    const { data: specialtyServices, error: specialtyError } = await supabase
-      .from('provider_services')
-      .select('*')
-      .eq('specialty_id', quoteDetails.specialtyId);
-      
-    if (specialtyError) {
-      console.error('Erro ao buscar serviços para especialidade:', specialtyError);
-      return [];
+    // Array para armazenar todos os serviços compatíveis
+    let matchingServices = [];
+    
+    // Buscar serviços prestados para a especialidade solicitada (se existir)
+    if (quoteDetails.specialtyId) {
+      console.log(`Buscando serviços com specialty_id=${quoteDetails.specialtyId}`);
+      const { data: specialtyServices, error: specialtyError } = await supabase
+        .from('provider_services')
+        .select('*')
+        .eq('specialty_id', quoteDetails.specialtyId);
+        
+      if (specialtyError) {
+        console.error('Erro ao buscar serviços para especialidade:', specialtyError);
+      } else if (specialtyServices && specialtyServices.length > 0) {
+        console.log('Serviços encontrados para a especialidade:', specialtyServices.length);
+        matchingServices = specialtyServices;
+      }
     }
     
-    console.log('Serviços encontrados para a especialidade:', specialtyServices?.length || 0);
-    
     // Se não encontrou para especialidade, tentar para o subserviço
-    let matchingServices = specialtyServices || [];
     if (!matchingServices.length && quoteDetails.subServiceId) {
       console.log(`Buscando serviços com specialty_id=${quoteDetails.subServiceId} (subserviço)`);
       const { data: subServiceMatches, error: subServiceError } = await supabase
@@ -83,11 +86,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
       if (subServiceError) {
         console.error('Erro ao buscar serviços para subserviço:', subServiceError);
-      } else {
-        console.log('Serviços encontrados para subserviço:', subServiceMatches?.length || 0);
-        if (subServiceMatches && subServiceMatches.length > 0) {
-          matchingServices = subServiceMatches;
-        }
+      } else if (subServiceMatches && subServiceMatches.length > 0) {
+        console.log('Serviços encontrados para subserviço:', subServiceMatches.length);
+        matchingServices = subServiceMatches;
       }
     }
     
@@ -101,11 +102,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
       if (serviceError) {
         console.error('Erro ao buscar serviços para serviço principal:', serviceError);
-      } else {
-        console.log('Serviços encontrados para serviço principal:', serviceMatches?.length || 0);
-        if (serviceMatches && serviceMatches.length > 0) {
-          matchingServices = serviceMatches;
-        }
+      } else if (serviceMatches && serviceMatches.length > 0) {
+        console.log('Serviços encontrados para serviço principal:', serviceMatches.length);
+        matchingServices = serviceMatches;
       }
     }
     
@@ -151,27 +150,19 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         });
       }
 
-      // Buscar avaliações dos prestadores
-      const { data: providerRatings, error: ratingsError } = await supabase
-        .from('provider_ratings')
-        .select('provider_id, rating')
-        .in('provider_id', providerIds);
+      // Buscar avaliações dos prestadores usando a função RPC
+      const ratingsMap = new Map<string, number>();
+      for (const providerId of providerIds) {
+        const { data: avgRating, error: ratingError } = await supabase.rpc(
+          'get_provider_average_rating',
+          { p_provider_id: providerId }
+        );
         
-      if (ratingsError) {
-        console.error('Erro ao buscar avaliações dos prestadores:', ratingsError);
-      }
-      
-      // Calcular média de avaliações por prestador
-      const ratingsMap = new Map<string, {sum: number, count: number}>();
-      if (providerRatings && providerRatings.length > 0) {
-        providerRatings.forEach(rating => {
-          if (!ratingsMap.has(rating.provider_id)) {
-            ratingsMap.set(rating.provider_id, {sum: 0, count: 0});
-          }
-          const current = ratingsMap.get(rating.provider_id)!;
-          current.sum += rating.rating;
-          current.count += 1;
-        });
+        if (ratingError) {
+          console.error(`Erro ao buscar avaliação média do prestador ${providerId}:`, ratingError);
+        } else {
+          ratingsMap.set(providerId, avgRating || 0);
+        }
       }
 
       // Geocodificar o endereço do cliente
@@ -262,14 +253,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           // Calcular preço básico para o serviço
           let totalPrice = service.base_price || 0;
           
-          // Calcular média de avaliações
-          let averageRating = 0;
-          if (ratingsMap.has(providerId)) {
-            const ratings = ratingsMap.get(providerId)!;
-            if (ratings.count > 0) {
-              averageRating = ratings.sum / ratings.count;
-            }
-          }
+          // Obter média de avaliações do mapa
+          const averageRating = ratingsMap.get(providerId) || 0;
           
           // Criar objeto ProviderProfile
           const provider: ProviderProfile = {
@@ -377,22 +362,18 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       console.error('Erro ao buscar portfólio:', portfolioError);
     }
 
-    // Buscar avaliações do prestador
-    const { data: ratings, error: ratingsError } = await supabase
-      .from('provider_ratings')
-      .select('rating')
-      .eq('provider_id', providerId);
-      
-    if (ratingsError) {
-      console.error('Erro ao buscar avaliações:', ratingsError);
+    // Buscar avaliações do prestador via RPC function
+    const { data: avgRating, error: ratingError } = await supabase.rpc(
+      'get_provider_average_rating',
+      { p_provider_id: providerId }
+    );
+    
+    if (ratingError) {
+      console.error('Erro ao buscar avaliações:', ratingError);
     }
     
-    // Calcular média de avaliação
-    let averageRating = 0;
-    if (ratings && ratings.length > 0) {
-      const sum = ratings.reduce((acc, curr) => acc + curr.rating, 0);
-      averageRating = sum / ratings.length;
-    }
+    // Usar a nota média obtida da função RPC
+    const averageRating = avgRating || 0;
 
     // Criar explicitamente um objeto ProviderProfile para evitar problemas de tipagem
     const providerProfile: ProviderProfile = {

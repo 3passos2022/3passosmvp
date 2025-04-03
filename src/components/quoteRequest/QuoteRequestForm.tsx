@@ -296,8 +296,8 @@ const ServiceStep: React.FC<{
     }
     
     const serviceName = services.find(s => s.id === selectedService)?.name;
-    const subServiceName = subServices.find(s => s.id === selectedSubService)?.name;
-    const specialtyName = specialties.find(s => s.id === selectedSpecialty)?.name;
+    const subServiceName = selectedSubService ? subServices.find(s => s.id === selectedSubService)?.name : undefined;
+    const specialtyName = selectedSpecialty ? specialties.find(s => s.id === selectedSpecialty)?.name : undefined;
     
     console.log('Seleções do usuário:',  {
       serviceId: selectedService,
@@ -588,7 +588,7 @@ const ServiceDetailsStep: React.FC<{
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (detailsSubStep === 'quiz' && !allQuestionsAnswered) {
+    if (detailsSubStep === 'quiz' && questions.length > 0 && !allQuestionsAnswered) {
       toast.error('Por favor, responda todas as perguntas');
       return;
     }
@@ -948,8 +948,8 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       console.log("Enviando dados de cotação via RPC...");
       console.log("Dados que serão enviados:", {
         service_id: formData.serviceId,
-        sub_service_id: formData.subServiceId,
-        specialty_id: formData.specialtyId,
+        sub_service_id: formData.subServiceId || null,
+        specialty_id: formData.specialtyId || null,
         description: formData.description,
         address: {
           street: formData.street, 
@@ -964,7 +964,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       });
       
       const { data: quoteId, error } = await supabase.rpc(
-        "submit_quote" as any,
+        "submit_quote",
         {
           p_service_id: formData.serviceId,
           p_sub_service_id: formData.subServiceId || null,
