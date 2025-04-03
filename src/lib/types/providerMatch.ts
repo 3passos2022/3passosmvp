@@ -3,6 +3,7 @@ import { QuoteMeasurement } from '@/lib/types';
 
 export interface PriceDetail {
   itemId: string;
+  itemName?: string; // Added item name for better debugging
   quantity?: number;
   area?: number;
   pricePerUnit: number;
@@ -28,6 +29,7 @@ export interface ProviderProfile {
   neighborhood?: string;
   relevanceScore?: number;
   hasAddress?: boolean;
+  serviceRadiusKm?: number; // Added to track provider's service radius
 }
 
 export interface ProviderSpecialty {
@@ -47,6 +49,7 @@ export interface ProviderDetails {
   distance: number | null;
   totalPrice: number;
   isWithinRadius: boolean;
+  priceDetails?: PriceDetail[]; // Added to ProviderDetails
 }
 
 export interface QuoteDetails {
