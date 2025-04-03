@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -27,62 +28,90 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
     console.log('Buscando prestadores disponíveis...');
     
-    // Primeiro buscar diretamente os serviços oferecidos por prestadores que correspondem à especialidade
-    console.log(`Buscando serviços com specialty_id=${quoteDetails.specialtyId}`);
-    const { data: matchingServices, error: servicesError } = await supabase
-      .from('provider_services')
-      .select('*, profiles:provider_id(*)')
-      .eq('specialty_id', quoteDetails.specialtyId);
+    // Buscar todos os prestadores usando a função de segurança que evita a recursão
+    const { data: allProviders, error: providersError } = await supabase
+      .rpc('get_all_providers');
       
-    if (servicesError) {
-      console.error('Erro ao buscar serviços compatíveis:', servicesError);
+    if (providersError) {
+      console.error('Erro ao buscar lista de prestadores:', providersError);
       return [];
     }
-
-    console.log('Serviços encontrados para a especialidade:', matchingServices?.length || 0);
-    console.log('Serviços:', matchingServices);
     
-    if (!matchingServices || matchingServices.length === 0) {
-      console.log('Nenhum serviço compatível encontrado para a especialidade. Tentando subserviço...');
+    console.log('Total de prestadores disponíveis:', allProviders?.length);
+    
+    // Buscar serviços prestados para a especialidade solicitada
+    console.log(`Buscando serviços com specialty_id=${quoteDetails.specialtyId}`);
+    const { data: specialtyServices, error: specialtyError } = await supabase
+      .from('provider_services')
+      .select('*')
+      .eq('specialty_id', quoteDetails.specialtyId);
       
-      // Tentar encontrar prestadores para o subserviço
+    if (specialtyError) {
+      console.error('Erro ao buscar serviços para especialidade:', specialtyError);
+      return [];
+    }
+    
+    console.log('Serviços encontrados para a especialidade:', specialtyServices?.length || 0);
+    
+    // Se não encontrou para especialidade, tentar para o subserviço
+    let matchingServices = specialtyServices || [];
+    if (!matchingServices.length && quoteDetails.subServiceId) {
+      console.log(`Buscando serviços com specialty_id=${quoteDetails.subServiceId} (subserviço)`);
       const { data: subServiceMatches, error: subServiceError } = await supabase
         .from('provider_services')
-        .select('*, profiles:provider_id(*)')
+        .select('*')
         .eq('specialty_id', quoteDetails.subServiceId);
         
       if (subServiceError) {
         console.error('Erro ao buscar serviços para subserviço:', subServiceError);
-      } else if (subServiceMatches && subServiceMatches.length > 0) {
-        console.log('Serviços encontrados para subserviço:', subServiceMatches.length);
-        matchingServices.push(...subServiceMatches);
       } else {
-        console.log('Tentando encontrar prestadores para o serviço principal...');
-        
-        // Tentar encontrar prestadores para o serviço principal
-        const { data: serviceMatches, error: serviceError } = await supabase
-          .from('provider_services')
-          .select('*, profiles:provider_id(*)')
-          .eq('specialty_id', quoteDetails.serviceId);
-          
-        if (serviceError) {
-          console.error('Erro ao buscar serviços para serviço principal:', serviceError);
-        } else if (serviceMatches && serviceMatches.length > 0) {
-          console.log('Serviços encontrados para serviço principal:', serviceMatches.length);
-          matchingServices.push(...serviceMatches);
+        console.log('Serviços encontrados para subserviço:', subServiceMatches?.length || 0);
+        if (subServiceMatches && subServiceMatches.length > 0) {
+          matchingServices = subServiceMatches;
         }
       }
     }
     
-    if (!matchingServices || matchingServices.length === 0) {
+    // Se ainda não encontrou, tentar para o serviço principal
+    if (!matchingServices.length && quoteDetails.serviceId) {
+      console.log(`Buscando serviços com specialty_id=${quoteDetails.serviceId} (serviço principal)`);
+      const { data: serviceMatches, error: serviceError } = await supabase
+        .from('provider_services')
+        .select('*')
+        .eq('specialty_id', quoteDetails.serviceId);
+        
+      if (serviceError) {
+        console.error('Erro ao buscar serviços para serviço principal:', serviceError);
+      } else {
+        console.log('Serviços encontrados para serviço principal:', serviceMatches?.length || 0);
+        if (serviceMatches && serviceMatches.length > 0) {
+          matchingServices = serviceMatches;
+        }
+      }
+    }
+    
+    console.log('Total de serviços compatíveis encontrados:', matchingServices.length);
+    
+    if (!matchingServices.length) {
       console.log('Não foi encontrado nenhum prestador compatível');
       return [];
     }
     
-    // Buscar configurações dos prestadores para verificar localização
+    // Lista de IDs de prestadores encontrados
     const providerIds = matchingServices.map(service => service.provider_id);
     console.log('IDs dos prestadores encontrados:', providerIds);
     
+    // Filtrar prestadores pelo ID e criar um mapa para acesso rápido
+    const providersMap = new Map();
+    allProviders.forEach(provider => {
+      if (providerIds.includes(provider.id)) {
+        providersMap.set(provider.id, provider);
+      }
+    });
+    
+    console.log('Prestadores mapeados:', providersMap.size);
+    
+    // Buscar configurações dos prestadores
     const { data: providerSettings, error: settingsError } = await supabase
       .from('provider_settings')
       .select('*')
@@ -92,9 +121,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       console.error('Erro ao buscar configurações dos prestadores:', settingsError);
     }
     
-    console.log('Configurações dos prestadores:', providerSettings);
+    console.log('Configurações dos prestadores:', providerSettings?.length || 0);
     
-    // Criar mapas para acesso rápido
+    // Criar mapa para configurações
     const settingsMap = new Map();
     if (providerSettings) {
       providerSettings.forEach(settings => {
@@ -132,14 +161,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     for (const service of matchingServices) {
       try {
         const providerId = service.provider_id;
-        const providerProfile = service.profiles;
+        const providerData = providersMap.get(providerId);
         
-        if (!providerId || !providerProfile) {
-          console.log('Serviço sem provider_id ou perfil válido:', service);
+        if (!providerId || !providerData) {
+          console.log('Serviço sem provider_id ou dados de prestador válidos');
           continue;
         }
         
-        console.log('Processando prestador:', providerProfile.name, 'ID:', providerId);
+        console.log('Processando prestador:', providerData.name, 'ID:', providerId);
         
         const settings = settingsMap.get(providerId);
         
@@ -172,9 +201,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           const serviceRadius = settings?.service_radius_km || 0;
           isWithinRadius = serviceRadius === 0 || distance <= serviceRadius;
           
-          console.log(`Prestador ${providerProfile.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
+          console.log(`Prestador ${providerData.name}, distância: ${distance.toFixed(2)}km, raio: ${serviceRadius}km, dentro do raio: ${isWithinRadius}`);
         } else {
-          console.log(`Prestador ${providerProfile.name} não possui coordenadas ou configuração de raio`);
+          console.log(`Prestador ${providerData.name} não possui coordenadas ou configuração de raio`);
           // Se o prestador não tem localização configurada, considerar que ele atende todo o Brasil
           isWithinRadius = true;
           distance = 0;
@@ -195,8 +224,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           bio: settings?.bio || '',
           averageRating: averageRating,
           specialties: [], // Será preenchido se necessário
-          name: providerProfile.name || 'Sem nome',
-          phone: providerProfile.phone || '',
+          name: providerData.name || 'Sem nome',
+          phone: providerData.phone || '',
           city: settings?.city || '',
           neighborhood: settings?.neighborhood || '',
           relevanceScore: relevanceScore
@@ -247,15 +276,20 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 // Função para obter detalhes completos de um prestador
 export const getProviderDetails = async (providerId: string): Promise<ProviderDetails | null> => {
   try {
-    // 1. Buscar informações básicas do prestador
-    const { data: provider, error: providerError } = await supabase
-      .from('profiles')
-      .select('id, name, phone')
-      .eq('id', providerId)
-      .single();
+    // Usar a função de segurança para obter o prestador específico
+    const { data: allProviders, error: providersError } = await supabase
+      .rpc('get_all_providers');
 
-    if (providerError || !provider) {
-      console.error('Erro ao buscar detalhes do prestador:', providerError);
+    if (providersError) {
+      console.error('Erro ao buscar prestadores:', providersError);
+      return null;
+    }
+    
+    // Encontrar o prestador específico
+    const provider = allProviders.find(p => p.id === providerId);
+    
+    if (!provider) {
+      console.error('Prestador não encontrado:', providerId);
       return null;
     }
 
@@ -270,7 +304,7 @@ export const getProviderDetails = async (providerId: string): Promise<ProviderDe
       console.error('Erro ao buscar configurações do prestador:', settingsError);
     }
 
-    // 2. Buscar portfólio do prestador
+    // Buscar portfólio do prestador
     const { data: portfolio, error: portfolioError } = await supabase
       .from('provider_portfolio')
       .select('id, image_url, description')
