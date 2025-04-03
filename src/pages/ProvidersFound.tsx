@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,7 +27,7 @@ const ProvidersFound: React.FC = () => {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
-  const [currentFilter, setCurrentFilter] = useState<FilterOption>('');
+  const [currentFilter, setCurrentFilter] = useState<FilterOption>('relevance');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const googleMapsApiKey = 'AIzaSyCz60dsmYx6T6qHNCs1OZtA7suJGA7xVW8';
@@ -157,12 +156,8 @@ const ProvidersFound: React.FC = () => {
   const handleFilterChange = (filter: FilterOption) => {
     setCurrentFilter(filter);
     
-    if (!filter || !providers.length) {
-      setFilteredProviders([...providers].sort((a, b) => {
-        if (a.isWithinRadius && !b.isWithinRadius) return -1;
-        if (!a.isWithinRadius && b.isWithinRadius) return 1;
-        return a.distance - b.distance;
-      }));
+    if (!providers.length) {
+      setFilteredProviders([]);
       return;
     }
     
@@ -177,6 +172,22 @@ const ProvidersFound: React.FC = () => {
         break;
       case 'rating':
         sorted = sorted.sort((a, b) => b.provider.averageRating - a.provider.averageRating);
+        break;
+      case 'relevance':
+      default:
+        sorted = sorted.sort((a, b) => {
+          if (a.isWithinRadius && !b.isWithinRadius) return -1;
+          if (!a.isWithinRadius && b.isWithinRadius) return 1;
+          
+          // Sort by relevance score if present
+          const relevanceA = a.provider.relevanceScore || 0;
+          const relevanceB = b.provider.relevanceScore || 0;
+          if (relevanceA !== relevanceB) {
+            return relevanceB - relevanceA;  // Higher score first
+          }
+          
+          return a.distance - b.distance;
+        });
         break;
     }
     

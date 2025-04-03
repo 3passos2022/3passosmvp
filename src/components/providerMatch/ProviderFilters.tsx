@@ -8,7 +8,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 
-export type FilterOption = 'distance' | 'price' | 'rating' | '';
+export type FilterOption = 'distance' | 'price' | 'rating' | 'relevance';
 
 interface ProviderFiltersProps {
   onFilterChange: (filter: FilterOption) => void;
@@ -27,7 +27,7 @@ const ProviderFilters: React.FC<ProviderFiltersProps> = ({ onFilterChange, curre
           <SelectValue placeholder="Selecione um filtro" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Relevância</SelectItem>
+          <SelectItem value="relevance">Relevância</SelectItem>
           <SelectItem value="distance">Distância</SelectItem>
           <SelectItem value="price">Preço</SelectItem>
           <SelectItem value="rating">Avaliação</SelectItem>
