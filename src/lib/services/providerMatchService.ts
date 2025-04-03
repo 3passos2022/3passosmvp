@@ -202,6 +202,13 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           console.log(`Provider ${providerData.name} has no coordinates or radius configuration`);
         }
         
+        // If provider has set a service radius and client is outside of it,
+        // don't include this provider in the results
+        if (serviceRadiusKm > 0 && !isWithinRadius) {
+          console.log(`Provider ${providerData.name} is outside of service radius - NOT adding to results`);
+          continue; // Skip to next provider
+        }
+        
         // Calculate price based on items and measurements
         let totalPrice = 0;
         const priceDetails: PriceDetail[] = [];
@@ -321,23 +328,80 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           provider,
           distance,
           totalPrice,
-          isWithinRadius,
+          isWithinRadius: true, // Only providers within radius are included now
           priceDetails
         });
         
-        console.log(`Provider added: ${provider.name}, price: ${totalPrice.toFixed(2)}, distance: ${distance?.toFixed(2) || 'unknown'}, within radius: ${isWithinRadius}`);
+        console.log(`Provider added: ${provider.name}, price: ${totalPrice.toFixed(2)}, distance: ${distance?.toFixed(2) || 'unknown'}, within radius: true`);
       } catch (providerError) {
         console.error('Error processing provider:', providerError);
       }
     }
 
     console.log(`Found ${matchedProviders.length} compatible providers total`);
-    console.log(`Providers within radius: ${matchedProviders.filter(p => p.isWithinRadius).length}`);
 
     if (matchedProviders.length === 0) {
-      console.log('No providers found within service radius, showing all providers as fallback');
-      // Do not return anything in this case - empty array is fine
-      return [];
+      console.log('No providers found within service radius');
+      
+      // As a fallback, also consider providers that don't have a service radius set
+      // or don't have coordinates set up correctly
+      for (const providerData of allProviders) {
+        try {
+          const providerId = providerData.id;
+          const settings = settingsMap.get(providerId);
+          
+          // Skip providers that have both coordinates and service radius but are out of range
+          // (those were already filtered out above)
+          if (settings && settings.latitude && settings.longitude && clientLocation && 
+              settings.service_radius_km && settings.service_radius_km > 0) {
+            continue;
+          }
+          
+          let distance = null;
+          if (settings && settings.latitude && settings.longitude && clientLocation) {
+            distance = calculateDistance(
+              clientLocation.lat, 
+              clientLocation.lng, 
+              settings.latitude, 
+              settings.longitude
+            );
+          }
+          
+          // Use a default price
+          const totalPrice = 100;
+          
+          // Get average rating
+          const averageRating = ratingsMap.get(providerId) || 0;
+          
+          // Create ProviderProfile object
+          const provider: ProviderProfile = {
+            userId: providerId,
+            bio: settings?.bio || '',
+            averageRating,
+            specialties: [],
+            name: providerData.name || 'No name',
+            phone: providerData.phone || '',
+            city: settings?.city || '',
+            neighborhood: settings?.neighborhood || '',
+            relevanceScore: 0,
+            hasAddress: !!(settings?.latitude && settings?.longitude),
+            serviceRadiusKm: settings?.service_radius_km || 0
+          };
+          
+          // Add to list with a flag that it's outside service radius
+          matchedProviders.push({
+            provider,
+            distance,
+            totalPrice,
+            isWithinRadius: false,
+            priceDetails: []
+          });
+          
+          console.log(`Fallback provider added: ${provider.name}, default price: ${totalPrice}, distance: ${distance?.toFixed(2) || 'unknown'}, within radius: false`);
+        } catch (error) {
+          console.error('Error processing fallback provider:', error);
+        }
+      }
     }
 
     // Sort: first those within radius and by relevance, then the others
@@ -367,7 +431,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     });
 
     console.log(`Returning ${matchedProviders.length} providers, ${matchedProviders.filter(p => p.isWithinRadius).length} within radius`);
-    console.log('Provider details:', JSON.stringify(matchedProviders, null, 2));
+    console.log('First provider details:', matchedProviders.length > 0 ? JSON.stringify(matchedProviders[0], null, 2) : 'No providers');
     return matchedProviders;
   } catch (error) {
     console.error('Error finding matching providers:', error);

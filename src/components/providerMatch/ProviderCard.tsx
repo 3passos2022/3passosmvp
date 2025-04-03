@@ -14,6 +14,10 @@ interface ProviderCardProps {
 const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) => {
   const { provider: providerData, distance, totalPrice, isWithinRadius, priceDetails = [] } = provider;
   
+  // Debug the price information
+  console.log(`Provider ${providerData.name} price details:`, priceDetails);
+  console.log(`Provider ${providerData.name} total price:`, totalPrice);
+  
   // Helper function to display price breakdown
   const renderPriceBreakdown = () => {
     if (!priceDetails || priceDetails.length === 0) {
@@ -67,7 +71,11 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
         {!isWithinRadius && (
           <div className="mb-3 p-2 bg-amber-50 rounded-md flex items-center gap-1 text-amber-600">
             <AlertTriangle className="h-4 w-4" />
-            <span className="text-xs">Este prestador está fora do seu raio de cobertura {providerData.serviceRadiusKm > 0 ? `(raio: ${providerData.serviceRadiusKm}km)` : ''}</span>
+            <span className="text-xs">
+              Este prestador está fora do seu raio de cobertura
+              {providerData.serviceRadiusKm > 0 ? ` (raio: ${providerData.serviceRadiusKm}km)` : ''}
+              {distance !== null ? ` - distância: ${distance.toFixed(1)}km` : ''}
+            </span>
           </div>
         )}
         
@@ -83,7 +91,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
           
           <div className={`text-${(distance !== null && providerData.hasAddress) ? 'right' : 'left'}`}>
             <p className="text-sm text-muted-foreground">Valor estimado:</p>
-            <p className="font-bold text-lg text-primary">{formatCurrency(totalPrice)}</p>
+            <p className="font-bold text-lg text-primary">{formatCurrency(totalPrice || 0)}</p>
             {renderPriceBreakdown()}
           </div>
         </div>
@@ -100,7 +108,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
                     {detail.quantity ? ` (${detail.quantity}x)` : ''}
                     {detail.area ? ` (${detail.area.toFixed(1)} m²)` : ''}
                   </span>
-                  <span>{formatCurrency(detail.total)}</span>
+                  <span>{formatCurrency(detail.total || 0)}</span>
                 </div>
               ))}
             </div>
