@@ -39,23 +39,28 @@ const ProvidersFound: React.FC = () => {
       setErrorMessage(null);
       
       try {
+        console.log('Starting to load quote details from location state or sessionStorage');
+        
         if (location.state?.quoteDetails) {
-          console.log('Detalhes do orçamento encontrados no state:', location.state.quoteDetails);
+          console.log('Quote details found in router state:', location.state.quoteDetails);
           setQuoteDetails(location.state.quoteDetails);
           return;
         }
         
         const storedQuote = sessionStorage.getItem('currentQuote');
         if (storedQuote) {
-          console.log('Detalhes do orçamento encontrados no sessionStorage');
+          console.log('Quote details found in sessionStorage');
           try {
             const parsedQuote = JSON.parse(storedQuote);
+            console.log('Parsed quote from sessionStorage:', parsedQuote);
             setQuoteDetails(parsedQuote);
             return;
           } catch (parseError) {
-            console.error('Erro ao parsear orçamento do sessionStorage:', parseError);
-            // Continuar para mensagem de erro
+            console.error('Error parsing quote from sessionStorage:', parseError);
+            // Continue to error message
           }
+        } else {
+          console.error('No quote details found in sessionStorage');
         }
         
         toast({
@@ -66,7 +71,7 @@ const ProvidersFound: React.FC = () => {
         
         navigate('/request-quote');
       } catch (error) {
-        console.error('Erro ao carregar detalhes do orçamento:', error);
+        console.error('Error loading quote details:', error);
         setErrorMessage("Erro ao carregar detalhes do orçamento");
         
         toast({
@@ -94,12 +99,10 @@ const ProvidersFound: React.FC = () => {
       console.log('Searching providers for quote:', quoteDetails);
       
       try {
-        // Verify service IDs for debugging
-        console.log(`Searching providers for: 
-          Service: ${quoteDetails.serviceName} (${quoteDetails.serviceId})
-          Subservice: ${quoteDetails.subServiceName || 'None'} (${quoteDetails.subServiceId || 'None'})
-          Specialty: ${quoteDetails.specialtyName || 'None'} (${quoteDetails.specialtyId || 'None'})
-        `);
+        console.log('Starting provider search with quote details');
+        console.log(`Service: ${quoteDetails.serviceName} (${quoteDetails.serviceId})`);
+        console.log(`Subservice: ${quoteDetails.subServiceName || 'None'} (${quoteDetails.subServiceId || 'None'})`);
+        console.log(`Specialty: ${quoteDetails.specialtyName || 'None'} (${quoteDetails.specialtyId || 'None'})`);
         
         // Validate quote data
         if (!quoteDetails.serviceId) {
@@ -108,20 +111,27 @@ const ProvidersFound: React.FC = () => {
         
         // Search for all available providers with improved error handling
         try {
+          console.log('Calling findMatchingProviders with quote details');
           const matchingProviders = await findMatchingProviders(quoteDetails);
-          console.log('Providers found:', matchingProviders);
+          console.log('Providers found:', matchingProviders?.length || 0);
           
           if (!matchingProviders || matchingProviders.length === 0) {
+            console.warn('No providers found for the given criteria');
             sonnerToast.warning('No providers found', {
               description: 'We couldn\'t find providers for this service at the moment. We\'re working on adding more providers.',
               duration: 5000
             });
+          } else {
+            console.log('Matched providers sample:');
+            matchingProviders.slice(0, 2).forEach((provider, index) => {
+              console.log(`[${index + 1}] ${provider.provider.name}: price=${provider.totalPrice}, distance=${provider.distance}, within radius=${provider.isWithinRadius}`);
+            });
           }
           
-          // Store all providers, including those outside service radius
+          // Store all providers
           setProviders(matchingProviders || []);
           
-          // Apply initial filter
+          // Apply initial filter to all providers (even if empty)
           handleFilterChange('relevance', matchingProviders || []);
         } catch (providerError: any) {
           console.error('Specific error when searching providers:', providerError);
@@ -140,11 +150,11 @@ const ProvidersFound: React.FC = () => {
         console.error('Error searching for providers:', error);
         
         // Show specific error message
-        setErrorMessage("Couldn't find providers. Please check your connection and try again.");
+        setErrorMessage("Não foi possível encontrar prestadores. Por favor, verifique sua conexão e tente novamente.");
         
         toast({
-          title: "Error searching for providers",
-          description: error.message || "Couldn't find providers for your quote.",
+          title: "Erro ao buscar prestadores",
+          description: error.message || "Não foi possível encontrar prestadores para seu orçamento.",
           variant: "destructive",
         });
       } finally {
@@ -206,6 +216,7 @@ const ProvidersFound: React.FC = () => {
         break;
     }
     
+    console.log(`Applied filter '${filter}', showing ${sorted.length} providers`);
     setFilteredProviders(sorted);
   };
   
@@ -252,6 +263,7 @@ const ProvidersFound: React.FC = () => {
             details.distance = originalProvider.distance;
             details.totalPrice = originalProvider.totalPrice;
             details.isWithinRadius = originalProvider.isWithinRadius;
+            details.priceDetails = originalProvider.priceDetails;
           }
           
           setSelectedProvider(details);
@@ -276,7 +288,7 @@ const ProvidersFound: React.FC = () => {
     if (errorMessage) {
       return (
         <div className="text-center py-10">
-          <h3 className="text-xl font-semibold mb-2">Error</h3>
+          <h3 className="text-xl font-semibold mb-2">Erro</h3>
           <p className="text-muted-foreground">{errorMessage}</p>
         </div>
       );
@@ -285,10 +297,10 @@ const ProvidersFound: React.FC = () => {
     if (providers.length === 0) {
       return (
         <div className="text-center py-10">
-          <h3 className="text-xl font-semibold mb-2">No providers found</h3>
+          <h3 className="text-xl font-semibold mb-2">Nenhum prestador encontrado</h3>
           <p className="text-muted-foreground">
-            We are still growing our network of service providers.
-            Please check back later or try another service.
+            Estamos ainda expandindo nossa rede de prestadores de serviço.
+            Por favor, tente novamente mais tarde ou tente outro serviço.
           </p>
         </div>
       );
@@ -299,9 +311,9 @@ const ProvidersFound: React.FC = () => {
     if (inRadiusProviders.length === 0 && providers.length > 0) {
       return (
         <div className="text-center py-6 mb-4 bg-amber-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">No service providers were found that serve your area</h3>
+          <h3 className="text-lg font-semibold mb-2">Nenhum prestador de serviço foi encontrado que atenda a sua região</h3>
           <p className="text-muted-foreground">
-            Check out other nearby providers below who might be able to accommodate your quote.
+            Veja abaixo outros prestadores próximos que podem atender seu orçamento.
           </p>
         </div>
       );
