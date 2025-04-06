@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -119,10 +120,9 @@ const ProvidersFound: React.FC = () => {
           
           // Store all providers, including those outside service radius
           setProviders(matchingProviders || []);
-          setFilteredProviders(matchingProviders || []);
           
           // Apply initial filter
-          handleFilterChange('relevance');
+          handleFilterChange('relevance', matchingProviders || []);
         } catch (providerError: any) {
           console.error('Specific error when searching providers:', providerError);
           
@@ -155,15 +155,15 @@ const ProvidersFound: React.FC = () => {
     fetchProviders();
   }, [quoteDetails, toast]);
   
-  const handleFilterChange = (filter: FilterOption) => {
+  const handleFilterChange = (filter: FilterOption, providersToFilter = providers) => {
     setCurrentFilter(filter);
     
-    if (!providers.length) {
+    if (!providersToFilter.length) {
       setFilteredProviders([]);
       return;
     }
     
-    let sorted = [...providers];
+    let sorted = [...providersToFilter];
     
     switch (filter) {
       case 'distance':
@@ -175,7 +175,11 @@ const ProvidersFound: React.FC = () => {
         });
         break;
       case 'price':
-        sorted = sorted.sort((a, b) => a.totalPrice - b.totalPrice);
+        sorted = sorted.sort((a, b) => {
+          if (a.totalPrice === 0 && b.totalPrice > 0) return 1;
+          if (a.totalPrice > 0 && b.totalPrice === 0) return -1;
+          return a.totalPrice - b.totalPrice;
+        });
         break;
       case 'rating':
         sorted = sorted.sort((a, b) => b.provider.averageRating - a.provider.averageRating);
@@ -330,7 +334,7 @@ const ProvidersFound: React.FC = () => {
               {filteredProviders.length > 0 && (
                 <>
                   <ProviderFilters 
-                    onFilterChange={handleFilterChange} 
+                    onFilterChange={(filter) => handleFilterChange(filter)} 
                     currentFilter={currentFilter} 
                   />
                   

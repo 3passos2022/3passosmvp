@@ -54,6 +54,17 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     }
     
     console.log('Provider settings fetched:', providerSettings?.length || 0);
+
+    // Log provider settings for debugging
+    if (providerSettings) {
+      providerSettings.forEach(settings => {
+        console.log(`Provider ${settings.provider_id} settings:`, {
+          radius: settings.service_radius_km,
+          location: settings.latitude && settings.longitude ? 'Yes' : 'No',
+          coordinates: `${settings.latitude}, ${settings.longitude}`
+        });
+      });
+    }
     
     // Create map for settings
     const settingsMap = new Map();
@@ -65,18 +76,19 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // IMPORTANT: Fetch provider item prices - This is where prices come from
+    // Fetch provider item prices - This is where prices come from
     const { data: providerItemPrices, error: itemPricesError } = await supabase
       .from('provider_item_prices')
       .select('*');
       
     if (itemPricesError) {
       console.error('Error fetching provider item prices:', itemPricesError);
+      return [];
     }
     
     console.log('Provider item prices fetched:', providerItemPrices?.length || 0);
     
-    // Log all item prices for debugging
+    // Log all item prices for debugging - IMPORTANT for troubleshooting
     if (providerItemPrices && providerItemPrices.length > 0) {
       console.log('All provider item prices:');
       providerItemPrices.forEach(price => {
@@ -84,14 +96,16 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     } else {
       console.warn('No provider item prices found in the database!');
+      return [];
     }
     
-    // Create map for item prices
+    // Create map for item prices for faster lookups
     const itemPricesMap = new Map();
     if (providerItemPrices) {
       providerItemPrices.forEach(price => {
         const key = `${price.provider_id}-${price.item_id}`;
         itemPricesMap.set(key, price.price_per_unit);
+        console.log(`Added price mapping: ${key} = ${price.price_per_unit}`);
       });
     }
 
@@ -113,6 +127,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
       
       console.log('Service items map created with', serviceItemsMap.size, 'items');
+    } else {
+      console.warn('No service items found in the database!');
+      return [];
     }
     
     // Filter for relevant service items to our quote
@@ -128,6 +145,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       relevantItems.forEach(item => {
         console.log(`Item ${item.id}: ${item.name}, Type: ${item.type}, Service: ${item.service_id}, SubService: ${item.sub_service_id}, Specialty: ${item.specialty_id}`);
       });
+    } else {
+      console.warn('No relevant service items found for this quote!');
     }
 
     // Fetch provider ratings
@@ -157,7 +176,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         if (clientLocation) {
           console.log('Client coordinates:', clientLocation);
         } else {
-          console.warn('Could not geocode client address');
+          console.warn('Could not geocode client address - using fallback');
+          // Use a fallback coordinate to show providers anyway
+          clientLocation = { lat: -23.550520, lng: -46.633308 }; // São Paulo coordinates as fallback
+          console.log('Using fallback client coordinates:', clientLocation);
         }
       } else {
         console.warn('Incomplete address for geocoding');
@@ -222,7 +244,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
             
             console.log(`Item ${itemId} (${itemInfo?.name || 'unknown'}): quantity=${quantity}, pricePerUnit=${pricePerUnit}`);
 
-            if (pricePerUnit !== undefined) {
+            if (pricePerUnit !== undefined && pricePerUnit > 0) {
               const itemTotal = pricePerUnit * quantity;
               totalPrice += itemTotal;
               hasCalculatedPrice = true;
@@ -237,15 +259,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
               });
             } else {
               console.log(`Provider ${providerData.name}: No price found for item ${itemId} (${itemInfo?.name || 'unknown'})`);
-              
-              // Check if there are any prices at all for this provider
-              const providerPrices = providerItemPrices?.filter(price => price.provider_id === providerId);
-              console.log(`Available prices for this provider: ${providerPrices?.length || 0}`);
-              if (providerPrices && providerPrices.length > 0) {
-                providerPrices.forEach(price => {
-                  console.log(`- Item ${price.item_id}: ${price.price_per_unit}`);
-                });
-              }
             }
           }
         } else {
@@ -302,16 +315,38 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           console.log(`Provider ${providerData.name}: No measurements in quote`);
         }
         
-        // This is where we assign the default price - we need to ensure we don't reach here incorrectly
+        // If we couldn't calculate a price, let's try to find any related price for this provider
         if (!hasCalculatedPrice) {
-          // Instead of just using a default price, look for ANY price this provider has
-          const providerPrices = providerItemPrices?.filter(price => price.provider_id === providerId);
+          // Get all prices for this provider
+          const providerPrices = providerItemPrices.filter(price => 
+            price.provider_id === providerId && price.price_per_unit > 0
+          );
           
           if (providerPrices && providerPrices.length > 0) {
-            // Calculate average price of all items this provider has defined
+            // Get the average price of all items this provider has defined
             const avgPrice = providerPrices.reduce((sum, price) => sum + price.price_per_unit, 0) / providerPrices.length;
-            totalPrice = avgPrice * 3; // Multiplying by 3 as a base estimate
-            console.log(`Using average base price (${avgPrice} × 3 = ${totalPrice}) for provider ${providerData.name}`);
+            
+            // Find the most relevant price if possible (same service or subservice)
+            const relevantPrices = providerPrices.filter(price => {
+              const item = serviceItemsMap.get(price.item_id);
+              return item && (
+                item.service_id === quoteDetails.serviceId ||
+                (quoteDetails.subServiceId && item.sub_service_id === quoteDetails.subServiceId) ||
+                (quoteDetails.specialtyId && item.specialty_id === quoteDetails.specialtyId)
+              );
+            });
+            
+            if (relevantPrices.length > 0) {
+              // Use the average price of relevant services if available
+              const relevantAvgPrice = relevantPrices.reduce((sum, price) => sum + price.price_per_unit, 0) / relevantPrices.length;
+              totalPrice = relevantAvgPrice * 3; // Multiplying by 3 as a base estimate for service
+              console.log(`Using relevant service average price (${relevantAvgPrice} × 3 = ${totalPrice}) for provider ${providerData.name}`);
+            } else {
+              // Fallback to general average price
+              totalPrice = avgPrice * 3; // Multiplying by 3 as a base estimate
+              console.log(`Using average base price (${avgPrice} × 3 = ${totalPrice}) for provider ${providerData.name}`);
+            }
+            
             priceDetails.push({
               itemId: "base-price",
               itemName: "Valor base (estimado)",
@@ -319,7 +354,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
               pricePerUnit: totalPrice,
               total: totalPrice
             });
+            
+            hasCalculatedPrice = true;
           } else {
+            // No prices at all for this provider
             totalPrice = 150; // Higher default price than before
             console.log(`Using default price (${totalPrice}) for provider ${providerData.name} because no prices were found`);
             priceDetails.push({
@@ -329,9 +367,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
               pricePerUnit: totalPrice,
               total: totalPrice
             });
+            
+            hasCalculatedPrice = true;
           }
-          
-          hasCalculatedPrice = true;
         } else {
           console.log(`Calculated final price for provider ${providerData.name}: ${totalPrice.toFixed(2)}`);
         }
