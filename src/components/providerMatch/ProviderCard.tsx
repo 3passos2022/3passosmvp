@@ -14,8 +14,10 @@ interface ProviderCardProps {
 const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) => {
   const { provider: providerData, distance, totalPrice, isWithinRadius, priceDetails = [] } = provider;
   
-  // Helper function to display price breakdown
+  // Helper function to display price breakdown with better debugging
   const renderPriceBreakdown = () => {
+    console.log(`Rendering price breakdown for provider ${providerData.name}:`, priceDetails);
+    
     if (!priceDetails || priceDetails.length === 0) {
       return (
         <p className="text-xs text-muted-foreground">Valor base (aproximado)</p>

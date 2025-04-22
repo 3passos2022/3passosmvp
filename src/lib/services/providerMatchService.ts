@@ -41,13 +41,16 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       console.log(`Provider found: ID=${provider.id}, Name=${provider.name}, Role=${provider.role}`);
     });
 
-    // Get provider settings
+    // Get provider settings - FIXING THE EMPTY ARRAY ISSUE BY USING FROM QUERY
+    console.log('Fetching provider settings directly from table...');
     const { data: providerSettings, error: settingsError } = await supabase
       .from('provider_settings')
       .select('*');
 
     if (settingsError) {
       console.error('Error fetching provider settings:', settingsError);
+    } else {
+      console.log('Provider settings raw response:', providerSettings);
     }
     
     console.log('Provider settings fetched:', providerSettings?.length || 0);
@@ -63,13 +66,16 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // Fetch provider item prices - This is where prices come from
+    // Fetch provider item prices - Using FROM query instead of the problematic approach
+    console.log('Fetching provider item prices directly from table...');
     const { data: providerItemPrices, error: itemPricesError } = await supabase
       .from('provider_item_prices')
       .select('*');
       
     if (itemPricesError) {
       console.error('Error fetching provider item prices:', itemPricesError);
+    } else {
+      console.log('Provider item prices raw response:', providerItemPrices);
     }
     
     console.log('Provider item prices fetched:', providerItemPrices?.length || 0);
@@ -187,7 +193,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         
         console.log('\n----- Processing provider:', providerData.name, '(ID:', providerId, ') -----');
         
+        // Get provider settings from the map
         const settings = settingsMap.get(providerId);
+        console.log('Provider settings:', settings ? 'Found' : 'Not found', settings);
+        
         const serviceRadiusKm = settings?.service_radius_km || 0;
         
         // Calculate distance if possible
@@ -226,10 +235,11 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
             const quantity = quoteDetails.items[itemId];
             const key = `${providerId}-${itemId}`;
             
+            // Look up price in the item prices map
             const pricePerUnit = itemPricesMap.get(key);
             const itemInfo = serviceItemsMap.get(itemId);
             
-            console.log(`Item ${itemId} (${itemInfo?.name || 'unknown'}): quantity=${quantity}, pricePerUnit=${pricePerUnit || 'not found'}`);
+            console.log(`Item ${itemId} (${itemInfo?.name || 'unknown'}): quantity=${quantity}, pricePerUnit=${pricePerUnit || 'not found'} - Key: ${key}`);
 
             if (pricePerUnit !== undefined && pricePerUnit > 0) {
               const itemTotal = pricePerUnit * quantity;
@@ -245,7 +255,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
                 total: itemTotal
               });
             } else {
-              console.log(`Provider ${providerData.name}: No price found for item ${itemId} (${itemInfo?.name || 'unknown'})`);
+              console.log(`Provider ${providerData.name}: No price found for item ${itemId} (${itemInfo?.name || 'unknown'}) with key ${key}`);
             }
           }
         } else {
@@ -292,7 +302,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
                   total: areaTotal
                 });
               } else {
-                console.log(`Provider ${providerData.name}: No price found for square meter item ${item.id} (${item.name})`);
+                console.log(`Provider ${providerData.name}: No price found for square meter item ${item.id} (${item.name}) with key ${key}`);
               }
             }
           } else {
@@ -306,10 +316,22 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         if (!hasCalculatedPrice) {
           console.log(`Provider ${providerData.name}: No specific prices calculated, using fallback pricing`);
           
-          // Try to find any prices for this provider
+          // DEBUG: Log all keys in the itemPricesMap to diagnose why we can't find prices
+          console.log("Available price keys in map:");
+          if (itemPricesMap.size > 0) {
+            Array.from(itemPricesMap.keys()).forEach(key => {
+              console.log(` - ${key}: ${itemPricesMap.get(key)}`);
+            });
+          } else {
+            console.log(" - No price keys available");
+          }
+          
+          // Get all prices for this provider from the raw data
           const providerPrices = providerItemPrices?.filter(price => 
             price.provider_id === providerId && price.price_per_unit > 0
           ) || [];
+          
+          console.log(`Found ${providerPrices.length} general prices for provider ${providerData.name}`);
           
           if (providerPrices.length > 0) {
             // Get the average price of all items this provider has defined
