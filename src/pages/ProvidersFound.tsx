@@ -12,6 +12,7 @@ import ProviderCard from '@/components/providerMatch/ProviderCard';
 import ProviderDetailsModal from '@/components/providerMatch/ProviderDetailsModal';
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
 import { toast as sonnerToast } from 'sonner';
+import { ENV } from '@/env';
 
 // Definindo a variável de ambiente do Google Maps
 declare global {
@@ -36,7 +37,7 @@ const ProvidersFound: React.FC = () => {
   const [currentFilter, setCurrentFilter] = useState<FilterOption>('relevance');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  const googleMapsApiKey = window.ENV_GOOGLE_MAPS_API_KEY || 'AIzaSyCz60dsmYx6T6qHNCs1OZtA7suJGA7xVW8';
+  const googleMapsApiKey = ENV.GOOGLE_MAPS_API_KEY;
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
   
   useEffect(() => {
