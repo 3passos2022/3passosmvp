@@ -160,6 +160,7 @@ const RequestedQuotes: React.FC = () => {
   const handleAction = async (quoteProviderId: string, action: 'accepted' | 'rejected') => {
     setActionLoading(quoteProviderId);
     try {
+      // Update the quote provider status
       const { error } = await supabase
         .from('quote_providers')
         .update({ status: action })
@@ -167,8 +168,20 @@ const RequestedQuotes: React.FC = () => {
 
       if (error) throw error;
 
+      // Successful update - update local state to reflect the change immediately
+      setQuotes(prevQuotes => 
+        prevQuotes.map(quote => 
+          quote.id === quoteProviderId 
+            ? { ...quote, status: action } 
+            : quote
+        )
+      );
+
+      // Show success toast
       toast.success(`Orçamento ${action === 'accepted' ? 'aceito' : 'rejeitado'} com sucesso!`);
-      fetchQuotes();
+      
+      // Re-fetch quotes to ensure data is up to date
+      await fetchQuotes();
     } catch (error) {
       console.error('Erro ao atualizar orçamento:', error);
       toast.error('Erro ao processar sua solicitação. Tente novamente.');
