@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,14 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface Specialty {
+  id: string;
+  name: string;
+  sub_service_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface SpecialtyFormData {
   id?: string;
   name: string;
@@ -19,6 +26,13 @@ interface SpecialtyFormData {
 interface SpecialtyManagementProps {
   subServiceId: string;
   subServiceName: string;
+}
+
+interface SupabaseError {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
 }
 
 const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId, subServiceName }) => {
@@ -78,7 +92,7 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
       setIsDialogOpen(false);
       toast.success('Especialidade criada com sucesso');
     },
-    onError: (error: any) => {
+    onError: (error: SupabaseError) => {
       toast.error(`Erro ao criar especialidade: ${error.message || 'Desconhecido'}`);
     }
   });
@@ -150,7 +164,7 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
     }
   };
 
-  const handleSpecialtyEdit = (specialty: any) => {
+  const handleSpecialtyEdit = (specialty: Specialty) => {
     setCurrentSpecialty({
       id: specialty.id,
       name: specialty.name,
@@ -243,7 +257,7 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
           </div>
         ) : (
           <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
-            {specialties.map((specialty: any) => (
+            {specialties.map((specialty: Specialty) => (
               <Card key={specialty.id} className="hover:bg-muted/50 transition-colors">
                 <CardContent className="p-4 flex justify-between items-center">
                   <div>

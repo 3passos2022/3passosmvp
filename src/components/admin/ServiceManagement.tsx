@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -28,6 +27,45 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 
+interface Service {
+  id: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  icon_url: string | null;
+  created_at: string;
+  updated_at: string;
+  sub_services?: SubService[];
+  questions?: Question[];
+  items?: Item[];
+}
+
+interface SubService {
+  id: string;
+  name: string;
+  description: string | null;
+  service_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Question {
+  id: string;
+  question: string;
+  service_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Item {
+  id: string;
+  name: string;
+  type: 'quantity' | 'square_meter' | 'linear_meter';
+  service_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ServiceFormData {
   id?: string;
   name: string;
@@ -35,6 +73,12 @@ interface ServiceFormData {
   tags: string[];
   icon?: File | null;
   icon_url?: string;
+}
+
+interface ApiError {
+  message: string;
+  code?: string;
+  details?: string;
 }
 
 // Create schema for service form validation
@@ -116,7 +160,7 @@ const ServiceManagement: React.FC = () => {
       if (!formData.id) throw new Error('ID do serviço não fornecido');
 
       try {
-        const updateData: Record<string, any> = {
+        const updateData: Partial<Service> = {
           name: formData.name,
           description: formData.description,
           tags: formData.tags
@@ -142,7 +186,7 @@ const ServiceManagement: React.FC = () => {
       setIsSheetOpen(false);
       toast.success('Serviço atualizado com sucesso');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(`Erro ao atualizar serviço: ${error.message || 'Desconhecido'}`);
     }
   });
@@ -189,7 +233,7 @@ const ServiceManagement: React.FC = () => {
     }
   };
 
-  const handleServiceEdit = (service: any) => {
+  const handleServiceEdit = (service: Service) => {
     setCurrentService({
       id: service.id,
       name: service.name,

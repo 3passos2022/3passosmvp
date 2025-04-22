@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,25 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+
+interface QuestionOption {
+  id?: string;
+  question_id: string;
+  option_text: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ServiceQuestion {
+  id: string;
+  question: string;
+  service_id?: string;
+  sub_service_id?: string;
+  specialty_id?: string;
+  created_at: string;
+  updated_at: string;
+  question_options?: QuestionOption[];
+}
 
 interface QuestionFormData {
   id?: string;
@@ -25,6 +43,13 @@ interface QuestionManagementProps {
   specialtyId?: string;
   parentName: string;
   level: 'service' | 'subService' | 'specialty';
+}
+
+interface SupabaseError {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
 }
 
 const QuestionManagement: React.FC<QuestionManagementProps> = ({ 
@@ -96,7 +121,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
     mutationFn: async (formData: QuestionFormData) => {
       try {
         // First, insert the question
-        const questionPayload: any = {
+        const questionPayload: Omit<ServiceQuestion, 'id' | 'created_at' | 'updated_at' | 'question_options'> = {
           question: formData.question
         };
         
@@ -123,7 +148,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
         const options = formData.options.filter(option => option.text.trim() !== '');
         
         if (options.length > 0) {
-          const optionsData = options.map(option => ({
+          const optionsData: Omit<QuestionOption, 'id' | 'created_at' | 'updated_at'>[] = options.map(option => ({
             question_id: newQuestion.id,
             option_text: option.text
           }));
@@ -147,7 +172,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
       setIsDialogOpen(false);
       toast.success('Pergunta criada com sucesso');
     },
-    onError: (error: any) => {
+    onError: (error: SupabaseError) => {
       toast.error(`Erro ao criar pergunta: ${error.message || 'Desconhecido'}`);
     }
   });
@@ -284,14 +309,14 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({
     });
   };
 
-  const handleQuestionEdit = (question: any) => {
+  const handleQuestionEdit = (question: ServiceQuestion) => {
     setCurrentQuestion({
       id: question.id,
       question: question.question,
-      options: question.question_options.map((option: any) => ({
+      options: question.question_options?.map(option => ({
         id: option.id,
         text: option.option_text
-      })),
+      })) || [{ text: '' }],
       serviceId: question.service_id,
       subServiceId: question.sub_service_id,
       specialtyId: question.specialty_id

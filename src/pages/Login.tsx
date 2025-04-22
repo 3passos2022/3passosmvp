@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -36,9 +35,7 @@ const loginSchema = z.object({
   email: z.string().email({
     message: "Por favor, insira um e-mail válido",
   }),
-  password: z.string().min(6, {
-    message: "A senha deve ter pelo menos 6 caracteres",
-  }),
+  password: z.string().min(1, { message: "A senha é obrigatória" }),
 });
 
 const signupSchema = z.object({
@@ -51,9 +48,11 @@ const signupSchema = z.object({
   phone: z.string().min(10, {
     message: "Por favor, insira um telefone válido",
   }).optional(),
-  password: z.string().min(6, {
-    message: "A senha deve ter pelo menos 6 caracteres",
-  }),
+  password: z.string()
+    .min(8, { message: "A senha deve ter pelo menos 8 caracteres" })
+    .regex(/[A-Z]/, { message: "A senha deve conter pelo menos uma letra maiúscula" })
+    .regex(/[0-9]/, { message: "A senha deve conter pelo menos um número" })
+    .regex(/[^A-Za-z0-9]/, { message: "A senha deve conter pelo menos um caractere especial" }),
   role: z.enum([UserRole.CLIENT, UserRole.PROVIDER], {
     message: "Selecione o tipo de conta",
   }),

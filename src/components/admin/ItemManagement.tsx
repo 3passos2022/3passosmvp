@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,17 @@ import {
 } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 
+interface ServiceItem {
+  id: string;
+  name: string;
+  type: 'quantity' | 'square_meter' | 'linear_meter';
+  service_id?: string;
+  sub_service_id?: string;
+  specialty_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ItemFormData {
   id?: string;
   name: string;
@@ -32,6 +42,13 @@ interface ItemManagementProps {
   specialtyId?: string;
   parentName: string;
   level: 'service' | 'subService' | 'specialty';
+}
+
+interface SupabaseError {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
 }
 
 const ItemManagement: React.FC<ItemManagementProps> = ({ 
@@ -99,7 +116,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
   // Create item mutation
   const createItemMutation = useMutation({
     mutationFn: async (formData: ItemFormData) => {
-      const itemData: any = {
+      const itemData: Omit<ServiceItem, 'id' | 'created_at' | 'updated_at'> = {
         name: formData.name,
         type: formData.type,
       };
@@ -130,7 +147,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
       setIsDialogOpen(false);
       toast.success('Item criado com sucesso');
     },
-    onError: (error: any) => {
+    onError: (error: SupabaseError) => {
       toast.error(`Erro ao criar item: ${error.message || 'Desconhecido'}`);
     }
   });
@@ -208,7 +225,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
     }
   };
 
-  const handleItemEdit = (item: any) => {
+  const handleItemEdit = (item: ServiceItem) => {
     setCurrentItem({
       id: item.id,
       name: item.name,

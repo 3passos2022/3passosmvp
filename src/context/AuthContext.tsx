@@ -1,9 +1,11 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, UserRole } from '@/lib/types';
 import { toast } from 'sonner';
 import { Session } from '@supabase/supabase-js';
+import DOMPurify from 'dompurify';
+
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutos
 
 interface AuthContextProps {
   user: User | null;
@@ -22,6 +24,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastActivity, setLastActivity] = useState(Date.now());
+
+  // Função para atualizar a última atividade
+  const updateLastActivity = () => {
+    setLastActivity(Date.now());
+  };
+
+  // Monitor de atividade do usuário
+  useEffect(() => {
+    if (!user) return;
+
+    const checkActivity = () => {
+      if (Date.now() - lastActivity > SESSION_TIMEOUT) {
+        handleSignOut();
+        toast.warning('Sessão expirada por inatividade');
+      }
+    };
+
+    const activityEvents = ['mousemove', 'keypress', 'click', 'scroll'];
+    activityEvents.forEach(event => {
+      window.addEventListener(event, updateLastActivity);
+    });
+
+    const intervalId = setInterval(checkActivity, 1000);
+
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, updateLastActivity);
+      });
+      clearInterval(intervalId);
+    };
+  }, [user, lastActivity]);
 
   const refreshUser = async () => {
     try {
@@ -36,13 +70,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       // Use the RPC function to get the user role safely
-      // This function was created in our SQL migration
       const { data: userRole, error: roleError } = await supabase.rpc('get_user_role', {
         user_id: session.user.id
       });
       
       if (roleError) {
-        console.error('Error fetching user role:', roleError);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error fetching user role:', roleError);
+        }
         // Try to get profile directly if RPC fails
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -51,13 +86,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .maybeSingle();
         
         if (error) {
-          console.error('Error fetching profile data:', error);
-          // Continue with basic user data if profile fetch fails
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('Error fetching profile data:', error);
+          }
           setUser({
             id: session.user.id,
             email: session.user.email || '',
-            name: session.user.user_metadata?.name || '',
-            phone: session.user.user_metadata?.phone || '',
+            name: DOMPurify.sanitize(session.user.user_metadata?.name || ''),
+            phone: DOMPurify.sanitize(session.user.user_metadata?.phone || ''),
             role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
             createdAt: session.user.created_at,
           });
@@ -65,33 +101,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (profile) {
-          console.log('RefreshUser - Profile found with role:', profile.role);
           setUser({
             id: session.user.id,
             email: session.user.email || '',
-            name: profile.name || '',
-            phone: profile.phone || '',
+            name: DOMPurify.sanitize(profile.name || ''),
+            phone: DOMPurify.sanitize(profile.phone || ''),
             role: profile.role as UserRole,
             createdAt: profile.created_at || session.user.created_at,
           });
-        } else {
-          // If no profile exists yet, use basic auth data
-          console.log('RefreshUser - No profile found, using basic auth data');
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.name || '',
-            phone: session.user.user_metadata?.phone || '',
-            role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-            createdAt: session.user.created_at,
-          });
         }
       } else {
-        // We got the role from the RPC function, convert string to UserRole
-        console.log('RefreshUser - Got role from RPC:', userRole);
-        
-        // Get the rest of the profile data
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('name, phone, created_at')
           .eq('id', session.user.id)
@@ -100,32 +120,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           id: session.user.id,
           email: session.user.email || '',
-          name: profile?.name || session.user.user_metadata?.name || '',
-          phone: profile?.phone || session.user.user_metadata?.phone || '',
+          name: DOMPurify.sanitize(profile?.name || session.user.user_metadata?.name || ''),
+          phone: DOMPurify.sanitize(profile?.phone || session.user.user_metadata?.phone || ''),
           role: userRole as UserRole,
           createdAt: profile?.created_at || session.user.created_at,
         });
       }
     } catch (error) {
-      console.error('Error refreshing user:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error refreshing user:', error);
+      }
       setUser(null);
       setSession(null);
     }
   };
 
   useEffect(() => {
-    // Set up auth listener FIRST
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Auth state changed:', event);
+      }
       
-      // Update session state synchronously
       setSession(session);
       
       if (session) {
-        // Use setTimeout to prevent potential deadlocks with Supabase client
         setTimeout(async () => {
           try {
-            // Fetch profile data
             const { data: profile, error } = await supabase
               .from('profiles')
               .select('*')
@@ -133,13 +153,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .single();
             
             if (error) {
-              console.error('Error fetching profile:', error);
-              // Fall back to basic user data
+              if (process.env.NODE_ENV !== 'production') {
+                console.error('Error fetching profile:', error);
+              }
               setUser({
                 id: session.user.id,
                 email: session.user.email || '',
-                name: session.user.user_metadata?.name || '',
-                phone: session.user.user_metadata?.phone || '',
+                name: DOMPurify.sanitize(session.user.user_metadata?.name || ''),
+                phone: DOMPurify.sanitize(session.user.user_metadata?.phone || ''),
                 role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
                 createdAt: session.user.created_at,
               });
@@ -147,27 +168,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             
             if (profile) {
-              console.log('Auth listener - Profile found with role:', profile.role);
               setUser({
                 id: session.user.id,
                 email: session.user.email || '',
-                name: profile.name || '',
-                phone: profile.phone || '',
+                name: DOMPurify.sanitize(profile.name || ''),
+                phone: DOMPurify.sanitize(profile.phone || ''),
                 role: profile.role as UserRole,
                 createdAt: profile.created_at || session.user.created_at,
               });
-            } else {
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: session.user.user_metadata?.name || '',
-                phone: session.user.user_metadata?.phone || '',
-                role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-                createdAt: session.user.created_at,
-              });
             }
           } catch (error) {
-            console.error('Error fetching profile:', error);
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('Error fetching profile:', error);
+            }
           }
         }, 0);
       } else {
@@ -177,7 +190,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // THEN check for existing session
     const initializeAuth = async () => {
       setLoading(true);
       await refreshUser();
@@ -194,15 +206,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSignIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: DOMPurify.sanitize(email), 
+        password 
+      });
       
       if (error) throw error;
       
       setSession(data.session);
       await refreshUser();
+      updateLastActivity();
       toast.success('Login realizado com sucesso');
     } catch (error: any) {
-      console.error('Error signing in:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error signing in:', error);
+      }
       toast.error(error.message || 'Erro ao fazer login. Verifique suas credenciais');
       throw error;
     } finally {
@@ -213,29 +231,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSignUp = async (email: string, password: string, userData: Partial<User>) => {
     setLoading(true);
     try {
-      // Add site URL for redirections
+      const sanitizedData = {
+        name: DOMPurify.sanitize(userData.name || ''),
+        role: userData.role,
+        phone: DOMPurify.sanitize(userData.phone || ''),
+      };
+
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: DOMPurify.sanitize(email),
         password,
         options: {
-          data: {
-            name: userData.name,
-            role: userData.role,
-            phone: userData.phone,
-          },
+          data: sanitizedData,
           emailRedirectTo: window.location.origin + '/login',
         },
       });
       
       if (error) throw error;
       
-      // Create profile entry
       if (data.user) {
         const { error: profileError } = await supabase.from('profiles').insert({
           id: data.user.id,
-          name: userData.name,
-          role: userData.role,
-          phone: userData.phone || '',
+          name: sanitizedData.name,
+          role: sanitizedData.role,
+          phone: sanitizedData.phone,
         });
         
         if (profileError) throw profileError;
@@ -243,7 +261,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       toast.success('Conta criada com sucesso');
     } catch (error: any) {
-      console.error('Error signing up:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error signing up:', error);
+      }
       toast.error(error.message || 'Erro ao criar conta');
       throw error;
     } finally {
@@ -259,7 +279,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       toast.success('Logout realizado com sucesso');
     } catch (error) {
-      console.error('Error signing out:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error signing out:', error);
+      }
       toast.error('Erro ao fazer logout');
       throw error;
     } finally {
@@ -269,9 +291,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const makeAdmin = async (userId: string) => {
     try {
-      // Use RPC function to update user role
       const { error } = await supabase.rpc('update_user_role', { 
-        user_id: userId,
+        user_id: DOMPurify.sanitize(userId),
         new_role: UserRole.ADMIN
       });
       
@@ -279,17 +300,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       toast.success('Usuário promovido a administrador com sucesso');
       
-      // If the current user is being promoted, refresh their session
       if (user && user.id === userId) {
-        // Force reauthorization to get updated claims
         await supabase.auth.refreshSession();
         await refreshUser();
-        console.log('User promoted to admin, refreshed role:', user?.role);
       }
       
       return;
     } catch (error: any) {
-      console.error('Error making user admin:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error making user admin:', error);
+      }
       toast.error(error.message || 'Erro ao promover usuário');
       throw error;
     }
