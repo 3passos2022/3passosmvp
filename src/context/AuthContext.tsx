@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, UserRole } from '@/lib/types';
@@ -69,8 +70,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setSession(session);
       
-      // Use the RPC function to get the user role safely
-      const { data: userRole, error: roleError } = await supabase.rpc('get_user_role', {
+      // Use the safer function to get the user role to avoid recursion
+      const { data: userRole, error: roleError } = await supabase.rpc('get_user_role_safely', {
         user_id: session.user.id
       });
       
@@ -81,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Try to get profile directly if RPC fails
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('name, phone, role, created_at')
           .eq('id', session.user.id)
           .maybeSingle();
         
@@ -144,11 +145,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       if (session) {
+        // Use setTimeout to avoid recursive policy issues
         setTimeout(async () => {
           try {
             const { data: profile, error } = await supabase
               .from('profiles')
-              .select('*')
+              .select('name, phone, role, created_at')
               .eq('id', session.user.id)
               .single();
             
