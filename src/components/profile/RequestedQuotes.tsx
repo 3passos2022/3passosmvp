@@ -8,12 +8,20 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface RequestedQuote {
   id: string;
   quoteId: string;
   status: string;
   created_at: string;
+  total_price?: number;
   quote: {
     id: string;
     service: string;
@@ -22,7 +30,15 @@ interface RequestedQuote {
     description: string;
     city: string;
     neighborhood: string;
+    street: string;
+    number: string;
+    complement?: string;
+    state: string;
+    zip_code: string;
     created_at: string;
+    clientName?: string;
+    clientEmail?: string;
+    clientPhone?: string;
   };
 }
 
@@ -32,6 +48,8 @@ const RequestedQuotes: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tab, setTab] = useState('pending');
+  const [selectedQuote, setSelectedQuote] = useState<RequestedQuote | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -51,12 +69,19 @@ const RequestedQuotes: React.FC = () => {
           quote_id,
           status,
           created_at,
+          total_price,
           quotes!quote_id (
             id,
             description,
             city,
             neighborhood,
+            street,
+            number,
+            complement,
+            state,
+            zip_code,
             created_at,
+            client_id,
             services:service_id (name),
             sub_services:sub_service_id (name),
             specialties:specialty_id (name)
@@ -67,28 +92,59 @@ const RequestedQuotes: React.FC = () => {
 
       if (quoteProvidersError) throw quoteProvidersError;
 
-      // Transform the data
-      const transformedData: RequestedQuote[] = quoteProviders.map((item) => ({
-        id: item.id,
-        quoteId: item.quote_id,
-        status: item.status,
-        created_at: item.created_at,
-        quote: {
-          id: item.quotes?.id || '',
-          service: item.quotes?.services?.name || 'Serviço não encontrado',
-          subService: item.quotes?.sub_services?.name || 'Subserviço não encontrado',
-          specialty: item.quotes?.specialties?.name || 'Especialidade não encontrada',
-          description: item.quotes?.description || '',
-          city: item.quotes?.city || '',
-          neighborhood: item.quotes?.neighborhood || '',
-          created_at: item.quotes?.created_at || '',
-        }
-      }));
+      // Get client info for each quote
+      const quotesWithClientInfo = await Promise.all(
+        quoteProviders.map(async (quoteProvider) => {
+          let clientName = 'Cliente anônimo';
+          let clientEmail = '';
+          let clientPhone = '';
+
+          if (quoteProvider.quotes?.client_id) {
+            const { data: clientData, error: clientError } = await supabase
+              .from('profiles')
+              .select('name, email, phone')
+              .eq('id', quoteProvider.quotes.client_id)
+              .single();
+
+            if (!clientError && clientData) {
+              clientName = clientData.name || 'Nome não informado';
+              clientEmail = clientData.email || '';
+              clientPhone = clientData.phone || '';
+            }
+          }
+
+          return {
+            id: quoteProvider.id,
+            quoteId: quoteProvider.quote_id,
+            status: quoteProvider.status,
+            created_at: quoteProvider.created_at,
+            total_price: quoteProvider.total_price,
+            quote: {
+              id: quoteProvider.quotes?.id || '',
+              service: quoteProvider.quotes?.services?.name || 'Serviço não encontrado',
+              subService: quoteProvider.quotes?.sub_services?.name || 'Subserviço não encontrado',
+              specialty: quoteProvider.quotes?.specialties?.name || 'Especialidade não encontrada',
+              description: quoteProvider.quotes?.description || '',
+              city: quoteProvider.quotes?.city || '',
+              neighborhood: quoteProvider.quotes?.neighborhood || '',
+              street: quoteProvider.quotes?.street || '',
+              number: quoteProvider.quotes?.number || '',
+              complement: quoteProvider.quotes?.complement || '',
+              state: quoteProvider.quotes?.state || '',
+              zip_code: quoteProvider.quotes?.zip_code || '',
+              created_at: quoteProvider.quotes?.created_at || '',
+              clientName,
+              clientEmail,
+              clientPhone,
+            }
+          };
+        })
+      );
 
       // Filter by tab
       const filteredQuotes = tab === 'all' 
-        ? transformedData 
-        : transformedData.filter(quote => quote.status === tab);
+        ? quotesWithClientInfo 
+        : quotesWithClientInfo.filter(quote => quote.status === tab);
 
       setQuotes(filteredQuotes);
     } catch (error) {
@@ -117,6 +173,11 @@ const RequestedQuotes: React.FC = () => {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleViewDetails = (quote: RequestedQuote) => {
+    setSelectedQuote(quote);
+    setShowDetailsModal(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -179,23 +240,32 @@ const RequestedQuotes: React.FC = () => {
                         </p>
                       </div>
 
-                      {quoteProvider.status === 'pending' && (
-                        <div className="flex flex-wrap gap-2">
-                          <Button 
-                            variant="outline"
-                            disabled={!!actionLoading}
-                            onClick={() => handleAction(quoteProvider.id, 'rejected')}
-                          >
-                            {actionLoading === quoteProvider.id ? 'Processando...' : 'Rejeitar'}
-                          </Button>
-                          <Button
-                            disabled={!!actionLoading}
-                            onClick={() => handleAction(quoteProvider.id, 'accepted')}
-                          >
-                            {actionLoading === quoteProvider.id ? 'Processando...' : 'Aceitar'}
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button 
+                          variant="outline"
+                          onClick={() => handleViewDetails(quoteProvider)}
+                        >
+                          Ver Detalhes
+                        </Button>
+
+                        {quoteProvider.status === 'pending' && (
+                          <>
+                            <Button 
+                              variant="outline"
+                              disabled={!!actionLoading}
+                              onClick={() => handleAction(quoteProvider.id, 'rejected')}
+                            >
+                              {actionLoading === quoteProvider.id ? 'Processando...' : 'Rejeitar'}
+                            </Button>
+                            <Button
+                              disabled={!!actionLoading}
+                              onClick={() => handleAction(quoteProvider.id, 'accepted')}
+                            >
+                              {actionLoading === quoteProvider.id ? 'Processando...' : 'Aceitar'}
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -204,6 +274,90 @@ const RequestedQuotes: React.FC = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Quote Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-w-2xl">
+          {selectedQuote && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Detalhes do Orçamento</DialogTitle>
+                <DialogDescription>
+                  Solicitado em {formatDate(selectedQuote.created_at)}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Informações do Serviço</h3>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Serviço</p>
+                        <p>{selectedQuote.quote.service}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Subserviço</p>
+                        <p>{selectedQuote.quote.subService}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Especialidade</p>
+                        <p>{selectedQuote.quote.specialty}</p>
+                      </div>
+                      {selectedQuote.quote.description && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Descrição</p>
+                          <p>{selectedQuote.quote.description}</p>
+                        </div>
+                      )}
+                      {selectedQuote.total_price && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Valor Estimado</p>
+                          <p className="font-medium">R$ {selectedQuote.total_price.toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Informações do Cliente</h3>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Nome</p>
+                        <p>{selectedQuote.quote.clientName}</p>
+                      </div>
+                      {selectedQuote.quote.clientEmail && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Email</p>
+                          <p>{selectedQuote.quote.clientEmail}</p>
+                        </div>
+                      )}
+                      {selectedQuote.quote.clientPhone && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Telefone</p>
+                          <p>{selectedQuote.quote.clientPhone}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <h3 className="text-lg font-semibold mb-2 mt-4">Endereço</h3>
+                    <div className="space-y-2">
+                      <p>
+                        {selectedQuote.quote.street}, {selectedQuote.quote.number}
+                        {selectedQuote.quote.complement && `, ${selectedQuote.quote.complement}`}
+                      </p>
+                      <p>
+                        {selectedQuote.quote.neighborhood}, {selectedQuote.quote.city} - {selectedQuote.quote.state}
+                      </p>
+                      <p>CEP: {selectedQuote.quote.zip_code}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
