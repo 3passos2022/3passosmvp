@@ -59,7 +59,7 @@ const ServiceNavBar: React.FC = () => {
       className="w-full py-2 bg-white shadow-sm border-b"
     >
       <div className="container mx-auto">
-        <ScrollArea className="w-full" orientation="horizontal">
+        <ScrollArea className="w-full">
           <div className="flex items-center space-x-6 px-1 py-1">
             {services.map((service) => (
               <Link

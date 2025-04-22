@@ -36,9 +36,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <Toaster />
-        <Sonner />
         <BrowserRouter>
+          <Toaster />
+          <Sonner />
           <AnimatePresence mode="wait">
             <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
               <Routes>
