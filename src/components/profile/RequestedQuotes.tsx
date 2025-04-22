@@ -102,14 +102,16 @@ const RequestedQuotes: React.FC = () => {
           if (quoteProvider.quotes?.client_id) {
             const { data: clientData, error: clientError } = await supabase
               .from('profiles')
-              .select('name, email, phone')
+              .select('name, phone')
               .eq('id', quoteProvider.quotes.client_id)
               .single();
 
             if (!clientError && clientData) {
               clientName = clientData.name || 'Nome não informado';
-              clientEmail = clientData.email || '';
               clientPhone = clientData.phone || '';
+              // Email is not directly available in profiles, as it's in auth.users
+              // We use client_id directly as the email reference
+              clientEmail = quoteProvider.quotes.client_id || '';
             }
           }
 
