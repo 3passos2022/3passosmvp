@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,6 +26,8 @@ const QuotesList: React.FC = () => {
   }, [user, tab]);
 
   const fetchQuotes = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
       const { data: quotesData, error: quotesError } = await supabase
@@ -44,57 +45,45 @@ const QuotesList: React.FC = () => {
           created_at,
           services!service_id (name),
           sub_services!sub_service_id (name),
-          specialties!specialty_id (name)
+          specialties!specialty_id (name),
+          quote_providers (
+            id,
+            provider_id,
+            status,
+            profiles!provider_id (name)
+          )
         `)
-        .eq('client_id', user?.id)
+        .eq('client_id', user.id)
         .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;
 
-      // Get providers for each quote
-      const quotesWithProviders = await Promise.all(
-        quotesData.map(async (quote) => {
-          const { data: providersData, error: providersError } = await supabase
-            .from('quote_providers')
-            .select(`
-              id,
-              provider_id,
-              status,
-              profiles!provider_id (name)
-            `)
-            .eq('quote_id', quote.id);
+      const quotesWithProviders: QuoteWithProviders[] = quotesData.map(quote => ({
+        id: quote.id,
+        status: quote.status,
+        description: quote.description,
+        city: quote.city,
+        neighborhood: quote.neighborhood,
+        created_at: quote.created_at,
+        serviceName: quote.services?.name || 'Serviço não encontrado',
+        subServiceName: quote.sub_services?.name || '',
+        specialtyName: quote.specialties?.name || '',
+        providers: quote.quote_providers.map(provider => ({
+          id: provider.id,
+          providerId: provider.provider_id,
+          providerName: provider.profiles?.name || 'Nome não encontrado',
+          status: provider.status
+        }))
+      }));
 
-          if (providersError) throw providersError;
-
-          return {
-            id: quote.id,
-            status: quote.status,
-            description: quote.description,
-            city: quote.city,
-            neighborhood: quote.neighborhood,
-            street: quote.street,
-            number: quote.number,
-            complement: quote.complement,
-            state: quote.state,
-            created_at: quote.created_at,
-            serviceName: quote.services?.name || 'Serviço não encontrado',
-            subServiceName: quote.sub_services?.name || '',
-            specialtyName: quote.specialties?.name || '',
-            providers: providersData.map(provider => ({
-              id: provider.id,
-              providerId: provider.provider_id,
-              providerName: provider.profiles?.name || 'Nome não encontrado',
-              status: provider.status
-            }))
-          };
-        })
-      );
-
-      // Filter quotes by tab
-      const filteredQuotes = tab === 'all' 
-        ? quotesWithProviders 
-        : quotesWithProviders.filter(quote => quote.status === tab);
-
+      // Filtra os orçamentos de acordo com a aba selecionada
+      let filteredQuotes;
+      if (tab === 'all') {
+        filteredQuotes = quotesWithProviders;
+      } else {
+        filteredQuotes = quotesWithProviders.filter(quote => quote.status === tab);
+      }
+      
       setQuotes(filteredQuotes);
     } catch (error) {
       console.error('Erro ao buscar orçamentos:', error);
