@@ -143,10 +143,17 @@ const RequestedQuotes: React.FC = () => {
         })
       );
 
-      const filteredQuotes = tab === 'all' 
-        ? quotesWithClientInfo 
-        : quotesWithClientInfo.filter(quote => quote.status === tab);
+      // Correção: Filtrando os orçamentos de acordo com a aba selecionada
+      let filteredQuotes;
+      if (tab === 'all') {
+        filteredQuotes = quotesWithClientInfo;
+      } else {
+        filteredQuotes = quotesWithClientInfo.filter(quote => quote.status === tab);
+      }
 
+      console.log(`Aba atual: ${tab}, Total orçamentos: ${quotesWithClientInfo.length}, Filtrados: ${filteredQuotes.length}`);
+      console.log('Status dos orçamentos:', quotesWithClientInfo.map(q => q.status));
+      
       setQuotes(filteredQuotes);
     } catch (error) {
       console.error('Erro ao buscar orçamentos solicitados:', error);
@@ -174,6 +181,7 @@ const RequestedQuotes: React.FC = () => {
         throw error;
       }
 
+      // Atualiza o estado local imediatamente
       setQuotes(prevQuotes => 
         prevQuotes.map(quote => 
           quote.id === quoteProviderId 
@@ -182,8 +190,17 @@ const RequestedQuotes: React.FC = () => {
         )
       );
 
+      // Se estamos em uma aba específica, e o status mudou, esse item deve ser removido da lista atual
+      if (tab !== 'all' && tab !== action) {
+        setQuotes(prevQuotes => prevQuotes.filter(quote => quote.id !== quoteProviderId));
+      }
+      
       toast.success(`Orçamento ${action === 'accepted' ? 'aceito' : 'rejeitado'} com sucesso!`);
-      await fetchQuotes();
+      
+      // Recarrega todos os orçamentos após uma pequena pausa para dar tempo ao banco de dados sincronizar
+      setTimeout(() => {
+        fetchQuotes();
+      }, 500);
     } catch (error: any) {
       console.error('Erro ao processar orçamento:', error);
       toast.error(`Erro ao ${action === 'accepted' ? 'aceitar' : 'rejeitar'} orçamento. Tente novamente.`);
@@ -277,7 +294,7 @@ const RequestedQuotes: React.FC = () => {
                               onClick={() => handleAction(quoteProvider.id, 'rejected')}
                             >
                               {actionLoading === quoteProvider.id ? (
-                                <LoadingSpinner className="w-4 h-4 mr-2" />
+                                <LoadingSpinner />
                               ) : null}
                               Rejeitar
                             </Button>
@@ -286,7 +303,7 @@ const RequestedQuotes: React.FC = () => {
                               onClick={() => handleAction(quoteProvider.id, 'accepted')}
                             >
                               {actionLoading === quoteProvider.id ? (
-                                <LoadingSpinner className="w-4 h-4 mr-2" />
+                                <LoadingSpinner />
                               ) : null}
                               Aceitar
                             </Button>
