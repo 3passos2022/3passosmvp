@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,13 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import LoadingSpinner from '@/components/ui/loading-spinner';
 
 interface RequestedQuote {
   id: string;
@@ -92,7 +85,6 @@ const RequestedQuotes: React.FC = () => {
 
       if (quoteProvidersError) throw quoteProvidersError;
 
-      // Get client info for each quote
       const quotesWithClientInfo = await Promise.all(
         quoteProviders.map(async (quoteProvider) => {
           let clientName = 'Cliente anônimo';
@@ -109,8 +101,6 @@ const RequestedQuotes: React.FC = () => {
             if (!clientError && clientData) {
               clientName = clientData.name || 'Nome não informado';
               clientPhone = clientData.phone || '';
-              // Email is not directly available in profiles, as it's in auth.users
-              // We use client_id directly as the email reference
               clientEmail = quoteProvider.quotes.client_id || '';
             }
           }
@@ -143,7 +133,6 @@ const RequestedQuotes: React.FC = () => {
         })
       );
 
-      // Filter by tab
       const filteredQuotes = tab === 'all' 
         ? quotesWithClientInfo 
         : quotesWithClientInfo.filter(quote => quote.status === tab);
@@ -160,15 +149,21 @@ const RequestedQuotes: React.FC = () => {
   const handleAction = async (quoteProviderId: string, action: 'accepted' | 'rejected') => {
     setActionLoading(quoteProviderId);
     try {
-      // Update the quote provider status
+      console.log(`Atualizando orçamento ${quoteProviderId} para ${action}`);
+      
       const { error } = await supabase
         .from('quote_providers')
-        .update({ status: action })
-        .eq('id', quoteProviderId);
+        .update({ 
+          status: action 
+        })
+        .eq('id', quoteProviderId)
+        .eq('provider_id', user?.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao atualizar orçamento:', error);
+        throw error;
+      }
 
-      // Successful update - update local state to reflect the change immediately
       setQuotes(prevQuotes => 
         prevQuotes.map(quote => 
           quote.id === quoteProviderId 
@@ -177,14 +172,11 @@ const RequestedQuotes: React.FC = () => {
         )
       );
 
-      // Show success toast
       toast.success(`Orçamento ${action === 'accepted' ? 'aceito' : 'rejeitado'} com sucesso!`);
-      
-      // Re-fetch quotes to ensure data is up to date
       await fetchQuotes();
-    } catch (error) {
-      console.error('Erro ao atualizar orçamento:', error);
-      toast.error('Erro ao processar sua solicitação. Tente novamente.');
+    } catch (error: any) {
+      console.error('Erro ao processar orçamento:', error);
+      toast.error(`Erro ao ${action === 'accepted' ? 'aceitar' : 'rejeitar'} orçamento. Tente novamente.`);
     } finally {
       setActionLoading(null);
     }
@@ -228,9 +220,13 @@ const RequestedQuotes: React.FC = () => {
         <TabsContent value={tab}>
           <div className="grid grid-cols-1 gap-4">
             {loading ? (
-              <p>Carregando orçamentos...</p>
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner />
+              </div>
             ) : quotes.length === 0 ? (
-              <p className="text-muted-foreground">Nenhum orçamento encontrado.</p>
+              <p className="text-muted-foreground text-center py-8">
+                Nenhum orçamento encontrado.
+              </p>
             ) : (
               quotes.map((quoteProvider) => (
                 <Card key={quoteProvider.id} className="overflow-hidden">
@@ -270,13 +266,19 @@ const RequestedQuotes: React.FC = () => {
                               disabled={!!actionLoading}
                               onClick={() => handleAction(quoteProvider.id, 'rejected')}
                             >
-                              {actionLoading === quoteProvider.id ? 'Processando...' : 'Rejeitar'}
+                              {actionLoading === quoteProvider.id ? (
+                                <LoadingSpinner className="w-4 h-4 mr-2" />
+                              ) : null}
+                              Rejeitar
                             </Button>
                             <Button
                               disabled={!!actionLoading}
                               onClick={() => handleAction(quoteProvider.id, 'accepted')}
                             >
-                              {actionLoading === quoteProvider.id ? 'Processando...' : 'Aceitar'}
+                              {actionLoading === quoteProvider.id ? (
+                                <LoadingSpinner className="w-4 h-4 mr-2" />
+                              ) : null}
+                              Aceitar
                             </Button>
                           </>
                         )}
@@ -290,7 +292,6 @@ const RequestedQuotes: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Quote Details Modal */}
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
         <DialogContent className="max-w-2xl">
           {selectedQuote && (
