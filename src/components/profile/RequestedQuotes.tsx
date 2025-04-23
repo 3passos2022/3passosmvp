@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +9,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import LoadingSpinner from '@/components/ui/loading-spinner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
 
 interface RequestedQuote {
   id: string;
@@ -293,7 +303,7 @@ const RequestedQuotes: React.FC = () => {
       </Tabs>
 
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           {selectedQuote && (
             <>
               <DialogHeader>

@@ -762,6 +762,13 @@ export type Database = {
         Args: { p_provider_id: string }
         Returns: number
       }
+      get_provider_quotes: {
+        Args: { _provider_id: string }
+        Returns: {
+          quote_id: string
+          status: string
+        }[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string
