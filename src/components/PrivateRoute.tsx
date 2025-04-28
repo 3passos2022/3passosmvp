@@ -37,4 +37,4 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   return <>{children}</>;
 };
 
-export default PrivateRoute; 
+export default PrivateRoute;

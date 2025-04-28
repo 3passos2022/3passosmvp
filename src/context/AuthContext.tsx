@@ -1,23 +1,11 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { UserRole } from '@/lib/types';
+import { UserRole, UserProfile } from '@/lib/types';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
 
-interface UserData {
-  id: string;
-  email: string;
-  role: UserRole;
-  name?: string;
-  avatar_url?: string;
-  address?: string;
-  phone?: string;
-  created_at: string;
-}
-
 export interface AuthContextProps {
-  user: UserData | null;
+  user: UserProfile | null;
   session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string, role: UserRole) => Promise<{
@@ -37,7 +25,7 @@ export interface AuthContextProps {
     error: Error | null;
     data: any;
   }>;
-  updateProfile: (data: Partial<UserData>) => Promise<{
+  updateProfile: (data: Partial<UserProfile>) => Promise<{
     error: Error | null;
     data: any;
   }>;
@@ -53,7 +41,7 @@ export interface AuthContextProps {
 export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserData | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
@@ -151,13 +139,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data) {
         setUser({
           id: data.id,
-          email: data.email,
+          email: data.email || data.id,
           role: data.role as UserRole,
           name: data.name,
           avatar_url: data.avatar_url,
           address: data.address,
           phone: data.phone,
-          created_at: data.created_at
+          created_at: data.created_at,
+          subscribed: subscription?.subscribed,
+          subscription_tier: subscription?.subscription_tier,
+          subscription_end: subscription?.subscription_end
         });
       }
     } catch (error) {
@@ -239,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  async function updateProfile(data: Partial<UserData>) {
+  async function updateProfile(data: Partial<UserProfile>) {
     if (!user) return { error: new Error('No user logged in'), data: null };
 
     try {
