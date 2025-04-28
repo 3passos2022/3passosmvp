@@ -93,19 +93,24 @@ const Login: React.FC = () => {
     },
   });
 
-  const onLoginSubmit = async (data: LoginFormData) => {
+  const handleLoginSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await signIn(data.email, data.password);
-      toast.success("Login realizado com sucesso!");
-      navigate("/");
+      const { error, data } = await signIn(data.email, data.password);
+      if (!error) {
+        toast.success("Login realizado com sucesso!");
+        navigate("/");
+      } else {
+        console.error("Error signing in:", error);
+        setIsLoading(false);
+      }
     } catch (error) {
       console.error("Error signing in:", error);
       setIsLoading(false);
     }
   };
 
-  const onSignupSubmit = async (data: SignupFormData) => {
+  const handleSignupSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
       await signUp(data.email, data.password, {
@@ -118,10 +123,8 @@ const Login: React.FC = () => {
         "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
       );
       
-      // Automatically switch to login tab
       setActiveTab("login");
       
-      // Pre-fill login form with the email
       loginForm.setValue("email", data.email);
       signupForm.reset();
     } catch (error) {
@@ -168,7 +171,7 @@ const Login: React.FC = () => {
                 <CardContent>
                   <Form {...loginForm}>
                     <form
-                      onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                      onSubmit={loginForm.handleSubmit(handleLoginSubmit)}
                       className="space-y-4"
                     >
                       <FormField
@@ -240,7 +243,7 @@ const Login: React.FC = () => {
                 <CardContent>
                   <Form {...signupForm}>
                     <form
-                      onSubmit={signupForm.handleSubmit(onSignupSubmit)}
+                      onSubmit={signupForm.handleSubmit(handleSignupSubmit)}
                       className="space-y-4"
                     >
                       <FormField

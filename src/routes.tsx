@@ -12,6 +12,7 @@ import PrivateRoute from './components/PrivateRoute';
 import Subscription from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import SubscriptionCancel from './pages/SubscriptionCancel';
+import { UserRole } from './lib/types';
 
 export const router = createBrowserRouter([
   {
@@ -57,7 +58,7 @@ export const router = createBrowserRouter([
   {
     path: '/admin/*',
     element: (
-      <PrivateRoute requiredRole="admin">
+      <PrivateRoute requiredRole={'admin' as UserRole}>
         <Admin />
       </PrivateRoute>
     )

@@ -10,7 +10,7 @@ import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client';
 
 const MakeAndreAdmin: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const { user, makeAdmin, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [success, setSuccess] = useState(false);
