@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -167,26 +168,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            role,
+          },
+        },
       });
 
       if (error) {
         return { error, data: null };
-      }
-
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            email,
-            role,
-          });
-
-        if (profileError) {
-          return { error: profileError, data: null };
-        }
-
-        return { data, error: null };
       }
 
       return { data, error: null };
@@ -251,14 +241,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   async function makeAdmin(userId: string) {
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { error: new Error('Unauthorized'), data: null };
     }
 
     try {
       const { error, data: updatedData } = await supabase
         .from('profiles')
-        .update({ role: 'admin' })
+        .update({ role: UserRole.ADMIN })
         .eq('id', userId);
 
       return { error, data: updatedData };

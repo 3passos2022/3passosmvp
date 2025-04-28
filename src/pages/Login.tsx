@@ -93,42 +93,46 @@ const Login: React.FC = () => {
     },
   });
 
-  const handleLoginSubmit = async (data: LoginFormData) => {
+  const handleLoginSubmit = async (formData: LoginFormData) => {
     setIsLoading(true);
     try {
-      const { error, data } = await signIn(data.email, data.password);
+      const { error, data } = await signIn(formData.email, formData.password);
       if (!error) {
         toast.success("Login realizado com sucesso!");
         navigate("/");
       } else {
         console.error("Error signing in:", error);
+        toast.error("Erro ao fazer login: " + error.message);
         setIsLoading(false);
       }
     } catch (error) {
       console.error("Error signing in:", error);
+      toast.error("Erro ao fazer login");
       setIsLoading(false);
     }
   };
 
-  const handleSignupSubmit = async (data: SignupFormData) => {
+  const handleSignupSubmit = async (formData: SignupFormData) => {
     setIsLoading(true);
     try {
-      await signUp(data.email, data.password, {
-        name: data.name,
-        phone: data.phone || "",
-        role: data.role,
-      });
+      const { error } = await signUp(formData.email, formData.password, formData.role);
 
-      toast.success(
-        "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
-      );
-      
-      setActiveTab("login");
-      
-      loginForm.setValue("email", data.email);
-      signupForm.reset();
+      if (error) {
+        console.error("Error signing up:", error);
+        toast.error("Erro ao criar conta: " + error.message);
+      } else {
+        toast.success(
+          "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
+        );
+        
+        setActiveTab("login");
+        
+        loginForm.setValue("email", formData.email);
+        signupForm.reset();
+      }
     } catch (error) {
       console.error("Error signing up:", error);
+      toast.error("Erro ao criar conta");
     } finally {
       setIsLoading(false);
     }
