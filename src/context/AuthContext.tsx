@@ -138,14 +138,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
+        // Create a UserProfile object with only the properties that exist in the data
+        // and use default values for properties not present in the database
         setUser({
           id: data.id,
-          email: data.email || data.id,
+          email: session?.user.email || data.id, // Use session email as fallback
           role: data.role as UserRole,
-          name: data.name,
-          avatar_url: data.avatar_url,
-          address: data.address,
-          phone: data.phone,
+          name: data.name || undefined,
+          avatar_url: undefined, // This field doesn't exist in the database
+          address: undefined, // This field doesn't exist in the database
+          phone: data.phone || undefined,
           created_at: data.created_at,
           subscribed: subscription?.subscribed,
           subscription_tier: subscription?.subscription_tier,
