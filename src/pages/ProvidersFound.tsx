@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -13,6 +14,11 @@ import ProviderDetailsModal from '@/components/providerMatch/ProviderDetailsModa
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
 import { toast as sonnerToast } from 'sonner';
 import { ENV } from '@/env';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 // Definindo a variável de ambiente do Google Maps
 declare global {
@@ -26,9 +32,11 @@ const ProvidersFound: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { featureLimits, loading: loadingFeatures } = useFeatureFlags();
   
   const [providers, setProviders] = useState<ProviderMatch[]>([]);
   const [filteredProviders, setFilteredProviders] = useState<ProviderMatch[]>([]);
+  const [displayedProviders, setDisplayedProviders] = useState<ProviderMatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<ProviderDetails | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
@@ -36,6 +44,10 @@ const ProvidersFound: React.FC = () => {
   const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
   const [currentFilter, setCurrentFilter] = useState<FilterOption>('relevance');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Obter o limite de prestadores visíveis baseado na assinatura
+  const providersLimit = featureLimits?.visible_providers_limit?.limit ?? 3;
+  const isUnlimited = providersLimit === null;
   
   const googleMapsApiKey = ENV.GOOGLE_MAPS_API_KEY;
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
@@ -171,6 +183,15 @@ const ProvidersFound: React.FC = () => {
     
     fetchProviders();
   }, [quoteDetails, toast]);
+  
+  useEffect(() => {
+    // Aplicar o limite de prestadores exibidos com base no plano de assinatura
+    if (!isUnlimited && providersLimit !== null && filteredProviders.length > providersLimit) {
+      setDisplayedProviders(filteredProviders.slice(0, providersLimit));
+    } else {
+      setDisplayedProviders(filteredProviders);
+    }
+  }, [filteredProviders, providersLimit, isUnlimited]);
   
   const handleFilterChange = (filter: FilterOption, providersToFilter = providers) => {
     setCurrentFilter(filter);
@@ -329,6 +350,25 @@ const ProvidersFound: React.FC = () => {
     return null;
   };
   
+  // Renderizar a mensagem de limite de prestadores
+  const renderLimitMessage = () => {
+    if (!isUnlimited && providersLimit !== null && filteredProviders.length > providersLimit) {
+      return (
+        <Alert className="mt-4 mb-6 bg-amber-50 border-amber-200">
+          <Lock className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Visualização limitada</AlertTitle>
+          <AlertDescription>
+            Você está visualizando {providersLimit} de {filteredProviders.length} prestadores disponíveis.{' '}
+            <Link to="/subscription" className="font-medium underline text-amber-600">
+              Faça upgrade para ver todos os prestadores
+            </Link>.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    return null;
+  };
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -341,7 +381,7 @@ const ProvidersFound: React.FC = () => {
         >
           <h1 className="text-2xl font-bold mb-2">Prestadores Encontrados</h1>
           
-          {isLoading ? (
+          {isLoading || loadingFeatures ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
               <p className="text-muted-foreground">Buscando prestadores de serviço...</p>
@@ -357,8 +397,10 @@ const ProvidersFound: React.FC = () => {
                     currentFilter={currentFilter} 
                   />
                   
+                  {renderLimitMessage()}
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProviders.map((provider) => (
+                    {displayedProviders.map((provider) => (
                       <ProviderCard 
                         key={provider.provider.userId} 
                         provider={provider} 
@@ -366,6 +408,18 @@ const ProvidersFound: React.FC = () => {
                       />
                     ))}
                   </div>
+                  
+                  {!isUnlimited && providersLimit !== null && filteredProviders.length > providersLimit && (
+                    <div className="mt-8 text-center">
+                      <Button 
+                        onClick={() => navigate('/subscription')} 
+                        className="px-8"
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Fazer upgrade para ver todos os prestadores
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
               

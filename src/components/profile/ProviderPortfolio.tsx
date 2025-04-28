@@ -8,17 +8,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { UploadCloud, X, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud, X, Image as ImageIcon, Lock } from 'lucide-react';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { Link } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const MAX_IMAGES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const ProviderPortfolio: React.FC = () => {
   const { user } = useAuth();
+  const { featureLimits, loading: loadingFeatures } = useFeatureFlags();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [portfolio, setPortfolio] = useState<any[]>([]);
   const [description, setDescription] = useState('');
+
+  // Obter o limite de imagens baseado na assinatura
+  const imageLimit = featureLimits?.portfolio_image_limit?.limit ?? 5;
+  const isLimitExceeded = imageLimit !== null && portfolio.length >= imageLimit;
+  const isLimitReached = imageLimit !== null && portfolio.length >= imageLimit;
+  const isUnlimited = imageLimit === null;
 
   useEffect(() => {
     async function loadPortfolio() {
@@ -53,8 +62,8 @@ const ProviderPortfolio: React.FC = () => {
     if (!files || files.length === 0) return;
     
     // Check if we've reached the maximum number of images
-    if (portfolio.length >= MAX_IMAGES) {
-      toast.error(`Você atingiu o limite de ${MAX_IMAGES} imagens. Remova algumas para adicionar novas.`);
+    if (isLimitReached) {
+      toast.error(`Você atingiu o limite de ${imageLimit} imagens. Faça upgrade para adicionar mais.`);
       return;
     }
     
@@ -147,7 +156,7 @@ const ProviderPortfolio: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading || loadingFeatures) {
     return <div className="p-4 text-center">Carregando portfólio...</div>;
   }
 
@@ -155,10 +164,30 @@ const ProviderPortfolio: React.FC = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Meu Portfólio</CardTitle>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+            <CardTitle>Meu Portfólio</CardTitle>
+            {!isUnlimited && (
+              <div className="text-sm text-muted-foreground">
+                {portfolio.length} / {imageLimit} imagens
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {isLimitReached && !isUnlimited && (
+              <Alert className="bg-amber-50 border-amber-200">
+                <Lock className="h-4 w-4 text-amber-600" />
+                <AlertTitle>Limite de imagens atingido</AlertTitle>
+                <AlertDescription>
+                  Você atingiu o limite de {imageLimit} imagens no seu plano atual.{' '}
+                  <Link to="/subscription" className="font-medium underline text-amber-600">
+                    Faça upgrade para adicionar mais imagens
+                  </Link>.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {portfolio.length === 0 ? (
               <div className="text-center py-6 border-2 border-dashed rounded-lg">
                 <ImageIcon className="h-12 w-12 mx-auto text-gray-400" />
@@ -195,12 +224,14 @@ const ProviderPortfolio: React.FC = () => {
               </div>
             )}
             
-            {portfolio.length < MAX_IMAGES && (
+            {(!isLimitReached || isUnlimited) && (
               <div className="space-y-4">
                 <p className="text-sm text-gray-500">
-                  {portfolio.length > 0 
-                    ? `Você pode adicionar mais ${MAX_IMAGES - portfolio.length} imagens ao seu portfólio.` 
-                    : 'Adicione até 5 imagens ao seu portfólio para mostrar seus trabalhos.'}
+                  {portfolio.length > 0 && !isUnlimited
+                    ? `Você pode adicionar mais ${imageLimit - portfolio.length} imagens ao seu portfólio.` 
+                    : isUnlimited
+                      ? 'Seu plano permite adicionar imagens ilimitadas ao seu portfólio.'
+                      : `Adicione até ${imageLimit} imagens ao seu portfólio para mostrar seus trabalhos.`}
                 </p>
                 
                 <div className="space-y-2">

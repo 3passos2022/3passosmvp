@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Menu, X, UserCircle, Home, Briefcase, 
-  ClipboardList, LogIn, LogOut 
+  ClipboardList, LogIn, LogOut, CreditCard
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 import { UserRole } from '@/lib/types';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 import ServiceNavBar from './ServiceNavBar';
+import { Badge } from './ui/badge';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -84,6 +85,11 @@ const Navbar: React.FC = () => {
                   <Button variant="outline" className="hover-scale">
                     <UserCircle className="mr-2 h-4 w-4" />
                     {user.name || 'Minha Conta'}
+                    {user.subscribed && (
+                      <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/20">
+                        {user.subscription_tier === 'premium' ? 'Premium' : 'Básico'}
+                      </Badge>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 animate-scale-in">
@@ -99,6 +105,12 @@ const Navbar: React.FC = () => {
                     <Link to="/profile/quotes" className="w-full cursor-pointer">
                       <ClipboardList className="mr-2 h-4 w-4" />
                       Meus Pedidos
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/subscription" className="w-full cursor-pointer">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Minha Assinatura
                     </Link>
                   </DropdownMenuItem>
                   {user.role === UserRole.PROVIDER && (
@@ -182,6 +194,15 @@ const Navbar: React.FC = () => {
                     <Link to="/profile/quotes" className="flex items-center py-2 hover:text-primary transition-colors">
                       <ClipboardList className="mr-2 h-5 w-5" />
                       Meus Pedidos
+                    </Link>
+                    <Link to="/subscription" className="flex items-center py-2 hover:text-primary transition-colors">
+                      <CreditCard className="mr-2 h-5 w-5" />
+                      Minha Assinatura
+                      {user.subscribed && (
+                        <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs">
+                          {user.subscription_tier === 'premium' ? 'Premium' : 'Básico'}
+                        </Badge>
+                      )}
                     </Link>
                     {user.role === UserRole.PROVIDER && (
                       <Link to="/profile/services" className="flex items-center py-2 hover:text-primary transition-colors">

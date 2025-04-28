@@ -1,66 +1,51 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import { AnimatePresence } from "framer-motion";
-import { lazy, Suspense } from "react";
+import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './App.css';
+import Index from './pages/Index';
+import Services from './pages/Services';
+import NotFound from './pages/NotFound';
+import Login from './pages/Login';
+import RequestQuote from './pages/RequestQuote';
+import ProvidersFound from './pages/ProvidersFound';
+import Profile from './pages/Profile';
+import Admin from './pages/Admin';
+import PrivateRoute from './components/PrivateRoute';
+import Subscription from './pages/Subscription';
+import SubscriptionSuccess from './pages/SubscriptionSuccess';
+import SubscriptionCancel from './pages/SubscriptionCancel';
 
-// Pages
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import MakeAndreAdmin from "./pages/makeAndreAdmin";
-// Import ProvidersFound directly instead of lazy loading since it's causing issues
-import ProvidersFound from "./pages/ProvidersFound";
-
-// Lazy loaded pages for better performance
-const RequestQuote = lazy(() => import("./pages/RequestQuote"));
-const Services = lazy(() => import("./pages/Services"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Admin = lazy(() => import("./pages/Admin"));
-
-// Create React Query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30000, // 30 seconds
-    },
-  },
-});
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <Toaster />
-          <Sonner />
-          <AnimatePresence mode="wait">
-            <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/request-quote" element={<RequestQuote />} />
-                <Route path="/prestadoresencontrados" element={<ProvidersFound />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/services/:serviceId" element={<Services />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/profile/*" element={<Profile />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/admin/*" element={<Admin />} />
-                <Route path="/make-andre-admin" element={<MakeAndreAdmin />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </AnimatePresence>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/request-quote" element={<RequestQuote />} />
+        <Route path="/prestadoresencontrados" element={<ProvidersFound />} />
+        
+        {/* Subscription Routes */}
+        <Route path="/subscription" element={<Subscription />} />
+        <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+        <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
+        
+        {/* Protected Routes */}
+        <Route path="/profile/*" element={
+          <PrivateRoute>
+            <Profile />
+          </PrivateRoute>
+        } />
+        <Route path="/admin/*" element={
+          <PrivateRoute requiredRole="admin">
+            <Admin />
+          </PrivateRoute>
+        } />
+        
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Router>
+  );
+}
 
 export default App;

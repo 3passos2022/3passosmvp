@@ -1,334 +1,263 @@
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { User, UserRole } from '@/lib/types';
+import { UserRole } from '@/lib/types';
+import { SubscriptionStatus } from '@/lib/types/subscriptions';
 import { toast } from 'sonner';
-import { Session } from '@supabase/supabase-js';
-import DOMPurify from 'dompurify';
 
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+export interface UserProfile {
+  id: string;
+  name?: string;
+  email: string;
+  role: UserRole;
+  subscribed: boolean;
+  subscription_tier: 'free' | 'basic' | 'premium';
+  subscription_end: string | null;
+}
 
 interface AuthContextProps {
-  user: User | null;
+  user: UserProfile | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, userData: Partial<User>) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error: string | null }>;
+  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<{ success: boolean; error: string | null }>;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;
-  makeAdmin: (userId: string) => Promise<void>;
+  checkSubscription: () => Promise<SubscriptionStatus | null>;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [lastActivity, setLastActivity] = useState(Date.now());
 
-  // Função para atualizar a última atividade
-  const updateLastActivity = () => {
-    setLastActivity(Date.now());
-  };
-
-  // Monitor de atividade do usuário
-  useEffect(() => {
-    if (!user) return;
-
-    const checkActivity = () => {
-      if (Date.now() - lastActivity > SESSION_TIMEOUT) {
-        handleSignOut();
-        toast.warning('Sessão expirada por inatividade');
-      }
-    };
-
-    const activityEvents = ['mousemove', 'keypress', 'click', 'scroll'];
-    activityEvents.forEach(event => {
-      window.addEventListener(event, updateLastActivity);
-    });
-
-    const intervalId = setInterval(checkActivity, 1000);
-
-    return () => {
-      activityEvents.forEach(event => {
-        window.removeEventListener(event, updateLastActivity);
-      });
-      clearInterval(intervalId);
-    };
-  }, [user, lastActivity]);
-
-  const refreshUser = async () => {
+  const checkSubscription = async (): Promise<SubscriptionStatus | null> => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('check-subscription', {});
       
-      if (!session) {
-        setUser(null);
-        setSession(null);
-        return;
+      if (error) {
+        console.error('Erro ao verificar assinatura:', error);
+        return null;
       }
-
-      setSession(session);
       
-      // Use the safer function to get the user role to avoid recursion
-      const { data: userRole, error: roleError } = await supabase.rpc('get_user_role_safely', {
-        user_id: session.user.id
-      });
+      const subscriptionStatus: SubscriptionStatus = data;
       
-      if (roleError) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('Error fetching user role:', roleError);
-        }
-        // Try to get profile directly if RPC fails
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('name, phone, role, created_at')
-          .eq('id', session.user.id)
-          .maybeSingle();
-        
-        if (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error('Error fetching profile data:', error);
-          }
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: DOMPurify.sanitize(session.user.user_metadata?.name || ''),
-            phone: DOMPurify.sanitize(session.user.user_metadata?.phone || ''),
-            role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-            createdAt: session.user.created_at,
-          });
-          return;
-        }
-        
-        if (profile) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: DOMPurify.sanitize(profile.name || ''),
-            phone: DOMPurify.sanitize(profile.phone || ''),
-            role: profile.role as UserRole,
-            createdAt: profile.created_at || session.user.created_at,
-          });
-        }
-      } else {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name, phone, created_at')
-          .eq('id', session.user.id)
-          .maybeSingle();
-          
+      // Atualizar o perfil de usuário com as informações de assinatura
+      if (user) {
         setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: DOMPurify.sanitize(profile?.name || session.user.user_metadata?.name || ''),
-          phone: DOMPurify.sanitize(profile?.phone || session.user.user_metadata?.phone || ''),
-          role: userRole as UserRole,
-          createdAt: profile?.created_at || session.user.created_at,
+          ...user,
+          subscribed: subscriptionStatus.subscribed,
+          subscription_tier: subscriptionStatus.subscription_tier,
+          subscription_end: subscriptionStatus.subscription_end
         });
       }
+      
+      return subscriptionStatus;
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error refreshing user:', error);
-      }
-      setUser(null);
-      setSession(null);
+      console.error('Erro ao verificar assinatura:', error);
+      return null;
     }
   };
 
+  // Setup auth state change listener
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Auth state changed:', event);
-      }
-      
-      setSession(session);
-      
-      if (session) {
-        // Use setTimeout to avoid recursive policy issues
-        setTimeout(async () => {
-          try {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select('name, phone, role, created_at')
-              .eq('id', session.user.id)
-              .single();
-            
-            if (error) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.error('Error fetching profile:', error);
-              }
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: DOMPurify.sanitize(session.user.user_metadata?.name || ''),
-                phone: DOMPurify.sanitize(session.user.user_metadata?.phone || ''),
-                role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT,
-                createdAt: session.user.created_at,
-              });
-              return;
-            }
-            
-            if (profile) {
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: DOMPurify.sanitize(profile.name || ''),
-                phone: DOMPurify.sanitize(profile.phone || ''),
-                role: profile.role as UserRole,
-                createdAt: profile.created_at || session.user.created_at,
-              });
-            }
-          } catch (error) {
-            if (process.env.NODE_ENV !== 'production') {
-              console.error('Error fetching profile:', error);
-            }
-          }
-        }, 0);
-      } else {
-        setUser(null);
-      }
-      
-      setLoading(false);
-    });
-
-    const initializeAuth = async () => {
+    const setupAuthListener = async () => {
       setLoading(true);
-      await refreshUser();
+      
+      // First set up the auth state listener
+      const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+        async (event, currentSession) => {
+          console.log('Auth state changed:', event);
+          setSession(currentSession);
+          
+          if (currentSession?.user) {
+            try {
+              const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', currentSession.user.id)
+                .single();
+              
+              if (profileError) throw profileError;
+
+              // Buscar informações de assinatura
+              let subscriptionData: SubscriptionStatus = {
+                subscribed: false,
+                subscription_tier: 'free',
+                subscription_end: null
+              };
+
+              try {
+                const { data: subData } = await supabase
+                  .from('subscribers')
+                  .select('*')
+                  .eq('user_id', currentSession.user.id)
+                  .maybeSingle();
+                
+                if (subData) {
+                  subscriptionData = {
+                    subscribed: subData.subscribed,
+                    subscription_tier: subData.subscription_tier || 'free',
+                    subscription_end: subData.subscription_end
+                  };
+                }
+              } catch (subError) {
+                console.error('Erro ao buscar dados de assinatura:', subError);
+              }
+              
+              setUser({
+                id: currentSession.user.id,
+                name: profile.name,
+                email: currentSession.user.email || '',
+                role: profile.role as UserRole,
+                ...subscriptionData
+              });
+
+              // Verificar assinatura no Stripe via edge function
+              setTimeout(() => {
+                checkSubscription().catch(console.error);
+              }, 0);
+
+            } catch (error) {
+              console.error('Erro ao buscar perfil do usuário:', error);
+              setUser(null);
+            }
+          } else {
+            setUser(null);
+          }
+          
+          setLoading(false);
+        }
+      );
+
+      // Then check for existing session
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      setSession(existingSession);
+      
+      if (existingSession?.user) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', existingSession.user.id)
+            .single();
+          
+          if (profileError) throw profileError;
+
+          // Buscar informações de assinatura
+          let subscriptionData: SubscriptionStatus = {
+            subscribed: false,
+            subscription_tier: 'free',
+            subscription_end: null
+          };
+
+          try {
+            const { data: subData } = await supabase
+              .from('subscribers')
+              .select('*')
+              .eq('user_id', existingSession.user.id)
+              .maybeSingle();
+            
+            if (subData) {
+              subscriptionData = {
+                subscribed: subData.subscribed,
+                subscription_tier: subData.subscription_tier || 'free',
+                subscription_end: subData.subscription_end
+              };
+            }
+          } catch (subError) {
+            console.error('Erro ao buscar dados de assinatura:', subError);
+          }
+          
+          setUser({
+            id: existingSession.user.id,
+            name: profile.name,
+            email: existingSession.user.email || '',
+            role: profile.role as UserRole,
+            ...subscriptionData
+          });
+
+          // Verificar assinatura no Stripe via edge function
+          setTimeout(() => {
+            checkSubscription().catch(console.error);
+          }, 0);
+
+        } catch (error) {
+          console.error('Erro ao buscar perfil do usuário:', error);
+          setUser(null);
+        }
+      }
+      
       setLoading(false);
+
+      return () => {
+        authSubscription.unsubscribe();
+      };
     };
 
-    initializeAuth();
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    setupAuthListener();
   }, []);
 
-  const handleSignIn = async (email: string, password: string) => {
-    setLoading(true);
+  const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: DOMPurify.sanitize(email), 
-        password 
-      });
-      
-      if (error) throw error;
-      
-      setSession(data.session);
-      await refreshUser();
-      updateLastActivity();
-      toast.success('Login realizado com sucesso');
-    } catch (error: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error signing in:', error);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        return { success: false, error: error.message };
       }
-      toast.error(error.message || 'Erro ao fazer login. Verifique suas credenciais');
-      throw error;
-    } finally {
-      setLoading(false);
+      return { success: true, error: null };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Erro ao fazer login' };
     }
   };
 
-  const handleSignUp = async (email: string, password: string, userData: Partial<User>) => {
-    setLoading(true);
+  const signUp = async (email: string, password: string, name: string, role: UserRole) => {
     try {
-      const sanitizedData = {
-        name: DOMPurify.sanitize(userData.name || ''),
-        role: userData.role,
-        phone: DOMPurify.sanitize(userData.phone || ''),
-      };
-
       const { data, error } = await supabase.auth.signUp({
-        email: DOMPurify.sanitize(email),
+        email,
         password,
         options: {
-          data: sanitizedData,
-          emailRedirectTo: window.location.origin + '/login',
+          data: {
+            name,
+            role,
+          },
         },
       });
-      
-      if (error) throw error;
-      
-      if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.user.id,
-          name: sanitizedData.name,
-          role: sanitizedData.role,
-          phone: sanitizedData.phone,
-        });
-        
-        if (profileError) throw profileError;
+
+      if (error) {
+        return { success: false, error: error.message };
       }
-      
-      toast.success('Conta criada com sucesso');
+
+      return { success: true, error: null };
     } catch (error: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error signing up:', error);
-      }
-      toast.error(error.message || 'Erro ao criar conta');
-      throw error;
-    } finally {
-      setLoading(false);
+      return { success: false, error: error.message || 'Erro ao criar conta' };
     }
   };
 
-  const handleSignOut = async () => {
-    setLoading(true);
+  const signOut = async () => {
     try {
       await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-      toast.success('Logout realizado com sucesso');
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error signing out:', error);
-      }
-      toast.error('Erro ao fazer logout');
-      throw error;
-    } finally {
-      setLoading(false);
+      console.error('Erro ao fazer logout:', error);
     }
   };
 
-  const makeAdmin = async (userId: string) => {
-    try {
-      const { error } = await supabase.rpc('update_user_role', { 
-        user_id: DOMPurify.sanitize(userId),
-        new_role: UserRole.ADMIN
-      });
-      
-      if (error) throw error;
-      
-      toast.success('Usuário promovido a administrador com sucesso');
-      
-      if (user && user.id === userId) {
-        await supabase.auth.refreshSession();
-        await refreshUser();
-      }
-      
-      return;
-    } catch (error: any) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error making user admin:', error);
-      }
-      toast.error(error.message || 'Erro ao promover usuário');
-      throw error;
-    }
-  };
-
-  const value = {
-    user,
-    session,
-    loading,
-    signIn: handleSignIn,
-    signUp: handleSignUp,
-    signOut: handleSignOut,
-    refreshUser,
-    makeAdmin,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        checkSubscription,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

@@ -1,4 +1,4 @@
-
+// Componente atualizado para usar feature flags
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -10,12 +10,15 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Specialty, Service, SubService } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Plus, PenLine, Settings } from 'lucide-react';
+import { Trash2, Plus, PenLine, Settings, Lock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { getAllServices } from '@/lib/api/services';
 import { formatCurrency, parseCurrencyInput } from '@/lib/utils';
 import { ProviderServiceItemPrice } from '@/lib/types/providerMatch';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { Link } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Basic type definitions to avoid deep types
 interface SpecialtyItem {
@@ -36,6 +39,7 @@ interface ProviderServiceItem {
 
 const ProviderServices = () => {
   const { user } = useAuth();
+  const { featureLimits, loading: loadingFeatures } = useFeatureFlags();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [addingService, setAddingService] = useState(false);
@@ -48,6 +52,11 @@ const ProviderServices = () => {
   const [serviceItems, setServiceItems] = useState<Record<string, ProviderServiceItemPrice[]>>({});
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
+  
+  // Obter o limite de serviços baseado na assinatura
+  const servicesLimit = featureLimits?.provider_services_limit?.limit ?? 1;
+  const isLimitReached = servicesLimit !== null && providerServices.length >= servicesLimit;
+  const isUnlimited = servicesLimit === null;
   
   // Load all available services
   useEffect(() => {
@@ -264,6 +273,12 @@ const ProviderServices = () => {
   
   const handleAddService = async () => {
     if (!user || !selectedSpecialty || !basePrice) return;
+    
+    // Verificar limite de serviços
+    if (!isUnlimited && providerServices.length >= servicesLimit) {
+      toast.error(`Você atingiu o limite de ${servicesLimit} serviços. Faça upgrade para adicionar mais.`);
+      return;
+    }
     
     setAddingService(true);
     try {
@@ -502,22 +517,42 @@ const ProviderServices = () => {
   const filteredSpecialties = selectedSubService
     ? filteredSubServices.find(s => s.id === selectedSubService)?.specialties || []
     : [];
-  
-  if (loading) {
+
+  if (loading || loadingFeatures) {
     return (
       <div className="text-center p-8">
         <p>Carregando serviços...</p>
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Serviços que você presta</CardTitle>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+            <CardTitle>Serviços que você presta</CardTitle>
+            {!isUnlimited && (
+              <div className="text-sm text-muted-foreground">
+                {providerServices.length} / {servicesLimit} serviços
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
+          {isLimitReached && !isUnlimited && (
+            <Alert className="mb-6 bg-amber-50 border-amber-200">
+              <Lock className="h-4 w-4 text-amber-600" />
+              <AlertTitle>Limite de serviços atingido</AlertTitle>
+              <AlertDescription>
+                Você atingiu o limite de {servicesLimit} serviços no seu plano atual.{' '}
+                <Link to="/subscription" className="font-medium underline text-amber-600">
+                  Faça upgrade para adicionar mais serviços
+                </Link>.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           {providerServices.length === 0 ? (
             <div className="text-center p-4 border border-dashed rounded-md">
               <p className="text-gray-500">Você ainda não oferece nenhum serviço</p>
@@ -783,105 +818,117 @@ const ProviderServices = () => {
           
           <Separator className="my-6" />
           
-          <div className="space-y-6">
-            <h3 className="font-medium">Adicionar novo serviço</h3>
-            
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="service">Serviço</Label>
-                <Select value={selectedService} onValueChange={setSelectedService}>
-                  <SelectTrigger id="service">
-                    <SelectValue placeholder="Selecione um serviço" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {(!isLimitReached || isUnlimited) ? (
+            <div className="space-y-6">
+              <h3 className="font-medium">Adicionar novo serviço</h3>
+              
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="service">Serviço</Label>
+                  <Select value={selectedService} onValueChange={setSelectedService}>
+                    <SelectTrigger id="service">
+                      <SelectValue placeholder="Selecione um serviço" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {services.map((service) => (
+                        <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {selectedService && (
+                  <div className="space-y-2">
+                    <Label htmlFor="sub-service">Tipo de serviço</Label>
+                    <Select 
+                      value={selectedSubService} 
+                      onValueChange={setSelectedSubService}
+                      disabled={filteredSubServices.length === 0}
+                    >
+                      <SelectTrigger id="sub-service">
+                        <SelectValue placeholder={
+                          filteredSubServices.length === 0 
+                            ? "Nenhum tipo de serviço disponível" 
+                            : "Selecione um tipo de serviço"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredSubServices.map((subService) => (
+                          <SelectItem key={subService.id} value={subService.id}>
+                            {subService.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
+                {selectedSubService && (
+                  <div className="space-y-2">
+                    <Label htmlFor="specialty">Especialidade</Label>
+                    <Select 
+                      value={selectedSpecialty} 
+                      onValueChange={setSelectedSpecialty}
+                      disabled={filteredSpecialties.length === 0}
+                    >
+                      <SelectTrigger id="specialty">
+                        <SelectValue placeholder={
+                          filteredSpecialties.length === 0 
+                            ? "Nenhuma especialidade disponível" 
+                            : "Selecione uma especialidade"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredSpecialties.map((specialty) => (
+                          <SelectItem key={specialty.id} value={specialty.id}>
+                            {specialty.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
+                {selectedSpecialty && (
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Preço base (R$)</Label>
+                    <Input 
+                      id="price" 
+                      type="text"
+                      value={basePrice}
+                      onChange={(e) => setBasePrice(e.target.value)}
+                      placeholder="Ex: 100,00"
+                    />
+                  </div>
+                )}
+                
+                <Button 
+                  onClick={handleAddService}
+                  disabled={
+                    addingService || 
+                    !selectedService || 
+                    !selectedSubService || 
+                    !selectedSpecialty || 
+                    !basePrice ||
+                    parseFloat(basePrice.replace(',', '.')) <= 0
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  {addingService ? 'Adicionando...' : 'Adicionar serviço'}
+                </Button>
               </div>
-              
-              {selectedService && (
-                <div className="space-y-2">
-                  <Label htmlFor="sub-service">Tipo de serviço</Label>
-                  <Select 
-                    value={selectedSubService} 
-                    onValueChange={setSelectedSubService}
-                    disabled={filteredSubServices.length === 0}
-                  >
-                    <SelectTrigger id="sub-service">
-                      <SelectValue placeholder={
-                        filteredSubServices.length === 0 
-                          ? "Nenhum tipo de serviço disponível" 
-                          : "Selecione um tipo de serviço"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSubServices.map((subService) => (
-                        <SelectItem key={subService.id} value={subService.id}>
-                          {subService.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
-              {selectedSubService && (
-                <div className="space-y-2">
-                  <Label htmlFor="specialty">Especialidade</Label>
-                  <Select 
-                    value={selectedSpecialty} 
-                    onValueChange={setSelectedSpecialty}
-                    disabled={filteredSpecialties.length === 0}
-                  >
-                    <SelectTrigger id="specialty">
-                      <SelectValue placeholder={
-                        filteredSpecialties.length === 0 
-                          ? "Nenhuma especialidade disponível" 
-                          : "Selecione uma especialidade"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSpecialties.map((specialty) => (
-                        <SelectItem key={specialty.id} value={specialty.id}>
-                          {specialty.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
-              {selectedSpecialty && (
-                <div className="space-y-2">
-                  <Label htmlFor="price">Preço base (R$)</Label>
-                  <Input 
-                    id="price" 
-                    type="text"
-                    value={basePrice}
-                    onChange={(e) => setBasePrice(e.target.value)}
-                    placeholder="Ex: 100,00"
-                  />
-                </div>
-              )}
-              
+            </div>
+          ) : (
+            <div className="mt-6">
               <Button 
-                onClick={handleAddService}
-                disabled={
-                  addingService || 
-                  !selectedService || 
-                  !selectedSubService || 
-                  !selectedSpecialty || 
-                  !basePrice ||
-                  parseFloat(basePrice.replace(',', '.')) <= 0
-                }
+                onClick={() => window.location.href = '/subscription'} 
+                className="w-full"
               >
-                <Plus className="h-4 w-4 mr-1" />
-                {addingService ? 'Adicionando...' : 'Adicionar serviço'}
+                <Lock className="mr-2 h-4 w-4" />
+                Fazer upgrade para adicionar mais serviços
               </Button>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -889,4 +936,3 @@ const ProviderServices = () => {
 };
 
 export default ProviderServices;
-

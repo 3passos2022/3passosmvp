@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      feature_flags: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled_globally: boolean
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled_globally?: boolean
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled_globally?: boolean
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -722,6 +746,115 @@ export type Database = {
           },
         ]
       }
+      subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          stripe_customer_id: string | null
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      subscription_features: {
+        Row: {
+          created_at: string
+          feature_id: string | null
+          id: string
+          subscription_tier: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          feature_id?: string | null
+          id?: string
+          subscription_tier: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string | null
+          id?: string
+          subscription_tier?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_features: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          expires_at: string | null
+          feature_id: string | null
+          id: string
+          reason: string | null
+          user_id: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          feature_id?: string | null
+          id?: string
+          reason?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          feature_id?: string | null
+          id?: string
+          reason?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -757,6 +890,10 @@ export type Database = {
           phone: string
           role: string
         }[]
+      }
+      get_feature_limit: {
+        Args: { p_user_id: string; p_feature_name: string }
+        Returns: Json
       }
       get_provider_average_rating: {
         Args: { p_provider_id: string }
