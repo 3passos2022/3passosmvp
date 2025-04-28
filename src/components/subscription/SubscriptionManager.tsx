@@ -3,31 +3,40 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
 
 const SubscriptionManager: React.FC = () => {
-  const { user, subscription, refreshSubscription } = useAuth();
+  const { user, subscription, refreshSubscription, subscriptionLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   useEffect(() => {
     const checkUserSubscription = async () => {
       if (user) {
-        await refreshSubscription();
+        try {
+          await refreshSubscription();
+        } catch (error) {
+          console.error("Failed to check subscription:", error);
+        }
       }
     };
     
     checkUserSubscription();
     
-    // Poll for subscription status changes every 10 seconds while on this page
+    // Poll for subscription status changes every 30 seconds while on this page
     const interval = setInterval(async () => {
       if (user) {
-        await refreshSubscription();
+        try {
+          await refreshSubscription();
+        } catch (error) {
+          console.error("Failed to check subscription in interval:", error);
+        }
       }
-    }, 10000);
+    }, 30000);
     
     return () => clearInterval(interval);
   }, [user, refreshSubscription]);
@@ -81,18 +90,49 @@ const SubscriptionManager: React.FC = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshSubscription();
+      toast.success("Informações de assinatura atualizadas");
+    } catch (error) {
+      console.error("Error refreshing subscription data:", error);
+      toast.error("Erro ao atualizar dados da assinatura");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Gerenciar Assinatura</CardTitle>
-        <CardDescription>
-          {subscription?.subscribed 
-            ? `Você tem uma assinatura ${subscription.subscription_tier === 'premium' ? 'Premium' : 'Básica'} ativa`
-            : "Você não tem uma assinatura ativa"}
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Gerenciar Assinatura</CardTitle>
+            <CardDescription>
+              {subscriptionLoading ? 'Verificando status da assinatura...' : 
+               (subscription?.subscribed 
+                ? `Você tem uma assinatura ${subscription.subscription_tier === 'premium' ? 'Premium' : 'Básica'} ativa`
+                : "Você não tem uma assinatura ativa")}
+            </CardDescription>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleRefresh}
+            disabled={refreshing || subscriptionLoading}
+            title="Atualizar status da assinatura"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing || subscriptionLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        {subscription?.subscribed ? (
+        {subscriptionLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        ) : subscription?.subscribed ? (
           <div>
             <p className="text-sm text-gray-500 mb-2">Plano atual:</p>
             <p className="font-medium">{subscription.subscription_tier === 'premium' ? 'Premium' : 'Básico'}</p>
@@ -118,7 +158,7 @@ const SubscriptionManager: React.FC = () => {
             onClick={handleManageSubscription} 
             variant="outline" 
             className="w-full"
-            disabled={portalLoading}
+            disabled={portalLoading || subscriptionLoading}
           >
             {portalLoading ? (
               <>
@@ -136,7 +176,7 @@ const SubscriptionManager: React.FC = () => {
           <Button 
             onClick={handleSubscribe} 
             className="w-full"
-            disabled={loading}
+            disabled={loading || subscriptionLoading}
           >
             {loading ? (
               <>

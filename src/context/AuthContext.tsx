@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import { UserRole, UserProfile } from '@/lib/types';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
+import { toast } from 'sonner';
 
 export interface AuthContextProps {
   user: UserProfile | null;
@@ -37,6 +38,7 @@ export interface AuthContextProps {
   }>;
   subscription: SubscriptionStatus | null;
   refreshSubscription: () => Promise<void>;
+  subscriptionLoading: boolean;
 }
 
 export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -46,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -56,7 +59,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (session) {
           await fetchUserProfile(session.user.id);
-          await checkSubscription();
+          // Start subscription check in the background
+          refreshSubscription().catch(error => {
+            console.error('Background subscription check failed:', error);
+          });
         } else {
           setUser(null);
           setSubscription(null);
@@ -81,7 +87,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.session) {
         await fetchUserProfile(data.session.user.id);
-        await checkSubscription();
+        
+        // Start subscription check in the background
+        refreshSubscription().catch(error => {
+          console.error('Background subscription check failed:', error);
+        });
       }
     } catch (error) {
       console.error('Error checking session:', error);
@@ -94,14 +104,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!session) return;
 
     try {
+      setSubscriptionLoading(true);
+      console.log('Checking subscription status');
+      
       const { data, error } = await supabase.functions.invoke('check-subscription');
       
       if (error) {
         console.error('Error checking subscription:', error);
+        // Don't fail the auth flow, just use default subscription state
+        setSubscription({
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
+        });
         return;
       }
       
       if (data) {
+        console.log('Subscription check returned:', data);
         setSubscription({
           subscribed: data.subscribed,
           subscription_tier: data.subscription_tier as 'free' | 'basic' | 'premium' || 'free',
@@ -116,11 +136,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error invoking check-subscription function:', error);
+      // Don't fail the auth flow, just use default subscription state
       setSubscription({
         subscribed: false,
         subscription_tier: 'free',
         subscription_end: null
       });
+    } finally {
+      setSubscriptionLoading(false);
     }
   }
 
@@ -149,9 +172,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           address: undefined, // This field doesn't exist in the database
           phone: data.phone || undefined,
           created_at: data.created_at,
-          subscribed: subscription?.subscribed,
-          subscription_tier: subscription?.subscription_tier,
-          subscription_end: subscription?.subscription_end
+          // Use default subscription info until the actual check completes
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
         });
       }
     } catch (error) {
@@ -276,7 +300,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser,
     makeAdmin,
     subscription,
-    refreshSubscription
+    refreshSubscription,
+    subscriptionLoading
   };
 
   return (

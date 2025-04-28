@@ -6,15 +6,23 @@ import { Link } from 'react-router-dom';
 import { pageVariants } from '@/lib/animations';
 import { CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const SubscriptionSuccess: React.FC = () => {
   const { refreshSubscription } = useAuth();
   
   useEffect(() => {
     const updateSubscription = async () => {
-      await refreshSubscription();
+      try {
+        await refreshSubscription();
+        toast.success("Informações de assinatura atualizadas com sucesso!");
+      } catch (error) {
+        console.error("Erro ao atualizar informações de assinatura:", error);
+        toast.error("Não foi possível atualizar as informações de assinatura. Tente novamente mais tarde.");
+      }
     };
     
+    // Start the update, but don't wait for it to complete
     updateSubscription();
   }, [refreshSubscription]);
   
