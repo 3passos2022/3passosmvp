@@ -40,12 +40,44 @@ function App() {
             <Route path="/subscription/success" element={<SubscriptionSuccess />} />
             <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
             
-            {/* Protected Routes */}
-            <Route path="/profile/*" element={
+            {/* Protected Routes - Profile and nested routes */}
+            <Route path="/profile" element={
               <PrivateRoute>
                 <Profile />
               </PrivateRoute>
             } />
+            <Route path="/profile/quotes" element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            } />
+            <Route path="/profile/requested" element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            } />
+            <Route path="/profile/subscription" element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            } />
+            <Route path="/profile/settings" element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            } />
+            <Route path="/profile/services" element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            } />
+            <Route path="/profile/portfolio" element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            } />
+            
+            {/* Admin Routes */}
             <Route path="/admin/*" element={
               <PrivateRoute requiredRole={UserRole.ADMIN}>
                 <Admin />
