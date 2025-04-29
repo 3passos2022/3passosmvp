@@ -12,26 +12,52 @@ import ProviderPortfolio from '@/components/profile/ProviderPortfolio';
 import ProviderServices from '@/components/profile/ProviderServices';
 import QuotesList from '@/components/profile/QuotesList';
 import RequestedQuotes from '@/components/profile/RequestedQuotes';
+import { toast } from 'sonner';
 
 const Profile: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, session, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('quotes');
 
+  console.log('Profile page rendered with:', {
+    hasUser: !!user,
+    hasSession: !!session,
+    isLoading: loading
+  });
+
+  // Effect to attempt profile refresh if session exists but no user
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!loading && !user) {
-      navigate('/login');
+    if (!loading && session && !user) {
+      console.log('Session exists but no user profile, attempting to refresh');
+      refreshUser().catch(err => {
+        console.error('Failed to refresh user profile:', err);
+        toast.error('Falha ao carregar dados do usuário');
+      });
     }
-  }, [user, loading, navigate]);
+  }, [loading, session, user, refreshUser]);
+
+  // Effect to redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !session) {
+      console.log('Not authenticated, redirecting to login');
+      navigate('/login', { state: { from: '/profile' } });
+    }
+  }, [loading, session, navigate]);
 
   // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  if (loading || !user) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+  if (loading || !user || !session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+          <p className="text-gray-600">Carregando seu perfil...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -49,7 +75,7 @@ const Profile: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold">Olá, {user.name}</h1>
+                    <h1 className="text-2xl font-bold">Olá, {user.name || user.email.split('@')[0]}</h1>
                     <p className="text-gray-600">{user.email}</p>
                   </div>
                   

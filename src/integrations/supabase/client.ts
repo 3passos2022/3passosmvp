@@ -33,6 +33,21 @@ const cookieStorage = {
   }
 };
 
+// Configure localStorage fallback for environments where cookies aren't supported
+const getStorageProvider = () => {
+  // Try to use cookieStorage by default
+  try {
+    if (typeof window !== 'undefined') {
+      return cookieStorage;
+    }
+  } catch (error) {
+    console.warn('Error setting up cookie storage, falling back to localStorage', error);
+  }
+  
+  // Fallback to localStorage if cookies aren't supported
+  return undefined;
+};
+
 export const supabase = createClient<Database>(
   supabaseUrl,
   supabaseAnonKey,
@@ -40,7 +55,7 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       storageKey: '3passos-auth',
-      storage: typeof window !== 'undefined' ? cookieStorage : undefined,
+      storage: getStorageProvider(),
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: 'pkce',
@@ -60,30 +75,13 @@ export const supabase = createClient<Database>(
   }
 );
 
-// Set site URL for Supabase redirects
+// Debug current auth state
 if (typeof window !== 'undefined') {
-  // Try to get existing session from cookies
-  const existingTokenCookie = cookieStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-token');
-  const existingRefreshTokenCookie = cookieStorage.getItem('sb-jezfwtknzraaykkjjaaf-auth-refresh-token');
-  
-  if (existingTokenCookie && existingRefreshTokenCookie) {
-    try {
-      const parsedToken = JSON.parse(existingTokenCookie);
-      const parsedRefreshToken = JSON.parse(existingRefreshTokenCookie);
-      
-      // Use setSession in newer versions of Supabase instead of setAuth
-      supabase.auth.setSession({
-        access_token: parsedToken,
-        refresh_token: parsedRefreshToken,
-      }).catch(err => {
-        if (typeof window !== 'undefined') {
-          console.error('Error setting session:', err);
-        }
-      });
-    } catch (error) {
-      if (typeof window !== 'undefined') {
-        console.error('Error parsing stored tokens:', error);
-      }
+  supabase.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      console.error('Error checking session:', error);
+    } else {
+      console.log('Supabase client initialized with session:', !!data.session);
     }
-  }
+  });
 }

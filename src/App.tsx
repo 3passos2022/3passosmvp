@@ -17,6 +17,7 @@ import SubscriptionCancel from './pages/SubscriptionCancel';
 import { UserRole } from './lib/types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
+import { Toaster } from 'sonner';
 
 // Create a query client
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
+        <Toaster position="top-center" richColors />
         <Router>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -49,6 +51,15 @@ function App() {
                 <Admin />
               </PrivateRoute>
             } />
+            
+            {/* Add an unauthorized route */}
+            <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <h1 className="text-2xl font-bold mb-4">Acesso não autorizado</h1>
+                <p className="text-gray-600 mb-6">Você não tem permissão para acessar esta página.</p>
+                <a href="/" className="text-primary hover:underline">Voltar para a página inicial</a>
+              </div>
+            </div>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
