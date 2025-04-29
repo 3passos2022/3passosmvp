@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -54,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('Auth state changed:', event);
+        console.log('New session e USER:', newSession.user.id);
         setSession(newSession);
         
         if (newSession) {
@@ -92,56 +92,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function fetchUserProfile(userId: string) {
     try {
-      const { data, error } = await supabase
+      console.log('Fetching profile for user:', userId);
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.error('Error fetching user profile:', error);
+      if (fetchError) {
+        console.log('Profile not found, creating new profile');
         
-        if (session?.user) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            role: UserRole.CLIENT,
-            created_at: new Date().toISOString(),
-            subscribed: false,
-            subscription_tier: 'free',
-            subscription_end: null
-          });
+        // Criar um perfil básico
+        const newProfile = {
+          id: userId,
+          email: session?.user?.email || '',
+          role: UserRole.CLIENT,
+          name: null,
+          phone: null,
+          created_at: new Date().toISOString(),
+        };
+
+        // Inserir o novo perfil
+        const { data: insertedProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert([newProfile])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          return;
         }
+
+        console.log('New profile created:', insertedProfile);
+        
+        // Definir o usuário com o perfil criado
+        const userProfile = {
+          id: userId,
+          email: session?.user?.email || '',
+          role: UserRole.CLIENT,
+          name: undefined,
+          avatar_url: undefined,
+          address: undefined,
+          phone: undefined,
+          created_at: new Date().toISOString(),
+          subscribed: false,
+          subscription_tier: 'free' as const,
+          subscription_end: null
+        };
+
+        console.log('Setting user profile after creation:', userProfile);
+        setUser(userProfile);
         return;
       }
 
-      if (data) {
-        setUser({
-          id: data.id,
-          email: session?.user.email || data.id,
-          role: data.role as UserRole,
-          name: data.name || undefined,
+      if (existingProfile) {
+        console.log('Existing profile found:', existingProfile);
+        const userProfile = {
+          id: existingProfile.id,
+          email: session?.user?.email || '',
+          role: existingProfile.role as UserRole || UserRole.CLIENT,
+          name: existingProfile.name || undefined,
           avatar_url: undefined,
           address: undefined,
-          phone: data.phone || undefined,
-          created_at: data.created_at,
+          phone: existingProfile.phone || undefined,
+          created_at: existingProfile.created_at,
           subscribed: false,
-          subscription_tier: 'free',
+          subscription_tier: 'free' as const,
           subscription_end: null
-        });
+        };
+
+        console.log('Setting existing user profile:', userProfile);
+        setUser(userProfile);
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
+      // Definir um perfil padrão em caso de erro
       if (session?.user) {
-        setUser({
+        const fallbackProfile = {
           id: session.user.id,
           email: session.user.email || '',
           role: UserRole.CLIENT,
           created_at: new Date().toISOString(),
           subscribed: false,
-          subscription_tier: 'free',
+          subscription_tier: 'free' as const,
           subscription_end: null
-        });
+        };
+        console.log('Setting fallback profile:', fallbackProfile);
+        setUser(fallbackProfile);
       }
     }
   }
@@ -170,10 +208,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function signIn(email: string, password: string) {
     try {
-      return await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
+      if (error) {
+        return { error, data: null };
+      }
+
+      if (data.session) {
+        setSession(data.session);
+        await fetchUserProfile(data.session.user.id);
+      }
+
+      return { data, error: null };
     } catch (error) {
       return { error: error as Error, data: null };
     }

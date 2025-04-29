@@ -69,8 +69,8 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      console.log("User is logged in, redirecting to:", "/");
-      navigate("/");
+      console.log("User is logged in, redirecting to:", "/profile");
+      navigate("/profile");
     }
   }, [user, navigate]);
 
@@ -97,17 +97,22 @@ const Login: React.FC = () => {
     setIsLoading(true);
     try {
       const { error, data } = await signIn(formData.email, formData.password);
-      if (!error) {
-        toast.success("Login realizado com sucesso!");
-        navigate("/");
-      } else {
+      if (error) {
         console.error("Error signing in:", error);
         toast.error("Erro ao fazer login: " + error.message);
         setIsLoading(false);
+        return;
+      }
+
+      if (data?.session) {
+        toast.success("Login realizado com sucesso!");
+        console.log("Login successful, session:", data.session);
+        // O redirecionamento será tratado pelo useEffect que monitora o estado do usuário
       }
     } catch (error) {
       console.error("Error signing in:", error);
       toast.error("Erro ao fazer login");
+    } finally {
       setIsLoading(false);
     }
   };
