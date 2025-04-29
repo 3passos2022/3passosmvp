@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserRole } from '@/lib/types';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -55,6 +56,18 @@ const UserProfile: React.FC = () => {
         .toUpperCase();
     }
     return user.email.substring(0, 2).toUpperCase();
+  };
+  
+  const getUserRoleLabel = (role: UserRole): string => {
+    switch (role) {
+      case UserRole.PROVIDER:
+        return 'Prestador de Serviços';
+      case UserRole.ADMIN:
+        return 'Administrador';
+      case UserRole.CLIENT:
+      default:
+        return 'Cliente';
+    }
   };
 
   return (
@@ -116,11 +129,7 @@ const UserProfile: React.FC = () => {
               
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
-                <p className="font-medium">
-                  {user.role === 'client' ? 'Cliente' : 
-                   user.role === 'provider' ? 'Prestador de Serviços' : 
-                   'Administrador'}
-                </p>
+                <p className="font-medium">{getUserRoleLabel(user.role)}</p>
               </div>
             </div>
           )}

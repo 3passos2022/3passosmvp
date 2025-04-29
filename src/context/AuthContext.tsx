@@ -108,18 +108,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('Role from database:', profileData.role);
             console.log('Type of role from database:', typeof profileData.role);
             
-            // Map database role to UserRole enum - convert string to enum if needed
+            // Map database role string to UserRole enum correctly
             let userRole: UserRole;
             
-            switch(profileData.role) {
-              case 'provider':
-                userRole = UserRole.PROVIDER;
-                break;
-              case 'admin':
-                userRole = UserRole.ADMIN;
-                break;
-              default:
-                userRole = UserRole.CLIENT;
+            if (profileData.role === 'provider') {
+              userRole = UserRole.PROVIDER;
+            } else if (profileData.role === 'admin') {
+              userRole = UserRole.ADMIN;
+            } else {
+              userRole = UserRole.CLIENT;
             }
             
             console.log('Mapped role to enum:', userRole);
@@ -355,18 +352,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Role from database during refresh:', profileData.role);
         console.log('Type of role from database during refresh:', typeof profileData.role);
         
-        // Map database role string to UserRole enum
+        // Map database role string to UserRole enum correctly
         let userRole: UserRole;
         
-        switch(profileData.role) {
-          case 'provider':
-            userRole = UserRole.PROVIDER;
-            break;
-          case 'admin':
-            userRole = UserRole.ADMIN;
-            break;
-          default:
-            userRole = UserRole.CLIENT;
+        if (profileData.role === 'provider') {
+          userRole = UserRole.PROVIDER;
+        } else if (profileData.role === 'admin') {
+          userRole = UserRole.ADMIN;
+        } else {
+          userRole = UserRole.CLIENT;
         }
         
         console.log('Mapped role to enum during refresh:', userRole);
