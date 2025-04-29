@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
-  // Function to check user role
+  // Function to check user role - using the imported hasRole from ProfileService
   const checkUserRole = (role: UserRole | string) => {
     return hasRole(user, role);
   };
@@ -73,7 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Fetch user profile using our ProfileService
           const profileData = await ProfileService.getUserProfile(
             newSession.user.id,
-            newSession.user.email || undefined
+            newSession.user.email || undefined,
+            true // Force refresh on auth change
           );
           
           if (profileData) {
@@ -235,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Profile management functions - now using ProfileService
+  // Profile management functions - using ProfileService
   async function updateProfile(data: Partial<UserProfile>) {
     if (!user) return { error: new Error('No user logged in'), data: null };
 
@@ -375,6 +376,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: !!user,
     userId: user?.id,
     userRole: user?.role,
+    userRoleType: user ? typeof user.role : 'undefined',
     sessionExists: !!session
   });
 

@@ -4,6 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
 import { toast } from 'sonner';
+import { hasRole } from '@/services/ProfileService';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -11,7 +12,7 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) => {
-  const { user, loading, session, refreshUser, hasRole } = useAuth();
+  const { user, loading, session, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -21,6 +22,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   console.log('PrivateRoute: Rendering with', {
     isAuthenticated: !!user, 
     userRole: user?.role,
+    userRoleType: user?.role ? typeof user.role : 'undefined',
     requiredRoleEnum: requiredRole,
     requiredRoleStr: requiredRole ? String(requiredRole) : null,
     loading,
@@ -93,13 +95,15 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  // Verificar a role do usuário - agora usando o helper hasRole
+  // Verificar a role do usuário usando o helper hasRole importado do ProfileService
   if (requiredRole) {
-    const hasRequiredRole = hasRole(requiredRole);
+    const hasRequiredRole = hasRole(user, requiredRole);
     console.log('PrivateRoute: Role check -', { 
       userRole: user.role, 
       requiredRole, 
-      hasRequiredRole 
+      hasRequiredRole,
+      userRoleStr: String(user.role).toLowerCase(),
+      requiredRoleStr: String(requiredRole).toLowerCase()
     });
     
     if (!hasRequiredRole) {

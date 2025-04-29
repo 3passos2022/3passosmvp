@@ -29,10 +29,11 @@ const Profile: React.FC = () => {
     isLoading: loading,
     userRole: user?.role,
     userRoleType: user ? typeof user.role : 'undefined',
+    roleString: user ? String(user.role).toLowerCase() : null,
     roleChecks: user ? {
-      isProviderStr: String(user.role).toLowerCase() === 'provider',
+      isProviderStr: String(user.role).toLowerCase() === String(UserRole.PROVIDER).toLowerCase(),
       isProviderEnum: user.role === UserRole.PROVIDER,
-      isAdminStr: String(user.role).toLowerCase() === 'admin',
+      isAdminStr: String(user.role).toLowerCase() === String(UserRole.ADMIN).toLowerCase(),
       isAdminEnum: user.role === UserRole.ADMIN
     } : null
   });
@@ -136,6 +137,7 @@ const Profile: React.FC = () => {
   console.log("User role checks:", {
     roleValue: user.role,
     roleType: typeof user.role,
+    roleString: String(user.role).toLowerCase(),
     isProvider: isProvider(),
     isAdmin: isAdmin(),
     UserRoleEnum: UserRole,
@@ -198,6 +200,16 @@ const Profile: React.FC = () => {
                         <Settings className="mr-2 h-4 w-4" />
                         Configurações de Serviço
                       </TabsTrigger>
+                      
+                      <TabsTrigger value="portfolio" className="flex items-center">
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        Portfólio
+                      </TabsTrigger>
+                      
+                      <TabsTrigger value="services" className="flex items-center">
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        Meus Serviços
+                      </TabsTrigger>
                     </>
                   )}
                   
@@ -224,6 +236,14 @@ const Profile: React.FC = () => {
                     
                     <TabsContent value="settings">
                       <ProviderSettings />
+                    </TabsContent>
+                    
+                    <TabsContent value="portfolio">
+                      <ProviderPortfolio />
+                    </TabsContent>
+                    
+                    <TabsContent value="services">
+                      <ProviderServices />
                     </TabsContent>
                   </>
                 )}

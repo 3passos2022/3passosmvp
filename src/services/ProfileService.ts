@@ -18,7 +18,9 @@ const CACHE_TTL = 10 * 60 * 1000;
 export const mapDatabaseRoleToEnum = (role: string): UserRole => {
   console.log('Mapping role from database:', role);
   
-  switch(String(role).toLowerCase()) {
+  const roleString = String(role).toLowerCase().trim();
+  
+  switch(roleString) {
     case 'provider':
       return UserRole.PROVIDER;
     case 'admin':
@@ -39,6 +41,12 @@ export const transformDatabaseProfile = (
   
   // Map database role to UserRole enum
   const userRole = mapDatabaseRoleToEnum(profileData.role);
+  
+  console.log('Role mapping result:', { 
+    originalRole: profileData.role, 
+    mappedRole: userRole,
+    roleType: typeof userRole
+  });
   
   return {
     id: profileData.id,
@@ -64,6 +72,14 @@ export const hasRole = (user: UserProfile | null, role: UserRole | string): bool
   // Compare both as strings to avoid enum comparison issues
   const userRoleStr = String(user.role).toLowerCase();
   const checkRoleStr = String(role).toLowerCase();
+  
+  console.log('Checking role:', {
+    userRole: user.role,
+    userRoleString: userRoleStr,
+    checkRole: role,
+    checkRoleString: checkRoleStr,
+    result: userRoleStr === checkRoleStr
+  });
   
   return userRoleStr === checkRoleStr;
 };
@@ -91,6 +107,18 @@ export class ProfileService {
     
     try {
       console.log('Fetching profile from database for user:', userId);
+      
+      // Use the RPC function to avoid RLS recursion issues
+      const { data: roleData, error: roleError } = await supabase
+        .rpc('get_user_role_safely', { user_id: userId });
+      
+      if (roleError) {
+        console.error('Error fetching user role:', roleError);
+      }
+      
+      console.log('Role data from RPC:', roleData);
+      
+      // Get the full profile
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -105,6 +133,13 @@ export class ProfileService {
       if (!profileData) {
         console.log('No profile found for user:', userId);
         return null;
+      }
+      
+      // If we got role data from RPC and it doesn't match, use that one
+      // This helps avoid any RLS issues
+      if (roleData && profileData.role !== roleData) {
+        console.log('Using role from RPC function:', roleData);
+        profileData.role = roleData;
       }
       
       // Transform and cache the profile
@@ -130,6 +165,9 @@ export class ProfileService {
       console.log('Creating default profile for user:', userId);
       
       const defaultName = email?.split('@')[0] || 'User';
+      const roleString = String(role).toLowerCase();
+      
+      console.log('Creating profile with role:', roleString);
       
       // Create profile in database
       const { error } = await supabase
@@ -137,7 +175,7 @@ export class ProfileService {
         .insert([{ 
           id: userId,
           name: defaultName,
-          role: role,
+          role: roleString,
           phone: ''
         }]);
         
@@ -190,7 +228,7 @@ export class ProfileService {
         return { error: new Error('No admin user provided'), data: null };
       }
 
-      // Verify admin role using RPC to avoid RLS issues
+      // Use our new RPC function to check if user is admin
       const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin', {
         user_id: adminUserId
       });
@@ -202,7 +240,7 @@ export class ProfileService {
       // Update user role using RPC
       const { error, data: updatedData } = await supabase.rpc('update_user_role', {
         user_id: targetUserId,
-        new_role: UserRole.ADMIN
+        new_role: 'admin'
       });
 
       if (error) {
