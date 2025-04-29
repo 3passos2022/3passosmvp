@@ -118,7 +118,6 @@ const Profile: React.FC = () => {
   };
 
   // Helper function to check if user is provider
-  // FIXED: Add strict equality check to ensure correct comparison between enum values
   const isProvider = () => {
     if (!user) return false;
     
@@ -127,14 +126,14 @@ const Profile: React.FC = () => {
       userRoleType: typeof user.role,
       providerEnumValue: UserRole.PROVIDER,
       providerEnumType: typeof UserRole.PROVIDER,
-      isEqual: user.role === UserRole.PROVIDER
+      isEqual: user.role === UserRole.PROVIDER,
+      stringComparison: String(user.role) === String(UserRole.PROVIDER)
     });
     
     return user.role === UserRole.PROVIDER;
   };
   
   // Helper function to check if user is admin
-  // FIXED: Add strict equality check to ensure correct comparison between enum values
   const isAdmin = () => {
     if (!user) return false;
     
@@ -143,7 +142,8 @@ const Profile: React.FC = () => {
       userRoleType: typeof user.role,
       adminEnumValue: UserRole.ADMIN,
       adminEnumType: typeof UserRole.ADMIN,
-      isEqual: user.role === UserRole.ADMIN
+      isEqual: user.role === UserRole.ADMIN,
+      stringComparison: String(user.role) === String(UserRole.ADMIN)
     });
     
     return user.role === UserRole.ADMIN;
@@ -156,8 +156,25 @@ const Profile: React.FC = () => {
     isAdmin: isAdmin(),
     UserRoleEnum: UserRole,
     matchesProviderEnum: user.role === UserRole.PROVIDER,
-    matchesAdminEnum: user.role === UserRole.ADMIN
+    matchesAdminEnum: user.role === UserRole.ADMIN,
+    directComparison: {
+      provider: user.role === 'provider',
+      admin: user.role === 'admin',
+      client: user.role === 'client'
+    }
   });
+
+  // Forçar um refresh do usuário se o role não estiver aparecendo corretamente
+  useEffect(() => {
+    // Se o usuário estiver autenticado mas o role não for detectado corretamente
+    if (user && !isProvider() && !isAdmin() && session) {
+      // Tenta fazer refresh do usuário mais uma vez
+      console.log('Role pode estar incorreto, tentando refresh do usuário');
+      refreshUser().catch(err => {
+        console.error('Falha ao atualizar perfil:', err);
+      });
+    }
+  }, [user]);
 
   return (
     <div className="min-h-screen flex flex-col">

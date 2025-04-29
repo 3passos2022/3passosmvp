@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -45,7 +44,21 @@ export interface AuthContextProps {
 export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 // Helper function to map database role string to UserRole enum
-const mapDatabaseRoleToEnum = (role: string): UserRole => {
+const mapDatabaseRoleToEnum = (role: string | null | undefined): UserRole => {
+  if (!role) return UserRole.CLIENT;
+  
+  // Log para debug
+  console.log('Mapeando role do banco de dados:', {
+    roleOriginal: role,
+    roleType: typeof role,
+    roleNormalizado: role.toLowerCase(),
+    enumProvider: UserRole.PROVIDER,
+    enumClient: UserRole.CLIENT,
+    enumAdmin: UserRole.ADMIN,
+    isProvider: role.toLowerCase() === 'provider',
+    isAdmin: role.toLowerCase() === 'admin'
+  });
+  
   // Normalize the role string to lowercase for case-insensitive comparison
   const normalizedRole = role.toLowerCase();
   
@@ -134,13 +147,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: newSession.user.email || profileData.id,
               role: userRole,
               name: profileData.name || undefined,
-              avatar_url: undefined,
-              address: undefined,
+              avatar_url: profileData.avatar_url || undefined,
+              address: profileData.address || undefined,
               phone: profileData.phone || undefined,
               created_at: profileData.created_at,
-              subscribed: false,
-              subscription_tier: 'free',
-              subscription_end: null
+              subscribed: Boolean(profileData.subscribed) || false,
+              subscription_tier: (profileData.subscription_tier as 'free' | 'basic' | 'premium') || 'free',
+              subscription_end: profileData.subscription_end || null
             });
           } else {
             console.log('No profile found, creating default profile');
@@ -370,20 +383,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Use the helper function to map the role
         const userRole = mapDatabaseRoleToEnum(profileData.role);
         
-        console.log('Mapped role to enum during refresh:', userRole);
+        console.log('Mapped role to enum during refresh:', userRole, 'Role original:', profileData.role);
         
         setUser({
           id: profileData.id,
           email: session.user.email || profileData.id,
           role: userRole,
           name: profileData.name || undefined,
-          avatar_url: undefined,
-          address: undefined,
+          avatar_url: profileData.avatar_url || undefined,
+          address: profileData.address || undefined,
           phone: profileData.phone || undefined,
           created_at: profileData.created_at,
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
+          subscribed: Boolean(profileData.subscribed) || false,
+          subscription_tier: (profileData.subscription_tier as 'free' | 'basic' | 'premium') || 'free',
+          subscription_end: profileData.subscription_end || null
         });
         console.log("User profile refreshed successfully with role:", userRole);
       } else {

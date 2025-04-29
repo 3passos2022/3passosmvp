@@ -21,7 +21,9 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   console.log('PrivateRoute: Rendering with', {
     isAuthenticated: !!user, 
     userRole: user?.role,
+    userRoleType: typeof user?.role,
     requiredRole,
+    requiredRoleType: typeof requiredRole,
     loading,
     sessionExists: !!session,
     path: location.pathname,
@@ -98,7 +100,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     userRoleType: typeof user.role,
     requiredRole, 
     requiredRoleType: typeof requiredRole,
-    isMatch: user.role === requiredRole
+    isMatch: user.role === requiredRole,
+    stringComparison: String(user.role) === String(requiredRole)
   });
   
   // Redirecionar se não tiver a role necessária
