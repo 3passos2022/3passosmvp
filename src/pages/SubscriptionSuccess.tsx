@@ -12,18 +12,22 @@ const SubscriptionSuccess: React.FC = () => {
   const { refreshSubscription } = useAuth();
   
   useEffect(() => {
-    const updateSubscription = async () => {
-      try {
-        await refreshSubscription();
-        toast.success("Informações de assinatura atualizadas com sucesso!");
-      } catch (error) {
-        console.error("Erro ao atualizar informações de assinatura:", error);
-        toast.error("Não foi possível atualizar as informações de assinatura. Tente novamente mais tarde.");
-      }
-    };
+    // Delay the subscription check to ensure auth is initialized
+    const timer = setTimeout(() => {
+      const updateSubscription = async () => {
+        try {
+          await refreshSubscription();
+          toast.success("Informações de assinatura atualizadas com sucesso!");
+        } catch (error) {
+          console.error("Erro ao atualizar informações de assinatura:", error);
+          toast.error("Não foi possível atualizar as informações de assinatura. Tente novamente mais tarde.");
+        }
+      };
+      
+      updateSubscription();
+    }, 1000); // Delay subscription check by 1 second
     
-    // Start the update, but don't wait for it to complete
-    updateSubscription();
+    return () => clearTimeout(timer);
   }, [refreshSubscription]);
   
   return (

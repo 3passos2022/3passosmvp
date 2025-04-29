@@ -13,18 +13,6 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Only redirect if not loading and no user
-    if (!loading && !user) {
-      navigate('/login');
-    }
-    
-    // Only redirect if user doesn't have required role
-    if (!loading && user && requiredRole && user.role !== requiredRole) {
-      navigate('/unauthorized');
-    }
-  }, [user, loading, requiredRole, navigate]);
-
   // Show loading state while checking auth
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;

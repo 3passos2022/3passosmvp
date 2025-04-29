@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -52,22 +51,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event, newSession) => {
         console.log('Auth state changed:', event);
-        setSession(session);
-        setLoading(true);
-
-        if (session) {
-          await fetchUserProfile(session.user.id);
-          // Start subscription check in the background
-          refreshSubscription().catch(error => {
-            console.error('Background subscription check failed:', error);
-          });
+        setSession(newSession);
+        
+        if (newSession) {
+          await fetchUserProfile(newSession.user.id);
         } else {
           setUser(null);
           setSubscription(null);
         }
-
+        
         setLoading(false);
       }
     );
@@ -87,63 +81,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.session) {
         await fetchUserProfile(data.session.user.id);
-        
-        // Start subscription check in the background
-        refreshSubscription().catch(error => {
-          console.error('Background subscription check failed:', error);
-        });
       }
     } catch (error) {
       console.error('Error checking session:', error);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function checkSubscription() {
-    if (!session) return;
-
-    try {
-      setSubscriptionLoading(true);
-      console.log('Checking subscription status');
-      
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      
-      if (error) {
-        console.error('Error checking subscription:', error);
-        // Don't fail the auth flow, just use default subscription state
-        setSubscription({
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
-        });
-        return;
-      }
-      
-      if (data) {
-        console.log('Subscription check returned:', data);
-        setSubscription({
-          subscribed: data.subscribed,
-          subscription_tier: data.subscription_tier as 'free' | 'basic' | 'premium' || 'free',
-          subscription_end: data.subscription_end
-        });
-      } else {
-        setSubscription({
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
-        });
-      }
-    } catch (error) {
-      console.error('Error invoking check-subscription function:', error);
-      // Don't fail the auth flow, just use default subscription state
-      setSubscription({
-        subscribed: false,
-        subscription_tier: 'free',
-        subscription_end: null
-      });
-    } finally {
-      setSubscriptionLoading(false);
     }
   }
 
@@ -157,22 +99,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            role: UserRole.CLIENT,
+            created_at: new Date().toISOString(),
+            subscribed: false,
+            subscription_tier: 'free',
+            subscription_end: null
+          });
+        }
         return;
       }
 
       if (data) {
-        // Create a UserProfile object with only the properties that exist in the data
-        // and use default values for properties not present in the database
         setUser({
           id: data.id,
-          email: session?.user.email || data.id, // Use session email as fallback
+          email: session?.user.email || data.id,
           role: data.role as UserRole,
           name: data.name || undefined,
-          avatar_url: undefined, // This field doesn't exist in the database
-          address: undefined, // This field doesn't exist in the database
+          avatar_url: undefined,
+          address: undefined,
           phone: data.phone || undefined,
           created_at: data.created_at,
-          // Use default subscription info until the actual check completes
           subscribed: false,
           subscription_tier: 'free',
           subscription_end: null
@@ -180,12 +131,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-    }
-  }
-
-  async function refreshUser() {
-    if (session) {
-      await fetchUserProfile(session.user.id);
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          role: UserRole.CLIENT,
+          created_at: new Date().toISOString(),
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
+        });
+      }
     }
   }
 
@@ -283,7 +239,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  async function checkSubscription() {
+    if (!session) return;
+
+    try {
+      setSubscriptionLoading(true);
+      console.log('Checking subscription status');
+      
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      
+      if (error) {
+        console.error('Error checking subscription:', error);
+        setSubscription({
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
+        });
+        return;
+      }
+      
+      if (data) {
+        console.log('Subscription check returned:', data);
+        setSubscription({
+          subscribed: data.subscribed,
+          subscription_tier: data.subscription_tier as 'free' | 'basic' | 'premium' || 'free',
+          subscription_end: data.subscription_end
+        });
+      } else {
+        setSubscription({
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
+        });
+      }
+    } catch (error) {
+      console.error('Error invoking check-subscription function:', error);
+      setSubscription({
+        subscribed: false,
+        subscription_tier: 'free',
+        subscription_end: null
+      });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }
+
   async function refreshSubscription() {
+    if (!user) {
+      return;
+    }
     await checkSubscription();
   }
 
