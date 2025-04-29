@@ -120,7 +120,7 @@ const Profile: React.FC = () => {
     if (!user) return false;
     
     // Check both enum and string value to be safe
-    return user.role === UserRole.PROVIDER || user.role === 'provider';
+    return user.role === UserRole.PROVIDER;
   };
   
   // Helper function to check if user is admin
@@ -128,7 +128,7 @@ const Profile: React.FC = () => {
     if (!user) return false;
     
     // Check both enum and string value to be safe
-    return user.role === UserRole.ADMIN || user.role === 'admin';
+    return user.role === UserRole.ADMIN;
   };
 
   console.log("User role checks:", {
