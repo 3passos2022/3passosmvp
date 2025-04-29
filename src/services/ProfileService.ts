@@ -88,8 +88,12 @@ export class ProfileService {
     
     try {
       // Usar a função RPC segura para evitar problemas de RLS
-      const { data: roleData, error: roleError } = await supabase
-        .rpc('get_role_safely', { user_id: userId });
+      const { data: role, error: roleError } = await supabase
+        .rpc('get_user_role_safely', { user_id: userId });
+      
+      if (roleError) {
+        console.error('Error getting user role:', roleError);
+      }
       
       // Obter perfil diretamente
       const { data: profileData, error } = await supabase
@@ -127,8 +131,8 @@ export class ProfileService {
       }
       
       // Se temos dados de role da RPC e é diferente, usar esse
-      if (roleData && profileData.role !== roleData) {
-        profileData.role = roleData;
+      if (role && profileData.role !== role) {
+        profileData.role = role;
       }
       
       // Transformar e armazenar em cache
@@ -140,6 +144,7 @@ export class ProfileService {
       
       return profile;
     } catch (error) {
+      console.error('Error in getUserProfile:', error);
       return null;
     }
   }
@@ -152,35 +157,22 @@ export class ProfileService {
       const defaultName = email?.split('@')[0] || 'User';
       const roleString = String(role).toLowerCase();
       
-      // Criar perfil no banco
-      const { error } = await supabase
-        .from('profiles')
-        .insert([{ 
-          id: userId,
-          name: defaultName,
-          role: roleString,
-          phone: ''
-        }]);
+      // Criar perfil no banco usando RPC
+      const { error } = await supabase.rpc('create_user_profile', { 
+        user_id: userId,
+        user_name: defaultName,
+        user_role: roleString
+      });
         
       if (error) {
-        // Tentar atualizar se a inserção falhou
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            name: defaultName,
-            role: roleString,
-            phone: ''
-          })
-          .eq('id', userId);
-          
-        if (updateError) {
-          return null;
-        }
+        console.error('Error creating profile:', error);
+        return null;
       }
       
       // Obter o perfil recém-criado
       return await this.getUserProfile(userId, email, true);
     } catch (error) {
+      console.error('Error in createDefaultProfile:', error);
       return null;
     }
   }
@@ -213,11 +205,7 @@ export class ProfileService {
    */
   static async makeAdmin(adminUserId: string, targetUserId: string): Promise<{ error: Error | null, data: any }> {
     try {
-      if (!adminUserId) {
-        return { error: new Error('No admin user provided'), data: null };
-      }
-
-      // Verificar se usuário é admin
+      // Verificar se usuário é admin usando nova função segura
       const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin', {
         user_id: adminUserId
       });

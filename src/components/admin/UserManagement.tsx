@@ -42,35 +42,63 @@ const UserManagement: React.FC = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      // Usar a função SECURITY DEFINER para garantir que não teremos o erro de recursão infinita
+      // Usar a função get_all_providers para obter todos os usuários
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .rpc('get_all_providers');
 
-      if (error) throw error;
+      if (error) {
+        // Se a função RPC falhar, tentar obter os perfis diretamente
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (profilesError) throw profilesError;
+        
+        // Mapear perfis para formato UserListItem
+        const usersWithEmails = profiles?.map(profile => ({
+          id: profile.id,
+          email: profile.id, // Padrão para ID
+          name: profile.name || '',
+          role: profile.role as UserRole,
+          profileExists: true,
+          created_at: profile.created_at || new Date().toISOString(),
+        })) || [];
+        
+        // Atualizar email codificado para seu usuário específico
+        const andreUser = usersWithEmails.find(user => 
+          user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
+        );
+        
+        if (andreUser) {
+          andreUser.email = 'pro.andresouza@gmail.com';
+        }
 
-      // Mapear perfis para formato UserListItem
-      const usersWithEmails = data?.map(profile => ({
-        id: profile.id,
-        email: profile.id, // Padrão para ID
-        name: profile.name || '',
-        role: profile.role as UserRole,
-        profileExists: true,
-        created_at: profile.created_at || new Date().toISOString(), // Add created_at
-      })) || [];
-      
-      // Atualizar email codificado para seu usuário específico
-      const andreUser = usersWithEmails.find(user => 
-        user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
-      );
-      
-      if (andreUser) {
-        andreUser.email = 'pro.andresouza@gmail.com';
+        setUsers(usersWithEmails);
+      } else {
+        // Se a função RPC for bem-sucedida, usar os dados retornados
+        const usersWithEmails = data?.map((provider: any) => ({
+          id: provider.id,
+          email: provider.id,
+          name: provider.name || '',
+          role: provider.role as UserRole,
+          profileExists: true,
+          created_at: new Date().toISOString(),
+        })) || [];
+        
+        // Atualizar email codificado para seu usuário específico
+        const andreUser = usersWithEmails.find(user => 
+          user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
+        );
+        
+        if (andreUser) {
+          andreUser.email = 'pro.andresouza@gmail.com';
+        }
+
+        setUsers(usersWithEmails);
       }
-
-      setUsers(usersWithEmails);
     } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
       toast.error('Falha ao carregar usuários.');
     } finally {
       setLoading(false);
@@ -101,6 +129,7 @@ const UserManagement: React.FC = () => {
       // Recarregar a lista após um pequeno atraso
       setTimeout(loadUsers, 500);
     } catch (error) {
+      console.error('Erro ao criar perfil:', error);
       toast.error('Falha ao criar perfil para o usuário.');
     } finally {
       setCreatingProfile(null);
@@ -144,6 +173,7 @@ const UserManagement: React.FC = () => {
       // Recarregar a lista após um pequeno atraso
       setTimeout(loadUsers, 500);
     } catch (error) {
+      console.error('Erro ao promover usuário:', error);
       toast.error('Falha ao promover usuário a administrador.');
     } finally {
       setPromoting(null);
@@ -203,7 +233,7 @@ const UserManagement: React.FC = () => {
                   }`}>
                     {RoleUtils.getAccountTypeLabel({
                       ...user, 
-                      created_at: user.created_at || new Date().toISOString() // Ensure created_at is present
+                      created_at: user.created_at || new Date().toISOString()
                     })}
                   </span>
                 </TableCell>
