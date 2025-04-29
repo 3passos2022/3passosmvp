@@ -92,8 +92,14 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  // Verificar a role do usuário
-  console.log('PrivateRoute: Checking user role:', user.role, 'required:', requiredRole);
+  // Enhanced logging for role checking
+  console.log('PrivateRoute: Checking user role:', {
+    userRole: user.role, 
+    userRoleType: typeof user.role,
+    requiredRole, 
+    requiredRoleType: typeof requiredRole,
+    isMatch: user.role === requiredRole
+  });
   
   // Redirecionar se não tiver a role necessária
   if (requiredRole && user.role !== requiredRole) {

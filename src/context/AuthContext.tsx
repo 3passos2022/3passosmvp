@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -42,6 +43,20 @@ export interface AuthContextProps {
 }
 
 export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+
+// Helper function to map database role string to UserRole enum
+const mapDatabaseRoleToEnum = (role: string): UserRole => {
+  // Normalize the role string to lowercase for case-insensitive comparison
+  const normalizedRole = role.toLowerCase();
+  
+  if (normalizedRole === 'provider') {
+    return UserRole.PROVIDER;
+  } else if (normalizedRole === 'admin') {
+    return UserRole.ADMIN;
+  } else {
+    return UserRole.CLIENT;
+  }
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -108,16 +123,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('Role from database:', profileData.role);
             console.log('Type of role from database:', typeof profileData.role);
             
-            // Map database role string to UserRole enum correctly
-            let userRole: UserRole;
-            
-            if (profileData.role === 'provider') {
-              userRole = UserRole.PROVIDER;
-            } else if (profileData.role === 'admin') {
-              userRole = UserRole.ADMIN;
-            } else {
-              userRole = UserRole.CLIENT;
-            }
+            // Use the helper function to map the role
+            const userRole = mapDatabaseRoleToEnum(profileData.role);
             
             console.log('Mapped role to enum:', userRole);
             
@@ -309,15 +316,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return { error: new Error('No user logged in'), data: null };
 
     try {
+      // Create a payload with only the fields that can be updated in the database
+      const dbUpdatePayload: any = {};
+      
+      if (data.name !== undefined) dbUpdatePayload.name = data.name;
+      if (data.phone !== undefined) dbUpdatePayload.phone = data.phone;
+      // Add other fields that should be updatable in the database
+      
       const { error, data: updatedData } = await supabase
         .from('profiles')
-        .update(data)
+        .update(dbUpdatePayload)
         .eq('id', user.id);
 
       if (error) {
         return { error, data: null };
       }
 
+      // Update the user state with all the fields from the data parameter
       setUser((prev) => (prev ? { ...prev, ...data } : null));
       return { data: updatedData, error: null };
     } catch (error) {
@@ -352,16 +367,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Role from database during refresh:', profileData.role);
         console.log('Type of role from database during refresh:', typeof profileData.role);
         
-        // Map database role string to UserRole enum correctly
-        let userRole: UserRole;
-        
-        if (profileData.role === 'provider') {
-          userRole = UserRole.PROVIDER;
-        } else if (profileData.role === 'admin') {
-          userRole = UserRole.ADMIN;
-        } else {
-          userRole = UserRole.CLIENT;
-        }
+        // Use the helper function to map the role
+        const userRole = mapDatabaseRoleToEnum(profileData.role);
         
         console.log('Mapped role to enum during refresh:', userRole);
         

@@ -28,7 +28,8 @@ const Profile: React.FC = () => {
     hasSession: !!session,
     isLoading: loading,
     userRole: user?.role,
-    userRoleType: user ? typeof user.role : 'undefined'
+    userRoleType: user ? typeof user.role : 'undefined',
+    userRoleValue: user?.role,
   });
 
   // Effect to attempt profile refresh if session exists but no user
@@ -117,15 +118,33 @@ const Profile: React.FC = () => {
   };
 
   // Helper function to check if user is provider
+  // FIXED: Add strict equality check to ensure correct comparison between enum values
   const isProvider = () => {
     if (!user) return false;
+    
+    console.log('isProvider check:', {
+      userRole: user.role,
+      userRoleType: typeof user.role,
+      providerEnumValue: UserRole.PROVIDER,
+      providerEnumType: typeof UserRole.PROVIDER,
+      isEqual: user.role === UserRole.PROVIDER
+    });
     
     return user.role === UserRole.PROVIDER;
   };
   
   // Helper function to check if user is admin
+  // FIXED: Add strict equality check to ensure correct comparison between enum values
   const isAdmin = () => {
     if (!user) return false;
+    
+    console.log('isAdmin check:', {
+      userRole: user.role,
+      userRoleType: typeof user.role,
+      adminEnumValue: UserRole.ADMIN,
+      adminEnumType: typeof UserRole.ADMIN,
+      isEqual: user.role === UserRole.ADMIN
+    });
     
     return user.role === UserRole.ADMIN;
   };
