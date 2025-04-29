@@ -4,7 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
 import { toast } from 'sonner';
-import { hasRole } from '@/services/ProfileService';
+import { RoleUtils } from '@/lib/utils/RoleUtils';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -76,9 +76,9 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  // Verificar permissão de role
+  // Verificar permissão de role usando a nova classe utilitária
   if (requiredRole) {
-    const hasRequiredRole = hasRole(user, requiredRole);
+    const hasRequiredRole = RoleUtils.hasRole(user, requiredRole);
     
     if (!hasRequiredRole) {
       toast.error('Você não tem permissão para acessar esta página.');

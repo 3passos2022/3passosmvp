@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserRole } from '@/lib/types';
+import { RoleUtils } from '@/lib/utils/RoleUtils';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -55,19 +55,6 @@ const UserProfile: React.FC = () => {
         .toUpperCase();
     }
     return user.email.substring(0, 2).toUpperCase();
-  };
-
-  // Helper para determinar tipo de conta
-  const getAccountType = () => {
-    const role = String(user.role).toLowerCase().trim();
-    
-    if (role === String(UserRole.PROVIDER).toLowerCase().trim()) {
-      return 'Prestador de Serviços';
-    } else if (role === String(UserRole.ADMIN).toLowerCase().trim()) {
-      return 'Administrador';
-    } else {
-      return 'Cliente';
-    }
   };
 
   return (
@@ -129,7 +116,7 @@ const UserProfile: React.FC = () => {
               
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
-                <p className="font-medium">{getAccountType()}</p>
+                <p className="font-medium">{RoleUtils.getAccountTypeLabel(user)}</p>
               </div>
             </div>
           )}

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { RoleUtils } from '@/lib/utils/RoleUtils';
 
 interface UserListItem {
   id: string;
@@ -40,7 +41,6 @@ const UserManagement: React.FC = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      console.log('Carregando usuários...');
       // Usar a função SECURITY DEFINER para garantir que não teremos o erro de recursão infinita
       const { data, error } = await supabase
         .from('profiles')
@@ -50,22 +50,14 @@ const UserManagement: React.FC = () => {
       if (error) throw error;
 
       // Mapear perfis para formato UserListItem
-      const usersWithEmails: UserListItem[] = [];
+      const usersWithEmails = data?.map(profile => ({
+        id: profile.id,
+        email: profile.id, // Padrão para ID
+        name: profile.name || '',
+        role: profile.role as UserRole,
+        profileExists: true,
+      })) || [];
       
-      for (const profile of data || []) {
-        // Para cada perfil, criar um UserListItem com email padrão (usando o ID)
-        const userItem: UserListItem = {
-          id: profile.id,
-          email: profile.id, // Padrão para ID
-          name: profile.name || '',
-          role: profile.role as UserRole,
-          profileExists: true,
-        };
-        
-        // Adicionar à nossa lista final
-        usersWithEmails.push(userItem);
-      }
-
       // Atualizar email codificado para seu usuário específico
       const andreUser = usersWithEmails.find(user => 
         user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
@@ -75,10 +67,8 @@ const UserManagement: React.FC = () => {
         andreUser.email = 'pro.andresouza@gmail.com';
       }
 
-      console.log('Usuários carregados:', usersWithEmails.length);
       setUsers(usersWithEmails);
     } catch (error) {
-      console.error('Error loading users:', error);
       toast.error('Falha ao carregar usuários.');
     } finally {
       setLoading(false);
@@ -88,11 +78,8 @@ const UserManagement: React.FC = () => {
   const handleCreateProfile = async (userId: string, userName: string = '') => {
     setCreatingProfile(userId);
     try {
-      console.log('Criando perfil para usuário:', userId);
-      
       // Usar uma função de service role via RPC para criar um perfil
-      // Isso ignora políticas RLS usando o service role
-      const { data, error } = await supabase.rpc('create_user_profile', { 
+      const { error } = await supabase.rpc('create_user_profile', { 
         user_id: userId,
         user_name: userName || 'Usuário',
         user_role: UserRole.CLIENT
@@ -110,12 +97,8 @@ const UserManagement: React.FC = () => {
       ));
       
       // Recarregar a lista após um pequeno atraso
-      setTimeout(() => {
-        loadUsers();
-      }, 500);
-      
-    } catch (error: any) {
-      console.error('Error creating profile:', error);
+      setTimeout(loadUsers, 500);
+    } catch (error) {
       toast.error('Falha ao criar perfil para o usuário.');
     } finally {
       setCreatingProfile(null);
@@ -135,7 +118,6 @@ const UserManagement: React.FC = () => {
       if (profileError) throw profileError;
       
       if (!profile) {
-        console.log('Perfil não encontrado, criando um novo...');
         // Se o perfil não existir, criar um perfil primeiro usando a RPC
         const { error: createError } = await supabase.rpc('create_user_profile', { 
           user_id: userId,
@@ -146,7 +128,7 @@ const UserManagement: React.FC = () => {
         if (createError) throw createError;
       }
       
-      // Agora promova o usuário a administrador usando a função RPC
+      // Promover o usuário a administrador
       await makeAdmin(userId);
       toast.success('Usuário promovido a administrador com sucesso!');
       
@@ -156,8 +138,10 @@ const UserManagement: React.FC = () => {
           ? {...user, role: UserRole.ADMIN} 
           : user
       ));
+
+      // Recarregar a lista após um pequeno atraso
+      setTimeout(loadUsers, 500);
     } catch (error) {
-      console.error('Error making admin:', error);
       toast.error('Falha ao promover usuário a administrador.');
     } finally {
       setPromoting(null);
@@ -215,8 +199,7 @@ const UserManagement: React.FC = () => {
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {user.role === UserRole.ADMIN ? 'Administrador' : 
-                     user.role === UserRole.PROVIDER ? 'Prestador' : 'Cliente'}
+                    {RoleUtils.getAccountTypeLabel({...user, email: user.email})}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">

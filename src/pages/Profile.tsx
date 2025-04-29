@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/lib/types';
 import { useNavigate, Link } from 'react-router-dom';
 import ProviderSettings from '@/components/profile/ProviderSettings';
 import ProviderPortfolio from '@/components/profile/ProviderPortfolio';
@@ -16,35 +15,17 @@ import { toast } from 'sonner';
 import UserProfile from '@/components/profile/UserProfile';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
+import { RoleUtils } from '@/lib/utils/RoleUtils';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Debug log melhorado para profile page
-  useEffect(() => {
-    if (user) {
-      console.log('Profile page rendered with:', {
-        hasUser: !!user,
-        hasSession: !!session,
-        isLoading: loading,
-        userRole: user.role,
-        userRoleType: typeof user.role,
-        roleNormalized: String(user.role).toLowerCase().trim(),
-        providerRoleNormalized: String(UserRole.PROVIDER).toLowerCase().trim(),
-        adminRoleNormalized: String(UserRole.ADMIN).toLowerCase().trim(),
-        isEqual: String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim()
-      });
-    }
-  }, [user, loading, session]);
-
   // Effect to attempt profile refresh if session exists but no user
   useEffect(() => {
     if (!loading && session && !user) {
-      console.log('Session exists but no user profile, attempting to refresh');
       refreshUser().catch(err => {
-        console.error('Failed to refresh user profile:', err);
         toast.error('Falha ao carregar dados do usuário');
       });
     }
@@ -53,7 +34,6 @@ const Profile: React.FC = () => {
   // Effect to redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !session) {
-      console.log('Not authenticated, redirecting to login');
       navigate('/login', { state: { from: '/profile' } });
     }
   }, [loading, session, navigate]);
@@ -124,61 +104,9 @@ const Profile: React.FC = () => {
     navigate(path);
   };
 
-  // Helper function to check if user is provider - Mais robusta
-  const isProvider = () => {
-    if (!user) return false;
-    
-    const userRole = String(user.role).toLowerCase().trim();
-    const providerRole = String(UserRole.PROVIDER).toLowerCase().trim();
-    
-    console.log('isProvider check details:', {
-      userRole,
-      providerRole, 
-      isEqual: userRole === providerRole
-    });
-    
-    return userRole === providerRole;
-  };
-  
-  // Helper function to check if user is admin - Mais robusta
-  const isAdmin = () => {
-    if (!user) return false;
-    
-    const userRole = String(user.role).toLowerCase().trim();
-    const adminRole = String(UserRole.ADMIN).toLowerCase().trim();
-    
-    console.log('isAdmin check details:', {
-      userRole,
-      adminRole, 
-      isEqual: userRole === adminRole
-    });
-    
-    return userRole === adminRole;
-  };
-
-  console.log("User role checks details:", {
-    userObj: user,
-    roleValue: user.role,
-    roleType: typeof user.role,
-    roleString: String(user.role).toLowerCase().trim(),
-    providerEnum: UserRole.PROVIDER,
-    providerEnumString: String(UserRole.PROVIDER).toLowerCase().trim(),
-    adminEnumString: String(UserRole.ADMIN).toLowerCase().trim(),
-    isProvider: isProvider(),
-    isAdmin: isAdmin(),
-    UserRoleEnum: UserRole
-  });
-
-  // Função para determinar qual rótulo mostrar para o tipo de conta
-  const getAccountTypeLabel = () => {
-    if (isProvider()) {
-      return 'Prestador de Serviços';
-    } else if (isAdmin()) {
-      return 'Administrador';
-    } else {
-      return 'Cliente';
-    }
-  };
+  // Check if user is provider or admin using our utility
+  const isProvider = RoleUtils.isProvider(user);
+  const isAdmin = RoleUtils.isAdmin(user);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -201,7 +129,7 @@ const Profile: React.FC = () => {
                   
                   <div className="flex items-center">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                      {getAccountTypeLabel()}
+                      {RoleUtils.getAccountTypeLabel(user)}
                     </span>
                   </div>
                 </div>
@@ -221,7 +149,7 @@ const Profile: React.FC = () => {
                   </TabsTrigger>
                   
                   {/* Tabs para prestadores e admins */}
-                  {(isProvider() || isAdmin()) && (
+                  {(isProvider || isAdmin) && (
                     <>
                       <TabsTrigger value="requested" className="flex items-center">
                         <FileText className="mr-2 h-4 w-4" />
@@ -260,7 +188,7 @@ const Profile: React.FC = () => {
                   <QuotesList />
                 </TabsContent>
                 
-                {(isProvider() || isAdmin()) && (
+                {(isProvider || isAdmin) && (
                   <>
                     <TabsContent value="requested">
                       <RequestedQuotes />
