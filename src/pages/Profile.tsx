@@ -18,16 +18,23 @@ import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { user, loading, session, refreshUser } = useAuth();
+  const { user, loading, session, refreshUser, hasRole } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
+  // Debug log for profile page
   console.log('Profile page rendered with:', {
     hasUser: !!user,
     hasSession: !!session,
     isLoading: loading,
     userRole: user?.role,
-    userRoleType: user ? typeof user.role : 'undefined'
+    userRoleType: user ? typeof user.role : 'undefined',
+    roleChecks: user ? {
+      isProviderStr: String(user.role).toLowerCase() === 'provider',
+      isProviderEnum: user.role === UserRole.PROVIDER,
+      isAdminStr: String(user.role).toLowerCase() === 'admin',
+      isAdminEnum: user.role === UserRole.ADMIN
+    } : null
   });
 
   // Effect to attempt profile refresh if session exists but no user
@@ -115,22 +122,17 @@ const Profile: React.FC = () => {
     navigate(path);
   };
 
-  // Helper function to check if user is provider
+  // Helper function to check if user is provider - using provided hasRole
   const isProvider = () => {
-    if (!user) return false;
-    
-    // Check both enum and string value to be safe
-    return user.role === UserRole.PROVIDER;
+    return hasRole(UserRole.PROVIDER);
   };
   
-  // Helper function to check if user is admin
+  // Helper function to check if user is admin - using provided hasRole
   const isAdmin = () => {
-    if (!user) return false;
-    
-    // Check both enum and string value to be safe
-    return user.role === UserRole.ADMIN;
+    return hasRole(UserRole.ADMIN);
   };
 
+  // Debug log for role checks
   console.log("User role checks:", {
     roleValue: user.role,
     roleType: typeof user.role,
@@ -138,7 +140,9 @@ const Profile: React.FC = () => {
     isAdmin: isAdmin(),
     UserRoleEnum: UserRole,
     matchesProviderEnum: user.role === UserRole.PROVIDER,
-    matchesAdminEnum: user.role === UserRole.ADMIN
+    matchesAdminEnum: user.role === UserRole.ADMIN,
+    matchesProviderString: String(user.role).toLowerCase() === String(UserRole.PROVIDER).toLowerCase(),
+    matchesAdminString: String(user.role).toLowerCase() === String(UserRole.ADMIN).toLowerCase(),
   });
 
   return (

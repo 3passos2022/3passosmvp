@@ -1,10 +1,11 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import { UserRole, UserProfile } from '@/lib/types';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
 import { toast } from 'sonner';
-import { getUserProfile } from '@/integrations/supabase/database-functions';
+import ProfileService, { hasRole } from '@/services/ProfileService';
 
 export interface AuthContextProps {
   user: UserProfile | null;
@@ -39,6 +40,7 @@ export interface AuthContextProps {
   subscription: SubscriptionStatus | null;
   refreshSubscription: () => Promise<void>;
   subscriptionLoading: boolean;
+  hasRole: (role: UserRole | string) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -50,12 +52,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
-  // Setup auth state listener and check current session
+  // Function to check user role
+  const checkUserRole = (role: UserRole | string) => {
+    return hasRole(user, role);
+  };
+
+  // Set up auth state listener and check current session
   useEffect(() => {
     console.log('AuthProvider: Setting up auth listener');
     
-    // First set up the auth listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    // Function to handle auth state changes
+    const handleAuthChange = async (event: string, newSession: Session | null) => {
       console.log('Auth state changed:', event, newSession?.user?.id);
       
       // Update session state immediately
@@ -63,111 +70,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (newSession) {
         try {
-          // Fetch user profile data
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', newSession.user.id)
-            .maybeSingle();
+          // Fetch user profile using our ProfileService
+          const profileData = await ProfileService.getUserProfile(
+            newSession.user.id,
+            newSession.user.email || undefined
+          );
           
-          if (error) {
-            console.error('Error fetching user profile during auth state change:', error);
-            
-            // Create fallback user profile with basic information
-            const fallbackUser: UserProfile = {
-              id: newSession.user.id,
-              email: newSession.user.email || '',
-              role: UserRole.CLIENT, // Default to CLIENT role
-              created_at: new Date().toISOString(),
-              subscribed: false,
-              subscription_tier: 'free' as 'free' | 'basic' | 'premium',
-              subscription_end: null
-            };
-            
-            setUser(fallbackUser);
-            
-            // Attempt to create profile in database
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert([{ 
-                id: newSession.user.id,
-                name: newSession.user.email?.split('@')[0] || '',
-                role: UserRole.CLIENT,
-                phone: ''
-              }]);
-            
-            if (insertError) {
-              console.error('Error creating default profile:', insertError);
-            } else {
-              console.log('Default profile created successfully');
-            }
-          } else if (profileData) {
+          if (profileData) {
             console.log('User profile found:', profileData);
-            
-            // Debug the role coming from database
-            console.log('Role from database:', profileData.role);
-            console.log('Type of role from database:', typeof profileData.role);
-            
-            // Map database role to UserRole enum - convert string to enum if needed
-            let userRole: UserRole;
-            
-            switch(profileData.role) {
-              case 'provider':
-                userRole = UserRole.PROVIDER;
-                break;
-              case 'admin':
-                userRole = UserRole.ADMIN;
-                break;
-              default:
-                userRole = UserRole.CLIENT;
-            }
-            
-            console.log('Mapped role to enum:', userRole);
-            
-            // Map database profile to UserProfile type with correctly mapped role
-            setUser({
-              id: profileData.id,
-              email: newSession.user.email || profileData.id,
-              role: userRole,
-              name: profileData.name || undefined,
-              avatar_url: undefined,
-              address: undefined,
-              phone: profileData.phone || undefined,
-              created_at: profileData.created_at,
-              subscribed: false,
-              subscription_tier: 'free',
-              subscription_end: null
-            });
+            setUser(profileData);
           } else {
             console.log('No profile found, creating default profile');
             
             // Create default profile if not found
-            const defaultProfile: UserProfile = {
-              id: newSession.user.id,
-              email: newSession.user.email || '',
-              role: UserRole.CLIENT,
-              created_at: new Date().toISOString(),
-              subscribed: false,
-              subscription_tier: 'free',
-              subscription_end: null
-            };
+            const newProfile = await ProfileService.createDefaultProfile(
+              newSession.user.id,
+              newSession.user.email || '',
+              UserRole.CLIENT
+            );
             
-            setUser(defaultProfile);
-            
-            // Create profile in database
-            const { error: createError } = await supabase
-              .from('profiles')
-              .insert([{ 
-                id: newSession.user.id,
-                name: newSession.user.email?.split('@')[0] || '',
-                role: UserRole.CLIENT,
-                phone: ''
-              }]);
-              
-            if (createError) {
-              console.error('Error creating profile:', createError);
-            } else {
+            if (newProfile) {
+              setUser(newProfile);
               console.log('Default profile created successfully');
+            } else {
+              console.error('Failed to create default profile');
             }
           }
         } catch (error) {
@@ -194,7 +120,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSubscription(null);
         setLoading(false);
       }
-    });
+    };
+    
+    // Set up the auth listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(handleAuthChange);
 
     // Then check current session
     const checkCurrentSession = async () => {
@@ -211,7 +140,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Current session:', data.session?.user?.id);
         
         // The onAuthStateChange handler will handle setting the user
-        // We don't need to duplicate that logic here
       } catch (error) {
         console.error('Error checking session:', error);
         setLoading(false);
@@ -307,22 +235,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Profile management functions
+  // Profile management functions - now using ProfileService
   async function updateProfile(data: Partial<UserProfile>) {
     if (!user) return { error: new Error('No user logged in'), data: null };
 
     try {
-      const { error, data: updatedData } = await supabase
-        .from('profiles')
-        .update(data)
-        .eq('id', user.id);
-
-      if (error) {
-        return { error, data: null };
+      const result = await ProfileService.updateProfile(user.id, data);
+      
+      if (!result.error) {
+        setUser((prev) => (prev ? { ...prev, ...data } : null));
       }
-
-      setUser((prev) => (prev ? { ...prev, ...data } : null));
-      return { data: updatedData, error: null };
+      
+      return result;
     } catch (error) {
       return { error: error as Error, data: null };
     }
@@ -337,78 +261,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     try {
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle();
+      // Force refresh from database
+      const refreshedProfile = await ProfileService.getUserProfile(
+        session.user.id,
+        session.user.email || undefined,
+        true // force refresh
+      );
       
-      if (error) {
-        console.error("Error refreshing user profile:", error);
-        return;
-      }
-      
-      if (profileData) {
-        console.log("Original profile data from database:", profileData);
-        
-        // Debug the role coming from database
-        console.log('Role from database during refresh:', profileData.role);
-        console.log('Type of role from database during refresh:', typeof profileData.role);
-        
-        // Map database role string to UserRole enum
-        let userRole: UserRole;
-        
-        switch(profileData.role) {
-          case 'provider':
-            userRole = UserRole.PROVIDER;
-            break;
-          case 'admin':
-            userRole = UserRole.ADMIN;
-            break;
-          default:
-            userRole = UserRole.CLIENT;
-        }
-        
-        console.log('Mapped role to enum during refresh:', userRole);
-        
-        setUser({
-          id: profileData.id,
-          email: session.user.email || profileData.id,
-          role: userRole,
-          name: profileData.name || undefined,
-          avatar_url: undefined,
-          address: undefined,
-          phone: profileData.phone || undefined,
-          created_at: profileData.created_at,
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
-        });
-        console.log("User profile refreshed successfully with role:", userRole);
+      if (refreshedProfile) {
+        console.log("User profile refreshed successfully with role:", refreshedProfile.role);
+        setUser(refreshedProfile);
       } else {
-        console.log("No profile found during refresh");
+        console.log("No profile found during refresh, attempting to create one");
+        
+        const newProfile = await ProfileService.createDefaultProfile(
+          session.user.id,
+          session.user.email || '',
+          UserRole.CLIENT
+        );
+        
+        if (newProfile) {
+          setUser(newProfile);
+        }
       }
     } catch (error) {
       console.error("Error refreshing user profile:", error);
+      toast.error('Falha ao atualizar dados do usuário');
     }
   }
 
   // Admin functions
   async function makeAdmin(userId: string) {
-    if (!user || user.role !== UserRole.ADMIN) {
-      return { error: new Error('Unauthorized'), data: null };
+    if (!user) {
+      return { error: new Error('No user logged in'), data: null };
     }
-
-    try {
-      const { error, data: updatedData } = await supabase.rpc('update_user_role', {
-        user_id: userId,
-        new_role: UserRole.ADMIN
-      });
-
-      return { error: error || null, data: updatedData };
-    } catch (error) {
-      return { error: error as Error, data: null };
-    }
+    
+    return await ProfileService.makeAdmin(user.id, userId);
   }
 
   // Subscription management
@@ -479,7 +367,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     makeAdmin,
     subscription,
     refreshSubscription,
-    subscriptionLoading
+    subscriptionLoading,
+    hasRole: checkUserRole
   };
 
   console.log('AuthProvider: Current auth state:', {

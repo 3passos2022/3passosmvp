@@ -11,7 +11,7 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) => {
-  const { user, loading, session, refreshUser } = useAuth();
+  const { user, loading, session, refreshUser, hasRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -21,7 +21,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   console.log('PrivateRoute: Rendering with', {
     isAuthenticated: !!user, 
     userRole: user?.role,
-    requiredRole,
+    requiredRoleEnum: requiredRole,
+    requiredRoleStr: requiredRole ? String(requiredRole) : null,
     loading,
     sessionExists: !!session,
     path: location.pathname,
@@ -92,14 +93,20 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  // Verificar a role do usuário
-  console.log('PrivateRoute: Checking user role:', user.role, 'required:', requiredRole);
-  
-  // Redirecionar se não tiver a role necessária
-  if (requiredRole && user.role !== requiredRole) {
-    console.log('PrivateRoute: User lacks required role, redirecting to unauthorized');
-    toast.error('Você não tem permissão para acessar esta página.');
-    return <Navigate to="/unauthorized" replace />;
+  // Verificar a role do usuário - agora usando o helper hasRole
+  if (requiredRole) {
+    const hasRequiredRole = hasRole(requiredRole);
+    console.log('PrivateRoute: Role check -', { 
+      userRole: user.role, 
+      requiredRole, 
+      hasRequiredRole 
+    });
+    
+    if (!hasRequiredRole) {
+      console.log('PrivateRoute: User lacks required role, redirecting to unauthorized');
+      toast.error('Você não tem permissão para acessar esta página.');
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   // Renderizar o conteúdo protegido
