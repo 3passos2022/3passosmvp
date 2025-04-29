@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -43,34 +42,6 @@ export interface AuthContextProps {
 }
 
 export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
-
-// Helper function to map database role string to UserRole enum
-const mapDatabaseRoleToEnum = (role: string | null | undefined): UserRole => {
-  if (!role) return UserRole.CLIENT;
-  
-  // Log para debug
-  console.log('Mapeando role do banco de dados:', {
-    roleOriginal: role,
-    roleType: typeof role,
-    roleNormalizado: role.toLowerCase(),
-    enumProvider: UserRole.PROVIDER,
-    enumClient: UserRole.CLIENT,
-    enumAdmin: UserRole.ADMIN,
-    isProvider: role.toLowerCase() === 'provider',
-    isAdmin: role.toLowerCase() === 'admin'
-  });
-  
-  // Normalize the role string to lowercase for case-insensitive comparison
-  const normalizedRole = role.toLowerCase();
-  
-  if (normalizedRole === 'provider') {
-    return UserRole.PROVIDER;
-  } else if (normalizedRole === 'admin') {
-    return UserRole.ADMIN;
-  } else {
-    return UserRole.CLIENT;
-  }
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -137,8 +108,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('Role from database:', profileData.role);
             console.log('Type of role from database:', typeof profileData.role);
             
-            // Use the helper function to map the role
-            const userRole = mapDatabaseRoleToEnum(profileData.role);
+            // Map database role to UserRole enum - convert string to enum if needed
+            let userRole: UserRole;
+            
+            switch(profileData.role) {
+              case 'provider':
+                userRole = UserRole.PROVIDER;
+                break;
+              case 'admin':
+                userRole = UserRole.ADMIN;
+                break;
+              default:
+                userRole = UserRole.CLIENT;
+            }
             
             console.log('Mapped role to enum:', userRole);
             
@@ -148,13 +130,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: newSession.user.email || profileData.id,
               role: userRole,
               name: profileData.name || undefined,
-              avatar_url: undefined, // Add default value for missing fields
-              address: undefined, // Add default value for missing fields
+              avatar_url: undefined,
+              address: undefined,
               phone: profileData.phone || undefined,
               created_at: profileData.created_at,
-              subscribed: false, // Default values for missing fields
-              subscription_tier: 'free', // Default value
-              subscription_end: null // Default value
+              subscribed: false,
+              subscription_tier: 'free',
+              subscription_end: null
             });
           } else {
             console.log('No profile found, creating default profile');
@@ -330,23 +312,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return { error: new Error('No user logged in'), data: null };
 
     try {
-      // Create a payload with only the fields that can be updated in the database
-      const dbUpdatePayload: any = {};
-      
-      if (data.name !== undefined) dbUpdatePayload.name = data.name;
-      if (data.phone !== undefined) dbUpdatePayload.phone = data.phone;
-      // Add other fields that should be updatable in the database
-      
       const { error, data: updatedData } = await supabase
         .from('profiles')
-        .update(dbUpdatePayload)
+        .update(data)
         .eq('id', user.id);
 
       if (error) {
         return { error, data: null };
       }
 
-      // Update the user state with all the fields from the data parameter
       setUser((prev) => (prev ? { ...prev, ...data } : null));
       return { data: updatedData, error: null };
     } catch (error) {
@@ -381,23 +355,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Role from database during refresh:', profileData.role);
         console.log('Type of role from database during refresh:', typeof profileData.role);
         
-        // Use the helper function to map the role
-        const userRole = mapDatabaseRoleToEnum(profileData.role);
+        // Map database role string to UserRole enum
+        let userRole: UserRole;
         
-        console.log('Mapped role to enum during refresh:', userRole, 'Role original:', profileData.role);
+        switch(profileData.role) {
+          case 'provider':
+            userRole = UserRole.PROVIDER;
+            break;
+          case 'admin':
+            userRole = UserRole.ADMIN;
+            break;
+          default:
+            userRole = UserRole.CLIENT;
+        }
+        
+        console.log('Mapped role to enum during refresh:', userRole);
         
         setUser({
           id: profileData.id,
           email: session.user.email || profileData.id,
           role: userRole,
           name: profileData.name || undefined,
-          avatar_url: undefined, // Default value for missing field
-          address: undefined, // Default value for missing field
+          avatar_url: undefined,
+          address: undefined,
           phone: profileData.phone || undefined,
           created_at: profileData.created_at,
-          subscribed: false, // Default value for missing field
-          subscription_tier: 'free', // Default value for missing field
-          subscription_end: null // Default value for missing field
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
         });
         console.log("User profile refreshed successfully with role:", userRole);
       } else {

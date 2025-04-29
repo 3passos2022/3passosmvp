@@ -21,10 +21,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   console.log('PrivateRoute: Rendering with', {
     isAuthenticated: !!user, 
     userRole: user?.role,
-    userRoleType: typeof user?.role,
-    userRoleValue: user?.role,
     requiredRole,
-    requiredRoleType: typeof requiredRole,
     loading,
     sessionExists: !!session,
     path: location.pathname,
@@ -95,15 +92,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  // Enhanced logging for role checking
-  console.log('PrivateRoute: Checking user role:', {
-    userRole: user.role, 
-    userRoleType: typeof user.role,
-    requiredRole, 
-    requiredRoleType: typeof requiredRole,
-    isMatch: user.role === requiredRole,
-    stringComparison: String(user.role) === String(requiredRole)
-  });
+  // Verificar a role do usuário
+  console.log('PrivateRoute: Checking user role:', user.role, 'required:', requiredRole);
   
   // Redirecionar se não tiver a role necessária
   if (requiredRole && user.role !== requiredRole) {
