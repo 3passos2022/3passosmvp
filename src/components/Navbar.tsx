@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Menu, X, UserCircle, Home, Briefcase, 
-  ClipboardList, LogIn, LogOut, CreditCard
+  ClipboardList, LogIn, LogOut, CreditCard,
+  User, FileText, Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import { UserRole } from '@/lib/types';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 import ServiceNavBar from './ServiceNavBar';
 import { Badge } from './ui/badge';
-import { FileText, Settings } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
