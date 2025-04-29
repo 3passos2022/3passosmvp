@@ -22,6 +22,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     isAuthenticated: !!user, 
     userRole: user?.role,
     userRoleType: typeof user?.role,
+    userRoleValue: user?.role,
     requiredRole,
     requiredRoleType: typeof requiredRole,
     loading,

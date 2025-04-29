@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -147,13 +148,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: newSession.user.email || profileData.id,
               role: userRole,
               name: profileData.name || undefined,
-              avatar_url: profileData.avatar_url || undefined,
-              address: profileData.address || undefined,
+              avatar_url: undefined, // Add default value for missing fields
+              address: undefined, // Add default value for missing fields
               phone: profileData.phone || undefined,
               created_at: profileData.created_at,
-              subscribed: Boolean(profileData.subscribed) || false,
-              subscription_tier: (profileData.subscription_tier as 'free' | 'basic' | 'premium') || 'free',
-              subscription_end: profileData.subscription_end || null
+              subscribed: false, // Default values for missing fields
+              subscription_tier: 'free', // Default value
+              subscription_end: null // Default value
             });
           } else {
             console.log('No profile found, creating default profile');
@@ -390,13 +391,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: session.user.email || profileData.id,
           role: userRole,
           name: profileData.name || undefined,
-          avatar_url: profileData.avatar_url || undefined,
-          address: profileData.address || undefined,
+          avatar_url: undefined, // Default value for missing field
+          address: undefined, // Default value for missing field
           phone: profileData.phone || undefined,
           created_at: profileData.created_at,
-          subscribed: Boolean(profileData.subscribed) || false,
-          subscription_tier: (profileData.subscription_tier as 'free' | 'basic' | 'premium') || 'free',
-          subscription_end: profileData.subscription_end || null
+          subscribed: false, // Default value for missing field
+          subscription_tier: 'free', // Default value for missing field
+          subscription_end: null // Default value for missing field
         });
         console.log("User profile refreshed successfully with role:", userRole);
       } else {
