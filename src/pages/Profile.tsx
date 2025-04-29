@@ -6,7 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
-import { useNavigate, Routes, Route, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import ProviderSettings from '@/components/profile/ProviderSettings';
 import ProviderPortfolio from '@/components/profile/ProviderPortfolio';
 import ProviderServices from '@/components/profile/ProviderServices';
@@ -15,7 +15,7 @@ import RequestedQuotes from '@/components/profile/RequestedQuotes';
 import { toast } from 'sonner';
 import UserProfile from '@/components/profile/UserProfile';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
-import { User, CreditCard, FileText, Settings } from 'lucide-react';
+import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
@@ -26,7 +26,8 @@ const Profile: React.FC = () => {
     hasUser: !!user,
     hasSession: !!session,
     isLoading: loading,
-    userRole: user?.role
+    userRole: user?.role,
+    userRoleType: user ? typeof user.role : 'undefined'
   });
 
   // Effect to attempt profile refresh if session exists but no user
@@ -114,6 +115,32 @@ const Profile: React.FC = () => {
     navigate(path);
   };
 
+  // Helper function to check if user is provider
+  const isProvider = () => {
+    if (!user) return false;
+    
+    // Check both enum and string value to be safe
+    return user.role === UserRole.PROVIDER || user.role === 'provider';
+  };
+  
+  // Helper function to check if user is admin
+  const isAdmin = () => {
+    if (!user) return false;
+    
+    // Check both enum and string value to be safe
+    return user.role === UserRole.ADMIN || user.role === 'admin';
+  };
+
+  console.log("User role checks:", {
+    roleValue: user.role,
+    roleType: typeof user.role,
+    isProvider: isProvider(),
+    isAdmin: isAdmin(),
+    UserRoleEnum: UserRole,
+    matchesProviderEnum: user.role === UserRole.PROVIDER,
+    matchesAdminEnum: user.role === UserRole.ADMIN
+  });
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -135,9 +162,8 @@ const Profile: React.FC = () => {
                   
                   <div className="flex items-center">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                      {user.role === UserRole.CLIENT ? 'Cliente' : 
-                       user.role === UserRole.PROVIDER ? 'Prestador de Serviços' : 
-                       'Administrador'}
+                      {isProvider() ? 'Prestador de Serviços' : 
+                       isAdmin() ? 'Administrador' : 'Cliente'}
                     </span>
                   </div>
                 </div>
@@ -157,7 +183,7 @@ const Profile: React.FC = () => {
                   </TabsTrigger>
                   
                   {/* Tabs para prestadores e admins */}
-                  {(user.role === UserRole.PROVIDER || user.role === UserRole.ADMIN) && (
+                  {(isProvider() || isAdmin()) && (
                     <>
                       <TabsTrigger value="requested" className="flex items-center">
                         <FileText className="mr-2 h-4 w-4" />
@@ -186,7 +212,7 @@ const Profile: React.FC = () => {
                   <QuotesList />
                 </TabsContent>
                 
-                {(user.role === UserRole.PROVIDER || user.role === UserRole.ADMIN) && (
+                {(isProvider() || isAdmin()) && (
                   <>
                     <TabsContent value="requested">
                       <RequestedQuotes />

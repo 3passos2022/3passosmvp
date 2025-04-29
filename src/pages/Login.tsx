@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import { UserRole } from '@/lib/types';
-import { User, UserCircle, Briefcase } from 'lucide-react';
+import { User as UserIcon, UserCircle, Briefcase } from 'lucide-react';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 
 const loginSchema = z.object({
@@ -85,7 +85,7 @@ const Login: React.FC = () => {
     }
   }, [user, session, navigate, from]);
 
-  const loginForm = useForm<LoginFormData>({
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -93,7 +93,7 @@ const Login: React.FC = () => {
     },
   });
 
-  const signupForm = useForm<SignupFormData>({
+  const signupForm = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
       name: "",
@@ -104,7 +104,7 @@ const Login: React.FC = () => {
     },
   });
 
-  const handleLoginSubmit = async (formData: LoginFormData) => {
+  const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
     try {
       console.log("Attempting login with:", formData.email);
@@ -133,9 +133,10 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleSignupSubmit = async (formData: SignupFormData) => {
+  const handleSignupSubmit = async (formData: z.infer<typeof signupSchema>) => {
     setIsLoading(true);
     try {
+      console.log("Attempting signup with email:", formData.email, "and role:", formData.role);
       const { error } = await signUp(formData.email, formData.password, formData.role);
 
       if (error) {
@@ -370,7 +371,7 @@ const Login: React.FC = () => {
                                     htmlFor="client"
                                     className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                                   >
-                                    <User className="mb-2 h-6 w-6" />
+                                    <UserIcon className="mb-2 h-6 w-6" />
                                     Cliente
                                   </Label>
                                 </div>

@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const fallbackUser: UserProfile = {
               id: newSession.user.id,
               email: newSession.user.email || '',
-              role: UserRole.CLIENT,
+              role: UserRole.CLIENT, // Default to CLIENT role
               created_at: new Date().toISOString(),
               subscribed: false,
               subscription_tier: 'free' as 'free' | 'basic' | 'premium',
@@ -104,11 +104,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else if (profileData) {
             console.log('User profile found:', profileData);
             
-            // Map database profile to UserProfile type
+            // Debug the role coming from database
+            console.log('Role from database:', profileData.role);
+            console.log('Type of role from database:', typeof profileData.role);
+            
+            // Map database role to UserRole enum - convert string to enum if needed
+            let userRole: UserRole;
+            
+            switch(profileData.role) {
+              case 'provider':
+                userRole = UserRole.PROVIDER;
+                break;
+              case 'admin':
+                userRole = UserRole.ADMIN;
+                break;
+              default:
+                userRole = UserRole.CLIENT;
+            }
+            
+            console.log('Mapped role to enum:', userRole);
+            
+            // Map database profile to UserProfile type with correctly mapped role
             setUser({
               id: profileData.id,
               email: newSession.user.email || profileData.id,
-              role: profileData.role as UserRole,
+              role: userRole,
               name: profileData.name || undefined,
               avatar_url: undefined,
               address: undefined,
@@ -329,10 +349,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       if (profileData) {
+        console.log("Original profile data from database:", profileData);
+        
+        // Debug the role coming from database
+        console.log('Role from database during refresh:', profileData.role);
+        console.log('Type of role from database during refresh:', typeof profileData.role);
+        
+        // Map database role string to UserRole enum
+        let userRole: UserRole;
+        
+        switch(profileData.role) {
+          case 'provider':
+            userRole = UserRole.PROVIDER;
+            break;
+          case 'admin':
+            userRole = UserRole.ADMIN;
+            break;
+          default:
+            userRole = UserRole.CLIENT;
+        }
+        
+        console.log('Mapped role to enum during refresh:', userRole);
+        
         setUser({
           id: profileData.id,
           email: session.user.email || profileData.id,
-          role: profileData.role as UserRole,
+          role: userRole,
           name: profileData.name || undefined,
           avatar_url: undefined,
           address: undefined,
@@ -342,7 +384,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           subscription_tier: 'free',
           subscription_end: null
         });
-        console.log("User profile refreshed successfully");
+        console.log("User profile refreshed successfully with role:", userRole);
       } else {
         console.log("No profile found during refresh");
       }
