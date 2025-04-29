@@ -108,14 +108,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error fetching user profile during session check:', error);
           // Criar perfil básico para garantir funcionamento
           setUser({
-            id: data.session.user.id,
-            email: data.session.user.email || '',
-            role: UserRole.CLIENT,
-            created_at: new Date().toISOString(),
-            subscribed: false,
-            subscription_tier: 'free',
-            subscription_end: null
-          });
+              id: data.session.user.id,
+              email: data.session.user.email || '',
+              role: UserRole.CLIENT,
+              created_at: new Date().toISOString(),
+              subscribed: false,
+              subscription_tier: 'free' as 'free' | 'basic' | 'premium',
+              subscription_end: null
+            });
         }
       } else {
         console.log('No current session found');
@@ -145,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('No profile found, creating default profile');
           
           if (session?.user) {
-            const defaultProfile = {
+            const defaultProfile: UserProfile = {
               id: session.user.id,
               email: session.user.email || '',
               role: UserRole.CLIENT,
@@ -382,7 +382,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Subscription check returned:', data);
         setSubscription({
           subscribed: data.subscribed,
-          subscription_tier: data.subscription_tier as 'free' | 'basic' | 'premium' || 'free',
+          subscription_tier: (data.subscription_tier || 'free') as 'free' | 'basic' | 'premium',
           subscription_end: data.subscription_end
         });
       } else {
