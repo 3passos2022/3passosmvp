@@ -23,16 +23,21 @@ const Profile: React.FC = () => {
   const [activeTab, setActiveTab] = useState('profile');
 
   // Debug log melhorado para profile page
-  console.log('Profile page rendered with:', {
-    hasUser: !!user,
-    hasSession: !!session,
-    isLoading: loading,
-    userRole: user?.role,
-    userRoleType: user ? typeof user.role : 'undefined',
-    roleNormalized: user ? String(user.role).toLowerCase().trim() : null,
-    providerRoleNormalized: String(UserRole.PROVIDER).toLowerCase().trim(),
-    adminRoleNormalized: String(UserRole.ADMIN).toLowerCase().trim()
-  });
+  useEffect(() => {
+    if (user) {
+      console.log('Profile page rendered with:', {
+        hasUser: !!user,
+        hasSession: !!session,
+        isLoading: loading,
+        userRole: user.role,
+        userRoleType: typeof user.role,
+        roleNormalized: String(user.role).toLowerCase().trim(),
+        providerRoleNormalized: String(UserRole.PROVIDER).toLowerCase().trim(),
+        adminRoleNormalized: String(UserRole.ADMIN).toLowerCase().trim(),
+        isEqual: String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim()
+      });
+    }
+  }, [user, loading, session]);
 
   // Effect to attempt profile refresh if session exists but no user
   useEffect(() => {
@@ -153,9 +158,9 @@ const Profile: React.FC = () => {
 
   console.log("User role checks details:", {
     userObj: user,
-    roleValue: user?.role,
-    roleType: typeof user?.role,
-    roleString: user ? String(user.role).toLowerCase().trim() : null,
+    roleValue: user.role,
+    roleType: typeof user.role,
+    roleString: String(user.role).toLowerCase().trim(),
     providerEnum: UserRole.PROVIDER,
     providerEnumString: String(UserRole.PROVIDER).toLowerCase().trim(),
     adminEnumString: String(UserRole.ADMIN).toLowerCase().trim(),

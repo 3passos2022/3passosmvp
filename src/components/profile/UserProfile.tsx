@@ -22,10 +22,11 @@ const UserProfile: React.FC = () => {
       console.log('UserProfile - User data:', {
         role: user.role,
         roleType: typeof user.role,
-        roleString: String(user.role).toLowerCase(),
-        isProvider: String(user.role).toLowerCase() === String(UserRole.PROVIDER).toLowerCase(),
-        isAdmin: String(user.role).toLowerCase() === String(UserRole.ADMIN).toLowerCase(),
-        userRoleEnum: UserRole.PROVIDER
+        roleString: String(user.role).toLowerCase().trim(),
+        isProvider: String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim(),
+        isAdmin: String(user.role).toLowerCase().trim() === String(UserRole.ADMIN).toLowerCase().trim(),
+        userRoleEnum: UserRole.PROVIDER,
+        userEnumStr: String(UserRole.PROVIDER).toLowerCase().trim()
       });
     }
   }, [user]);
@@ -75,10 +76,20 @@ const UserProfile: React.FC = () => {
   // Helper para determinar o tipo de conta de forma mais robusta
   const getAccountType = () => {
     const role = String(user.role).toLowerCase().trim();
+    const providerRole = String(UserRole.PROVIDER).toLowerCase().trim();
+    const adminRole = String(UserRole.ADMIN).toLowerCase().trim();
     
-    if (role === String(UserRole.PROVIDER).toLowerCase().trim()) {
+    console.log('Checking account type:', {
+      userRole: role,
+      providerRole: providerRole,
+      adminRole: adminRole,
+      isProvider: role === providerRole,
+      isAdmin: role === adminRole
+    });
+    
+    if (role === providerRole) {
       return 'Prestador de Serviços';
-    } else if (role === String(UserRole.ADMIN).toLowerCase().trim()) {
+    } else if (role === adminRole) {
       return 'Administrador';
     } else {
       return 'Cliente';
@@ -148,7 +159,8 @@ const UserProfile: React.FC = () => {
                   {getAccountType()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  (Valor no banco: {String(user.role)})
+                  Valor: {String(user.role)} | Enum: {String(UserRole.PROVIDER)} | 
+                  Comparação: {String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim() ? 'Igual' : 'Diferente'}
                 </p>
               </div>
             </div>

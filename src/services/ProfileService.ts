@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/types';
 import { toast } from 'sonner';
@@ -125,15 +126,15 @@ export class ProfileService {
     try {
       console.log('Fetching profile from database for user:', userId);
       
-      // Approach 1: Use the RPC function to avoid RLS recursion issues (preferred method)
+      // Approach 1: Use the security definer function to avoid RLS recursion issues (preferred method)
       const { data: roleData, error: roleError } = await supabase
-        .rpc('get_user_role_safely', { user_id: userId });
+        .rpc('get_role_safely', { user_id: userId });
       
       if (roleError) {
-        console.error('Error fetching user role using RPC:', roleError);
+        console.error('Error fetching user role using get_role_safely:', roleError);
         // Continue to next approach
       } else {
-        console.log('Role data from RPC:', roleData);
+        console.log('Role data from get_role_safely:', roleData);
       }
       
       // Approach 2: Get the full profile through direct query
@@ -183,7 +184,7 @@ export class ProfileService {
       // If we got role data from RPC and it doesn't match, use that one
       // This helps avoid any RLS issues
       if (roleData && profileData.role !== roleData) {
-        console.log('Using role from RPC function:', roleData);
+        console.log('Using role from get_role_safely function:', roleData);
         profileData.role = roleData;
       }
       
