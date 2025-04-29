@@ -108,7 +108,7 @@ const SubscriptionManager: React.FC = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Gerenciar Assinatura</CardTitle>
+            <CardTitle>Status da Assinatura</CardTitle>
             <CardDescription>
               {subscriptionLoading ? 'Verificando status da assinatura...' : 
                (subscription?.subscribed 

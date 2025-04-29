@@ -15,6 +15,7 @@ import RequestedQuotes from '@/components/profile/RequestedQuotes';
 import { toast } from 'sonner';
 import UserProfile from '@/components/profile/UserProfile';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
+import PlansComparison from '@/components/subscription/PlansComparison';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 
 const Profile: React.FC = () => {
@@ -119,7 +120,6 @@ const Profile: React.FC = () => {
   const isProvider = () => {
     if (!user) return false;
     
-    // Check both enum and string value to be safe
     return user.role === UserRole.PROVIDER;
   };
   
@@ -127,7 +127,6 @@ const Profile: React.FC = () => {
   const isAdmin = () => {
     if (!user) return false;
     
-    // Check both enum and string value to be safe
     return user.role === UserRole.ADMIN;
   };
 
@@ -182,6 +181,12 @@ const Profile: React.FC = () => {
                     Meus Orçamentos
                   </TabsTrigger>
                   
+                  {/* Tab de assinatura para todos */}
+                  <TabsTrigger value="subscription" className="flex items-center">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Minha Assinatura
+                  </TabsTrigger>
+                  
                   {/* Tabs para prestadores e admins */}
                   {(isProvider() || isAdmin()) && (
                     <>
@@ -196,12 +201,6 @@ const Profile: React.FC = () => {
                       </TabsTrigger>
                     </>
                   )}
-                  
-                  {/* Tab de assinatura para todos */}
-                  <TabsTrigger value="subscription" className="flex items-center">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Minha Assinatura
-                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="profile">
@@ -210,6 +209,16 @@ const Profile: React.FC = () => {
                 
                 <TabsContent value="quotes">
                   <QuotesList />
+                </TabsContent>
+                
+                <TabsContent value="subscription">
+                  <div className="space-y-8">
+                    <SubscriptionManager />
+                    <div className="mt-10">
+                      <h2 className="text-2xl font-semibold mb-6">Planos Disponíveis</h2>
+                      <PlansComparison showTitle={false} />
+                    </div>
+                  </div>
                 </TabsContent>
                 
                 {(isProvider() || isAdmin()) && (
@@ -223,10 +232,6 @@ const Profile: React.FC = () => {
                     </TabsContent>
                   </>
                 )}
-                
-                <TabsContent value="subscription">
-                  <SubscriptionManager />
-                </TabsContent>
               </Tabs>
             </div>
           </motion.div>
