@@ -31,7 +31,6 @@ const UserProfile: React.FC = () => {
       toast.success('Perfil atualizado com sucesso');
       setIsEditing(false);
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
       toast.error('Erro ao atualizar perfil');
     } finally {
       setLoading(false);
@@ -58,7 +57,7 @@ const UserProfile: React.FC = () => {
     return user.email.substring(0, 2).toUpperCase();
   };
 
-  // Helper para determinar o tipo de conta
+  // Helper para determinar tipo de conta
   const getAccountType = () => {
     const role = String(user.role).toLowerCase().trim();
     
@@ -130,9 +129,7 @@ const UserProfile: React.FC = () => {
               
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
-                <p className="font-medium">
-                  {getAccountType()}
-                </p>
+                <p className="font-medium">{getAccountType()}</p>
               </div>
             </div>
           )}

@@ -3,20 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/types';
 import { toast } from 'sonner';
 
-// Local cache for profiles to reduce database calls
+// Cache para perfis
 const profileCache = new Map<string, {
   profile: UserProfile,
   timestamp: number
 }>();
 
-// Cache expiration time (10 minutes)
+// Tempo de expiração do cache (10 minutos)
 const CACHE_TTL = 10 * 60 * 1000;
 
 /**
- * Maps string role from database to UserRole enum
+ * Mapeia role string do banco para enum UserRole
  */
 export const mapDatabaseRoleToEnum = (role: string): UserRole => {
-  // Garantir que role seja tratada como string e normalizada
   const roleString = String(role).toLowerCase().trim();
   
   switch(roleString) {
@@ -30,13 +29,12 @@ export const mapDatabaseRoleToEnum = (role: string): UserRole => {
 };
 
 /**
- * Transforms database profile to UserProfile
+ * Transforma dados do banco em UserProfile
  */
 export const transformDatabaseProfile = (
   profileData: any, 
   email: string | null = null
 ): UserProfile => {
-  // Map database role to UserRole enum
   const userRole = mapDatabaseRoleToEnum(profileData.role);
   
   return {
@@ -55,12 +53,11 @@ export const transformDatabaseProfile = (
 };
 
 /**
- * Checks if user has specific role - safe string comparison
+ * Verifica se usuário tem role específica
  */
 export const hasRole = (user: UserProfile | null, role: UserRole | string): boolean => {
   if (!user) return false;
   
-  // Garantir que ambos os valores sejam tratados como string e normalizados
   const userRoleStr = String(user.role).toLowerCase().trim();
   const checkRoleStr = String(role).toLowerCase().trim();
   
@@ -68,19 +65,18 @@ export const hasRole = (user: UserProfile | null, role: UserRole | string): bool
 };
 
 /**
- * Service for Profile operations
+ * Serviço para operações com perfis
  */
 export class ProfileService {
   /**
-   * Get user profile by ID with fallback mechanisms
+   * Obtém perfil do usuário por ID
    */
   static async getUserProfile(userId: string, email: string | null = null, forceRefresh = false): Promise<UserProfile | null> {
     if (!userId) {
-      console.error('No user ID provided for getUserProfile');
       return null;
     }
     
-    // Check cache first if not forcing refresh
+    // Verificar cache primeiro
     if (!forceRefresh) {
       const cached = profileCache.get(userId);
       const now = Date.now();
@@ -91,15 +87,11 @@ export class ProfileService {
     }
     
     try {
-      // Use the get_role_safely RPC function to avoid RLS issues
+      // Usar a função RPC segura para evitar problemas de RLS
       const { data: roleData, error: roleError } = await supabase
         .rpc('get_role_safely', { user_id: userId });
       
-      if (roleError) {
-        console.error('Error fetching user role using get_role_safely:', roleError);
-      }
-      
-      // Get the profile through direct query
+      // Obter perfil diretamente
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -107,9 +99,7 @@ export class ProfileService {
         .maybeSingle();
       
       if (error) {
-        console.error('Error fetching user profile directly:', error);
-        
-        // Create a minimal profile if other approaches fail
+        // Criar perfil mínimo se outras abordagens falharem
         if (email) {
           const minimalProfile: UserProfile = {
             id: userId,
@@ -121,7 +111,6 @@ export class ProfileService {
             subscription_end: null
           };
           
-          // Cache this minimal profile
           profileCache.set(userId, {
             profile: minimalProfile,
             timestamp: Date.now()
@@ -137,13 +126,12 @@ export class ProfileService {
         return null;
       }
       
-      // If we got role data from RPC and it doesn't match, use that one
-      // This helps avoid any RLS issues
+      // Se temos dados de role da RPC e é diferente, usar esse
       if (roleData && profileData.role !== roleData) {
         profileData.role = roleData;
       }
       
-      // Transform and cache the profile
+      // Transformar e armazenar em cache
       const profile = transformDatabaseProfile(profileData, email);
       profileCache.set(userId, {
         profile,
@@ -152,20 +140,19 @@ export class ProfileService {
       
       return profile;
     } catch (error) {
-      console.error('Exception in getUserProfile:', error);
       return null;
     }
   }
   
   /**
-   * Create default profile for user
+   * Cria perfil padrão para usuário
    */
   static async createDefaultProfile(userId: string, email: string, role: UserRole = UserRole.CLIENT): Promise<UserProfile | null> {
     try {
       const defaultName = email?.split('@')[0] || 'User';
       const roleString = String(role).toLowerCase();
       
-      // Create profile in database
+      // Criar perfil no banco
       const { error } = await supabase
         .from('profiles')
         .insert([{ 
@@ -176,9 +163,7 @@ export class ProfileService {
         }]);
         
       if (error) {
-        console.error('Error creating profile:', error);
-        
-        // Try updating instead if insert failed (might be a duplicate)
+        // Tentar atualizar se a inserção falhou
         const { error: updateError } = await supabase
           .from('profiles')
           .update({ 
@@ -189,21 +174,19 @@ export class ProfileService {
           .eq('id', userId);
           
         if (updateError) {
-          console.error('Error updating profile:', updateError);
           return null;
         }
       }
       
-      // Get the newly created profile
+      // Obter o perfil recém-criado
       return await this.getUserProfile(userId, email, true);
     } catch (error) {
-      console.error('Exception in createDefaultProfile:', error);
       return null;
     }
   }
   
   /**
-   * Update user profile
+   * Atualiza perfil do usuário
    */
   static async updateProfile(userId: string, data: Partial<UserProfile>): Promise<{ error: Error | null, data: any }> {
     try {
@@ -216,18 +199,17 @@ export class ProfileService {
         return { error, data: null };
       }
 
-      // Invalidate cache
+      // Invalidar cache
       profileCache.delete(userId);
       
       return { data: updatedData, error: null };
     } catch (error) {
-      console.error('Exception in updateProfile:', error);
       return { error: error as Error, data: null };
     }
   }
   
   /**
-   * Make user an admin
+   * Torna usuário admin
    */
   static async makeAdmin(adminUserId: string, targetUserId: string): Promise<{ error: Error | null, data: any }> {
     try {
@@ -235,7 +217,7 @@ export class ProfileService {
         return { error: new Error('No admin user provided'), data: null };
       }
 
-      // Use our RPC function to check if user is admin
+      // Verificar se usuário é admin
       const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin', {
         user_id: adminUserId
       });
@@ -244,7 +226,7 @@ export class ProfileService {
         return { error: new Error('Unauthorized - Not an admin'), data: null };
       }
 
-      // Update user role using RPC
+      // Atualizar role do usuário usando RPC
       const { error, data: updatedData } = await supabase.rpc('update_user_role', {
         user_id: targetUserId,
         new_role: 'admin'
@@ -254,18 +236,17 @@ export class ProfileService {
         return { error, data: null };
       }
       
-      // Invalidate cache
+      // Invalidar cache
       profileCache.delete(targetUserId);
       
       return { error: null, data: updatedData };
     } catch (error) {
-      console.error('Exception in makeAdmin:', error);
       return { error: error as Error, data: null };
     }
   }
   
   /**
-   * Clear profile cache
+   * Limpar cache de perfil
    */
   static clearCache(userId?: string) {
     if (userId) {
@@ -276,5 +257,4 @@ export class ProfileService {
   }
 }
 
-// Export a singleton instance
 export default ProfileService;

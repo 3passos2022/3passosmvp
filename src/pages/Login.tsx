@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -12,8 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,9 +25,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { UserRole } from '@/lib/types';
-import { User as UserIcon, UserCircle, Briefcase } from 'lucide-react';
+import { User as UserIcon, Briefcase } from 'lucide-react';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 
 const loginSchema = z.object({
@@ -68,19 +69,11 @@ const Login: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("login");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Get the redirect path from location state or default to "/"
+  // Obter caminho de redirecionamento
   const from = location.state?.from || "/";
   
-  console.log("Login page rendered with:", { 
-    hasUser: !!user, 
-    hasSession: !!session,
-    isLoading: loading,
-    redirectPath: from
-  });
-
   useEffect(() => {
     if (user && session) {
-      console.log("User is authenticated, redirecting to:", from);
       navigate(from);
     }
   }, [user, session, navigate, from]);
@@ -107,26 +100,20 @@ const Login: React.FC = () => {
   const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
     try {
-      console.log("Attempting login with:", formData.email);
-      const { error, data } = await signIn(formData.email, formData.password);
+      const { error } = await signIn(formData.email, formData.password);
       if (error) {
-        console.error("Error signing in:", error);
-        toast.error("Erro ao fazer login: " + error.message);
+        toast.error(`Erro ao fazer login: ${error.message}`);
       } else {
-        console.log("Login successful, user:", data.user?.id);
         toast.success("Login realizado com sucesso!");
         
-        // Auth provider will handle the redirection in the useEffect above
-        // Just delay a bit to make sure state updates
+        // Atraso para garantir atualização do estado
         setTimeout(() => {
           if (!user || !session) {
-            console.log("Manually navigating after successful login");
             navigate(from);
           }
         }, 500);
       }
     } catch (error) {
-      console.error("Error signing in:", error);
       toast.error("Erro inesperado ao fazer login");
     } finally {
       setIsLoading(false);
@@ -136,33 +123,28 @@ const Login: React.FC = () => {
   const handleSignupSubmit = async (formData: z.infer<typeof signupSchema>) => {
     setIsLoading(true);
     try {
-      console.log("Attempting signup with email:", formData.email, "and role:", formData.role);
       const { error } = await signUp(formData.email, formData.password, formData.role);
 
       if (error) {
-        console.error("Error signing up:", error);
-        toast.error("Erro ao criar conta: " + error.message);
+        toast.error(`Erro ao criar conta: ${error.message}`);
       } else {
         toast.success(
           "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
         );
         
         setActiveTab("login");
-        
         loginForm.setValue("email", formData.email);
         signupForm.reset();
       }
     } catch (error) {
-      console.error("Error signing up:", error);
       toast.error("Erro ao criar conta");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // If user is already logged in, redirect to the from page
+  // Redirecionar se já estiver logado
   if (!loading && user && session) {
-    console.log("Already logged in, redirecting to:", from);
     navigate(from);
     return null;
   }
