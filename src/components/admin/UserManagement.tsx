@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
+import { ProfileService } from '@/services/ProfileService';
 
 interface UserListItem {
   id: string;
@@ -42,64 +43,67 @@ const UserManagement: React.FC = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      // Usar a função get_all_providers para obter todos os usuários
-      const { data, error } = await supabase
-        .rpc('get_all_providers');
-
-      if (error) {
-        // Se a função RPC falhar, tentar obter os perfis diretamente
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (profilesError) throw profilesError;
+      console.log('Carregando usuários...');
+      
+      // Obter todos os perfis diretamente da tabela profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
         
-        // Mapear perfis para formato UserListItem
-        const usersWithEmails = profiles?.map(profile => ({
-          id: profile.id,
-          email: profile.id, // Padrão para ID
-          name: profile.name || '',
-          role: profile.role as UserRole,
-          profileExists: true,
-          created_at: profile.created_at || new Date().toISOString(),
-        })) || [];
-        
-        // Atualizar email codificado para seu usuário específico
-        const andreUser = usersWithEmails.find(user => 
-          user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
-        );
-        
-        if (andreUser) {
-          andreUser.email = 'pro.andresouza@gmail.com';
-        }
-
-        setUsers(usersWithEmails);
-      } else {
-        // Se a função RPC for bem-sucedida, usar os dados retornados
-        const usersWithEmails = data?.map((provider: any) => ({
-          id: provider.id,
-          email: provider.id,
-          name: provider.name || '',
-          role: provider.role as UserRole,
-          profileExists: true,
-          created_at: new Date().toISOString(),
-        })) || [];
-        
-        // Atualizar email codificado para seu usuário específico
-        const andreUser = usersWithEmails.find(user => 
-          user.id === '9bbc7e62-df90-45ff-bf9e-edb0738fb4b9'
-        );
-        
-        if (andreUser) {
-          andreUser.email = 'pro.andresouza@gmail.com';
-        }
-
-        setUsers(usersWithEmails);
+      if (profilesError) {
+        console.error('Erro ao carregar perfis:', profilesError);
+        throw profilesError;
       }
+      
+      console.log('Perfis obtidos:', profiles?.length || 0);
+      
+      if (!profiles || profiles.length === 0) {
+        // Tentar usar método alternativo se nenhum perfil for encontrado
+        console.log('Tentando método alternativo: get_user_role_safely');
+        
+        // Verificar se o usuário atual é admin
+        const { data: isAdmin } = await supabase.rpc('is_admin', {
+          user_id: user?.id
+        });
+        
+        if (!isAdmin) {
+          toast.error('Você precisa ter permissões de administrador para ver usuários');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Transformar os perfis no formato esperado pelo componente
+      const usersWithEmails = profiles?.map(profile => ({
+        id: profile.id,
+        email: profile.email || profile.id, // Usar email do perfil ou ID como fallback
+        name: profile.name || '',
+        role: profile.role as UserRole,
+        profileExists: true,
+        created_at: profile.created_at || new Date().toISOString(),
+      })) || [];
+      
+      // Obter emails diretamente da tabela de autenticação usando o serviço ProfileService
+      // Isso faz uma chamada segura via RPC que só retorna se o usuário atual for admin
+      try {
+        for (const userItem of usersWithEmails) {
+          if (userItem.email === userItem.id) {
+            const userProfile = await ProfileService.getUserProfile(userItem.id, null, true);
+            if (userProfile?.email && userProfile.email !== userItem.id) {
+              userItem.email = userProfile.email;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao obter emails dos usuários:', error);
+        // Continuar mesmo se falhar a obtenção de emails
+      }
+
+      setUsers(usersWithEmails);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
-      toast.error('Falha ao carregar usuários.');
+      toast.error('Falha ao carregar usuários. Verifique o console para mais detalhes.');
     } finally {
       setLoading(false);
     }
@@ -108,14 +112,12 @@ const UserManagement: React.FC = () => {
   const handleCreateProfile = async (userId: string, userName: string = '') => {
     setCreatingProfile(userId);
     try {
-      // Usar uma função de service role via RPC para criar um perfil
-      const { error } = await supabase.rpc('create_user_profile', { 
-        user_id: userId,
-        user_name: userName || 'Usuário',
-        user_role: UserRole.CLIENT
-      });
+      // Usar ProfileService para criar um perfil
+      const profile = await ProfileService.createDefaultProfile(userId, userName || 'Usuário', UserRole.CLIENT);
       
-      if (error) throw error;
+      if (!profile) {
+        throw new Error('Falha ao criar perfil');
+      }
       
       toast.success('Perfil criado com sucesso!');
       
@@ -149,18 +151,17 @@ const UserManagement: React.FC = () => {
       if (profileError) throw profileError;
       
       if (!profile) {
-        // Se o perfil não existir, criar um perfil primeiro usando a RPC
-        const { error: createError } = await supabase.rpc('create_user_profile', { 
-          user_id: userId,
-          user_name: 'Usuário',
-          user_role: UserRole.CLIENT
-        });
-        
-        if (createError) throw createError;
+        // Se o perfil não existir, criar um perfil primeiro usando ProfileService
+        await ProfileService.createDefaultProfile(userId, 'Usuário', UserRole.CLIENT);
       }
       
       // Promover o usuário a administrador
-      await makeAdmin(userId);
+      const result = await ProfileService.makeAdmin(user?.id || '', userId);
+      
+      if (result.error) {
+        throw result.error;
+      }
+      
       toast.success('Usuário promovido a administrador com sucesso!');
       
       // Atualizar a lista de usuários local
@@ -218,41 +219,49 @@ const UserManagement: React.FC = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.id}</TableCell>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    user.role === UserRole.ADMIN 
-                      ? 'bg-purple-100 text-purple-800' 
-                      : user.role === UserRole.PROVIDER
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {RoleUtils.getAccountTypeLabel({
-                      ...user, 
-                      created_at: user.created_at || new Date().toISOString()
-                    })}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  {user.role !== UserRole.ADMIN && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleMakeAdmin(user.id)}
-                      disabled={promoting === user.id || creatingProfile === user.id}
-                    >
-                      {promoting === user.id ? 'Processando...' : 
-                       creatingProfile === user.id ? 'Criando perfil...' : 
-                       'Promover a Admin'}
-                    </Button>
-                  )}
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.id}</TableCell>
+                  <TableCell>{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      user.role === UserRole.ADMIN 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : user.role === UserRole.PROVIDER
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {RoleUtils.getAccountTypeLabel({
+                        ...user, 
+                        created_at: user.created_at || new Date().toISOString()
+                      })}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {user.role !== UserRole.ADMIN && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleMakeAdmin(user.id)}
+                        disabled={promoting === user.id || creatingProfile === user.id}
+                      >
+                        {promoting === user.id ? 'Processando...' : 
+                        creatingProfile === user.id ? 'Criando perfil...' : 
+                        'Promover a Admin'}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-4">
+                  Nenhum usuário encontrado.
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       )}

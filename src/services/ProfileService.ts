@@ -73,6 +73,7 @@ export class ProfileService {
    */
   static async getUserProfile(userId: string, email: string | null = null, forceRefresh = false): Promise<UserProfile | null> {
     if (!userId) {
+      console.log('getUserProfile: userId é nulo');
       return null;
     }
     
@@ -87,12 +88,14 @@ export class ProfileService {
     }
     
     try {
+      console.log(`Tentando obter perfil para userId: ${userId}`);
+      
       // Usar a função RPC segura para evitar problemas de RLS
       const { data: role, error: roleError } = await supabase
         .rpc('get_user_role_safely', { user_id: userId });
       
       if (roleError) {
-        console.error('Error getting user role:', roleError);
+        console.error('Erro ao obter role do usuário via RPC:', roleError);
       }
       
       // Obter perfil diretamente
@@ -103,8 +106,12 @@ export class ProfileService {
         .maybeSingle();
       
       if (error) {
+        console.error('Erro ao obter perfil do usuário via tabela profiles:', error);
+        
         // Criar perfil mínimo se outras abordagens falharem
         if (email) {
+          console.log('Criando perfil mínimo para usuário com email:', email);
+          
           const minimalProfile: UserProfile = {
             id: userId,
             email: email,
@@ -127,11 +134,15 @@ export class ProfileService {
       }
       
       if (!profileData) {
+        console.log(`Nenhum perfil encontrado para userId: ${userId}`);
         return null;
       }
       
+      console.log(`Perfil encontrado para userId: ${userId}`, profileData);
+      
       // Se temos dados de role da RPC e é diferente, usar esse
       if (role && profileData.role !== role) {
+        console.log(`Atualizando role de ${profileData.role} para ${role}`);
         profileData.role = role;
       }
       
@@ -144,7 +155,7 @@ export class ProfileService {
       
       return profile;
     } catch (error) {
-      console.error('Error in getUserProfile:', error);
+      console.error('Erro em getUserProfile:', error);
       return null;
     }
   }
@@ -154,6 +165,8 @@ export class ProfileService {
    */
   static async createDefaultProfile(userId: string, email: string, role: UserRole = UserRole.CLIENT): Promise<UserProfile | null> {
     try {
+      console.log(`Criando perfil padrão para userId: ${userId}, email: ${email}, role: ${role}`);
+      
       const defaultName = email?.split('@')[0] || 'User';
       const roleString = String(role).toLowerCase();
       
@@ -165,14 +178,33 @@ export class ProfileService {
       });
         
       if (error) {
-        console.error('Error creating profile:', error);
-        return null;
+        console.error('Erro ao criar perfil via RPC:', error);
+        
+        // Tentar abordagem alternativa se RPC falhar
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            name: defaultName,
+            role: roleString,
+            email: email
+          });
+          
+        if (insertError) {
+          console.error('Erro alternativo ao criar perfil via insert:', insertError);
+          return null;
+        }
       }
+      
+      console.log('Perfil criado com sucesso, obtendo perfil atualizado');
+      
+      // Limpar cache para garantir que dados novos sejam obtidos
+      profileCache.delete(userId);
       
       // Obter o perfil recém-criado
       return await this.getUserProfile(userId, email, true);
     } catch (error) {
-      console.error('Error in createDefaultProfile:', error);
+      console.error('Erro em createDefaultProfile:', error);
       return null;
     }
   }
@@ -182,12 +214,15 @@ export class ProfileService {
    */
   static async updateProfile(userId: string, data: Partial<UserProfile>): Promise<{ error: Error | null, data: any }> {
     try {
+      console.log(`Atualizando perfil para userId: ${userId}`, data);
+      
       const { error, data: updatedData } = await supabase
         .from('profiles')
         .update(data)
         .eq('id', userId);
 
       if (error) {
+        console.error('Erro ao atualizar perfil:', error);
         return { error, data: null };
       }
 
@@ -196,6 +231,7 @@ export class ProfileService {
       
       return { data: updatedData, error: null };
     } catch (error) {
+      console.error('Erro em updateProfile:', error);
       return { error: error as Error, data: null };
     }
   }
@@ -205,12 +241,15 @@ export class ProfileService {
    */
   static async makeAdmin(adminUserId: string, targetUserId: string): Promise<{ error: Error | null, data: any }> {
     try {
+      console.log(`Tornando usuário admin: targetUserId=${targetUserId}, por adminUserId=${adminUserId}`);
+      
       // Verificar se usuário é admin usando nova função segura
       const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin', {
         user_id: adminUserId
       });
       
       if (roleCheckError || !isAdmin) {
+        console.error('Erro na verificação de admin:', roleCheckError);
         return { error: new Error('Unauthorized - Not an admin'), data: null };
       }
 
@@ -221,6 +260,7 @@ export class ProfileService {
       });
 
       if (error) {
+        console.error('Erro ao atualizar role do usuário:', error);
         return { error, data: null };
       }
       
@@ -229,6 +269,7 @@ export class ProfileService {
       
       return { error: null, data: updatedData };
     } catch (error) {
+      console.error('Erro em makeAdmin:', error);
       return { error: error as Error, data: null };
     }
   }
@@ -241,6 +282,30 @@ export class ProfileService {
       profileCache.delete(userId);
     } else {
       profileCache.clear();
+    }
+  }
+
+  /**
+   * Obtém todos os perfis (para administradores)
+   */
+  static async getAllProfiles(): Promise<UserProfile[]> {
+    try {
+      console.log('Obtendo todos os perfis');
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao obter todos os perfis:', error);
+        throw error;
+      }
+      
+      return data.map((profile: any) => transformDatabaseProfile(profile));
+    } catch (error) {
+      console.error('Erro em getAllProfiles:', error);
+      return [];
     }
   }
 }
