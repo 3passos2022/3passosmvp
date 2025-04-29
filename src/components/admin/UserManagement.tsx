@@ -24,6 +24,7 @@ interface UserListItem {
   name: string;
   role: UserRole;
   profileExists: boolean;
+  created_at: string;
 }
 
 const UserManagement: React.FC = () => {
@@ -56,6 +57,7 @@ const UserManagement: React.FC = () => {
         name: profile.name || '',
         role: profile.role as UserRole,
         profileExists: true,
+        created_at: profile.created_at || new Date().toISOString(), // Add created_at
       })) || [];
       
       // Atualizar email codificado para seu usuário específico
@@ -199,7 +201,10 @@ const UserManagement: React.FC = () => {
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {RoleUtils.getAccountTypeLabel({...user, email: user.email})}
+                    {RoleUtils.getAccountTypeLabel({
+                      ...user, 
+                      created_at: user.created_at || new Date().toISOString() // Ensure created_at is present
+                    })}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
