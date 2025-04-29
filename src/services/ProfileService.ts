@@ -89,10 +89,15 @@ export const hasRole = (user: UserProfile | null, role: UserRole | string): bool
  */
 export class ProfileService {
   /**
-   * Get user profile by ID
+   * Get user profile by ID with fallback mechanisms
    */
   static async getUserProfile(userId: string, email: string | null = null, forceRefresh = false): Promise<UserProfile | null> {
     console.log('Getting user profile for ID:', userId, 'Force refresh:', forceRefresh);
+    
+    if (!userId) {
+      console.error('No user ID provided for getUserProfile');
+      return null;
+    }
     
     // Check cache first if not forcing refresh
     if (!forceRefresh) {
@@ -105,20 +110,22 @@ export class ProfileService {
       }
     }
     
+    // Try multiple approaches to get the profile
     try {
       console.log('Fetching profile from database for user:', userId);
       
-      // Use the RPC function to avoid RLS recursion issues
+      // Approach 1: Use the RPC function to avoid RLS recursion issues (preferred method)
       const { data: roleData, error: roleError } = await supabase
         .rpc('get_user_role_safely', { user_id: userId });
       
       if (roleError) {
-        console.error('Error fetching user role:', roleError);
+        console.error('Error fetching user role using RPC:', roleError);
+        // Continue to next approach
+      } else {
+        console.log('Role data from RPC:', roleData);
       }
       
-      console.log('Role data from RPC:', roleData);
-      
-      // Get the full profile
+      // Approach 2: Get the full profile through direct query
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -126,7 +133,34 @@ export class ProfileService {
         .maybeSingle();
       
       if (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('Error fetching user profile directly:', error);
+        
+        // Approach 3: Try to use service role if available (server-side only)
+        // This part would require a Supabase Edge Function in production
+        
+        // For now, create a minimal profile if other approaches fail
+        if (email) {
+          const minimalProfile: UserProfile = {
+            id: userId,
+            email: email,
+            role: UserRole.CLIENT,
+            created_at: new Date().toISOString(),
+            subscribed: false,
+            subscription_tier: 'free',
+            subscription_end: null
+          };
+          
+          console.log('Created minimal profile as fallback:', minimalProfile);
+          
+          // Cache this minimal profile
+          profileCache.set(userId, {
+            profile: minimalProfile,
+            timestamp: Date.now()
+          });
+          
+          return minimalProfile;
+        }
+        
         return null;
       }
       
@@ -181,7 +215,21 @@ export class ProfileService {
         
       if (error) {
         console.error('Error creating profile:', error);
-        return null;
+        
+        // Try updating instead if insert failed (might be a duplicate)
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ 
+            name: defaultName,
+            role: roleString,
+            phone: ''
+          })
+          .eq('id', userId);
+          
+        if (updateError) {
+          console.error('Error updating profile:', updateError);
+          return null;
+        }
       }
       
       // Get the newly created profile

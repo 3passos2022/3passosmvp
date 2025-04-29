@@ -57,70 +57,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole(user, role);
   };
 
+  // Esta função será usada para buscar o perfil do usuário
+  const fetchUserProfile = async (sessionUser: User) => {
+    try {
+      // Tentar obter o perfil do usuário usando a função do ProfileService
+      const profileData = await ProfileService.getUserProfile(
+        sessionUser.id,
+        sessionUser.email || undefined,
+        true // forçar atualização do cache
+      );
+      
+      if (profileData) {
+        console.log('Perfil do usuário encontrado:', profileData);
+        setUser(profileData);
+        return;
+      }
+      
+      console.log('Nenhum perfil encontrado, criando perfil padrão...');
+      
+      // Criar um perfil padrão se não encontrado
+      const newProfile = await ProfileService.createDefaultProfile(
+        sessionUser.id,
+        sessionUser.email || '',
+        UserRole.CLIENT
+      );
+      
+      if (newProfile) {
+        setUser(newProfile);
+        console.log('Perfil padrão criado com sucesso');
+      } else {
+        console.error('Falha ao criar perfil padrão');
+        // Criar um perfil mínimo localmente para permitir a navegação
+        setUser({
+          id: sessionUser.id,
+          email: sessionUser.email || '',
+          role: UserRole.CLIENT,
+          created_at: new Date().toISOString(),
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar perfil de usuário:', error);
+      // Criar um perfil mínimo para permitir a navegação
+      setUser({
+        id: sessionUser.id,
+        email: sessionUser.email || '',
+        role: UserRole.CLIENT,
+        created_at: new Date().toISOString(),
+        subscribed: false,
+        subscription_tier: 'free',
+        subscription_end: null
+      });
+    }
+  };
+
   // Set up auth state listener and check current session
   useEffect(() => {
     console.log('AuthProvider: Setting up auth listener');
     
     // Function to handle auth state changes
-    const handleAuthChange = async (event: string, newSession: Session | null) => {
+    const handleAuthChange = (event: string, newSession: Session | null) => {
       console.log('Auth state changed:', event, newSession?.user?.id);
       
       // Update session state immediately
       setSession(newSession);
       
-      if (newSession) {
-        try {
-          // Fetch user profile using our ProfileService
-          const profileData = await ProfileService.getUserProfile(
-            newSession.user.id,
-            newSession.user.email || undefined,
-            true // Force refresh on auth change
-          );
-          
-          if (profileData) {
-            console.log('User profile found:', profileData);
-            setUser(profileData);
-          } else {
-            console.log('No profile found, creating default profile');
-            
-            // Create default profile if not found
-            const newProfile = await ProfileService.createDefaultProfile(
-              newSession.user.id,
-              newSession.user.email || '',
-              UserRole.CLIENT
-            );
-            
-            if (newProfile) {
-              setUser(newProfile);
-              console.log('Default profile created successfully');
-            } else {
-              console.error('Failed to create default profile');
-            }
-          }
-        } catch (error) {
-          console.error('Exception in auth state change handler:', error);
-          
-          // Fallback to minimal profile on error
-          if (newSession.user) {
-            setUser({
-              id: newSession.user.id,
-              email: newSession.user.email || '',
-              role: UserRole.CLIENT,
-              created_at: new Date().toISOString(),
-              subscribed: false,
-              subscription_tier: 'free',
-              subscription_end: null
-            });
-          }
-        } finally {
-          setLoading(false);
-        }
-      } else {
+      // Se o usuário fez logout, limpe os dados
+      if (!newSession) {
         console.log('Auth state change: No session, setting user to null');
         setUser(null);
         setSubscription(null);
         setLoading(false);
+        return;
       }
+      
+      // Usando setTimeout(0) para evitar problemas de recursão com useEffect
+      setTimeout(() => {
+        if (newSession.user) {
+          fetchUserProfile(newSession.user);
+        }
+        setLoading(false);
+      }, 0);
     };
     
     // Set up the auth listener
@@ -140,7 +159,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         console.log('Current session:', data.session?.user?.id);
         
-        // The onAuthStateChange handler will handle setting the user
+        // Atualizar a sessão 
+        setSession(data.session);
+        
+        // Se temos uma sessão, buscar o perfil
+        if (data.session?.user) {
+          await fetchUserProfile(data.session.user);
+        }
+        
+        setLoading(false);
       } catch (error) {
         console.error('Error checking session:', error);
         setLoading(false);
@@ -176,6 +203,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('Sign up successful:', data);
+      
+      // Se o registro foi bem sucedido e temos um usuário, criar perfil
+      if (data?.user) {
+        try {
+          // Esperar um momento para garantir que o usuário seja criado no Supabase
+          setTimeout(async () => {
+            await ProfileService.createDefaultProfile(data.user.id, email, role);
+          }, 500);
+        } catch (profileError) {
+          console.error('Error creating profile after signup:', profileError);
+        }
+      }
+      
       return { data, error: null };
     } catch (error) {
       console.error('Exception during sign up:', error);
@@ -211,6 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign out function
   async function signOut() {
     console.log('Signing out user');
+    ProfileService.clearCache(); // Limpar cache de perfis
     await supabase.auth.signOut();
     console.log('Sign out completed');
   }

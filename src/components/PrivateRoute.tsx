@@ -33,28 +33,28 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
 
   // Attempt to refresh user data if we have a session but no user
   useEffect(() => {
-    if (!loading && session && (!user || refreshAttempts < MAX_REFRESH_ATTEMPTS)) {
-      const attemptRefresh = async () => {
-        if (isRefreshing) return;
-        
-        setIsRefreshing(true);
-        console.log('PrivateRoute: Session exists but no user or refresh needed, attempting to refresh user data');
-        
-        try {
-          await refreshUser();
-          // After refreshing, wait a brief moment to see if user state updates
-          setTimeout(() => {
-            setIsRefreshing(false);
-            setRefreshAttempts(prev => prev + 1);
-          }, 500);
-        } catch (err) {
-          console.error('Failed to refresh user data:', err);
-          toast.error('Falha ao carregar dados do usuário. Tente fazer login novamente.');
-          setIsRefreshing(false);
-          navigate('/login', { state: { from: location.pathname }, replace: true });
-        }
-      };
+    const attemptRefresh = async () => {
+      if (isRefreshing || !session?.user?.id) return;
       
+      console.log('PrivateRoute: Session exists but no user or refresh needed, attempting to refresh user data');
+      setIsRefreshing(true);
+      
+      try {
+        await refreshUser();
+        // After refreshing, wait a brief moment to see if user state updates
+        setTimeout(() => {
+          setIsRefreshing(false);
+          setRefreshAttempts(prev => prev + 1);
+        }, 500);
+      } catch (err) {
+        console.error('Failed to refresh user data:', err);
+        toast.error('Falha ao carregar dados do usuário. Tente fazer login novamente.');
+        setIsRefreshing(false);
+        navigate('/login', { state: { from: location.pathname }, replace: true });
+      }
+    };
+    
+    if (!loading && session && (!user || refreshAttempts < MAX_REFRESH_ATTEMPTS)) {
       attemptRefresh();
     }
   }, [loading, session, user, refreshUser, navigate, location.pathname, refreshAttempts, isRefreshing]);
