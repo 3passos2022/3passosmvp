@@ -81,7 +81,6 @@ const Login: React.FC = () => {
   useEffect(() => {
     if (user && session) {
       console.log("User is authenticated, redirecting to:", from);
-      toast.success("Login efetuado com sucesso!");
       navigate(from);
     }
   }, [user, session, navigate, from]);
