@@ -62,7 +62,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
 
 const Login: React.FC = () => {
-  const { user, signIn, signUp } = useAuth();
+  const { user, session, loading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
@@ -70,13 +70,21 @@ const Login: React.FC = () => {
 
   // Get the redirect path from location state or default to "/"
   const from = location.state?.from || "/";
+  
+  console.log("Login page rendered with:", { 
+    hasUser: !!user, 
+    hasSession: !!session,
+    isLoading: loading,
+    redirectPath: from
+  });
 
   useEffect(() => {
-    if (user) {
-      console.log("User is logged in, redirecting to:", from);
+    if (user && session) {
+      console.log("User is authenticated, redirecting to:", from);
+      toast.success("Login efetuado com sucesso!");
       navigate(from);
     }
-  }, [user, navigate, from]);
+  }, [user, session, navigate, from]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -102,18 +110,26 @@ const Login: React.FC = () => {
     try {
       console.log("Attempting login with:", formData.email);
       const { error, data } = await signIn(formData.email, formData.password);
-      if (!error) {
-        console.log("Login successful, user:", data.user?.id);
-        toast.success("Login realizado com sucesso!");
-        navigate(from); // Navigate to the redirect path
-      } else {
+      if (error) {
         console.error("Error signing in:", error);
         toast.error("Erro ao fazer login: " + error.message);
-        setIsLoading(false);
+      } else {
+        console.log("Login successful, user:", data.user?.id);
+        toast.success("Login realizado com sucesso!");
+        
+        // Auth provider will handle the redirection in the useEffect above
+        // Just delay a bit to make sure state updates
+        setTimeout(() => {
+          if (!user || !session) {
+            console.log("Manually navigating after successful login");
+            navigate(from);
+          }
+        }, 500);
       }
     } catch (error) {
       console.error("Error signing in:", error);
-      toast.error("Erro ao fazer login");
+      toast.error("Erro inesperado ao fazer login");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -143,6 +159,13 @@ const Login: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // If user is already logged in, redirect to the from page
+  if (!loading && user && session) {
+    console.log("Already logged in, redirecting to:", from);
+    navigate(from);
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
