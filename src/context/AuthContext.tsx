@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -219,6 +220,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { data: updatedData, error: null };
     } catch (error) {
       return { error: error as Error, data: null };
+    }
+  }
+
+  // Implement the refreshUser function that was missing
+  async function refreshUser() {
+    if (!session?.user?.id) {
+      console.error("Cannot refresh user: No user ID available");
+      return;
+    }
+    
+    try {
+      await fetchUserProfile(session.user.id);
+      console.log("User profile refreshed successfully");
+    } catch (error) {
+      console.error("Error refreshing user profile:", error);
     }
   }
 
