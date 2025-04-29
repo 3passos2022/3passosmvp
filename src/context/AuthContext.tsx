@@ -51,14 +51,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   useEffect(() => {
+    console.log('AuthProvider: Setting up auth listener');
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log('Auth state changed:', event);
+        console.log('Auth state changed:', event, newSession?.user?.id);
         setSession(newSession);
         
         if (newSession) {
-          await fetchUserProfile(newSession.user.id);
+          try {
+            await fetchUserProfile(newSession.user.id);
+          } catch (error) {
+            console.error('Error fetching user profile during auth state change:', error);
+            // Criar perfil básico para garantir funcionamento
+            setUser({
+              id: newSession.user.id,
+              email: newSession.user.email || '',
+              role: UserRole.CLIENT,
+              created_at: new Date().toISOString(),
+              subscribed: false,
+              subscription_tier: 'free',
+              subscription_end: null
+            });
+          }
         } else {
+          console.log('Auth state change: No session, setting user to null');
           setUser(null);
           setSubscription(null);
         }
@@ -67,21 +83,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
+    // Verificar sessão atual
     checkCurrentSession();
 
     return () => {
+      console.log('AuthProvider: Cleaning up auth listener');
       authListener.subscription.unsubscribe();
     };
   }, []);
 
   async function checkCurrentSession() {
     try {
+      console.log('AuthProvider: Checking current session');
       setLoading(true);
       const { data } = await supabase.auth.getSession();
+      
+      console.log('Current session:', data.session?.user?.id);
       setSession(data.session);
 
       if (data.session) {
-        await fetchUserProfile(data.session.user.id);
+        try {
+          await fetchUserProfile(data.session.user.id);
+        } catch (error) {
+          console.error('Error fetching user profile during session check:', error);
+          // Criar perfil básico para garantir funcionamento
+          setUser({
+            id: data.session.user.id,
+            email: data.session.user.email || '',
+            role: UserRole.CLIENT,
+            created_at: new Date().toISOString(),
+            subscribed: false,
+            subscription_tier: 'free',
+            subscription_end: null
+          });
+        }
+      } else {
+        console.log('No current session found');
       }
     } catch (error) {
       console.error('Error checking session:', error);
@@ -92,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function fetchUserProfile(userId: string) {
     try {
+      console.log('Fetching user profile for:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -101,6 +140,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('Error fetching user profile:', error);
         
+        // Se o perfil não existe, tentar criar um
+        if (error.code === 'PGRST116') { // código para "nenhum resultado encontrado"
+          console.log('No profile found, creating default profile');
+          
+          if (session?.user) {
+            const defaultProfile = {
+              id: session.user.id,
+              email: session.user.email || '',
+              role: UserRole.CLIENT,
+              created_at: new Date().toISOString(),
+              subscribed: false,
+              subscription_tier: 'free',
+              subscription_end: null
+            };
+            
+            setUser(defaultProfile);
+            
+            // Tentar criar o perfil na base de dados
+            const { error: createError } = await supabase
+              .from('profiles')
+              .insert([{ 
+                id: session.user.id,
+                name: '',
+                role: UserRole.CLIENT,
+                phone: ''
+              }]);
+              
+            if (createError) {
+              console.error('Error creating profile:', createError);
+            } else {
+              console.log('Default profile created successfully');
+            }
+            
+            return;
+          }
+        }
+        
+        // Definir um usuário básico para permitir navegação
         if (session?.user) {
           setUser({
             id: session.user.id,
@@ -116,6 +193,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
+        console.log('User profile found:', data);
+        
         setUser({
           id: data.id,
           email: session?.user.email || data.id,
@@ -129,10 +208,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           subscription_tier: 'free',
           subscription_end: null
         });
+        
+        console.log('User state updated with profile data');
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
+      
       if (session?.user) {
+        // Definir um usuário básico para permitir navegação
         setUser({
           id: session.user.id,
           email: session.user.email || '',
@@ -148,6 +231,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function signUp(email: string, password: string, role: UserRole) {
     try {
+      console.log('Signing up user with email:', email, 'and role:', role);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -159,28 +244,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        console.error('Error signing up:', error);
         return { error, data: null };
       }
 
+      console.log('Sign up successful:', data);
       return { data, error: null };
     } catch (error) {
+      console.error('Exception during sign up:', error);
       return { error: error as Error, data: null };
     }
   }
 
   async function signIn(email: string, password: string) {
     try {
-      return await supabase.auth.signInWithPassword({
+      console.log('Signing in user with email:', email);
+      
+      const result = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
+      console.log('Sign in result:', result);
+      
+      if (result.error) {
+        console.error('Sign in error:', result.error);
+      } else {
+        console.log('Sign in successful, user ID:', result.data.user?.id);
+      }
+      
+      return result;
     } catch (error) {
+      console.error('Exception during sign in:', error);
       return { error: error as Error, data: null };
     }
   }
 
   async function signOut() {
+    console.log('Signing out user');
     await supabase.auth.signOut();
+    console.log('Sign out completed');
   }
 
   async function forgotPassword(email: string) {
@@ -223,8 +326,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Implement the refreshUser function that was missing
+  // Implementar a função refreshUser
   async function refreshUser() {
+    console.log('Refreshing user profile');
     if (!session?.user?.id) {
       console.error("Cannot refresh user: No user ID available");
       return;
@@ -323,6 +427,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshSubscription,
     subscriptionLoading
   };
+
+  console.log('AuthProvider: Current auth state:', {
+    isAuthenticated: !!user,
+    userId: user?.id,
+    userRole: user?.role,
+    sessionExists: !!session
+  });
 
   return (
     <AuthContext.Provider value={value}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
@@ -64,15 +64,19 @@ type SignupFormData = z.infer<typeof signupSchema>;
 const Login: React.FC = () => {
   const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  // Get the redirect path from location state or default to "/"
+  const from = location.state?.from || "/";
+
   useEffect(() => {
     if (user) {
-      console.log("User is logged in, redirecting to:", "/");
-      navigate("/");
+      console.log("User is logged in, redirecting to:", from);
+      navigate(from);
     }
-  }, [user, navigate]);
+  }, [user, navigate, from]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -96,10 +100,12 @@ const Login: React.FC = () => {
   const handleLoginSubmit = async (formData: LoginFormData) => {
     setIsLoading(true);
     try {
+      console.log("Attempting login with:", formData.email);
       const { error, data } = await signIn(formData.email, formData.password);
       if (!error) {
+        console.log("Login successful, user:", data.user?.id);
         toast.success("Login realizado com sucesso!");
-        navigate("/");
+        navigate(from); // Navigate to the redirect path
       } else {
         console.error("Error signing in:", error);
         toast.error("Erro ao fazer login: " + error.message);

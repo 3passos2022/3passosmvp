@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
 
@@ -10,25 +10,43 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, session } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Show loading state while checking auth
+  console.log('PrivateRoute: Rendering with', {
+    isAuthenticated: !!user, 
+    userRole: user?.role,
+    requiredRole,
+    loading,
+    sessionExists: !!session,
+    path: location.pathname
+  });
+
+  // Mostrar estado de carregamento enquanto verifica autenticação
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+    console.log('PrivateRoute: Loading state, showing loading spinner');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
-  // Redirect if not authenticated
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  // Redirecionar se não estiver autenticado
+  if (!user || !session) {
+    console.log('PrivateRoute: User not authenticated, redirecting to login');
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  // Redirect if missing required role
+  // Redirecionar se não tiver a role necessária
   if (requiredRole && user.role !== requiredRole) {
+    console.log('PrivateRoute: User lacks required role, redirecting to unauthorized');
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // Render the protected content
+  // Renderizar o conteúdo protegido
+  console.log('PrivateRoute: User authenticated with correct role, rendering children');
   return <>{children}</>;
 };
 
