@@ -23,9 +23,9 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     isAuthenticated: !!user, 
     userRole: user?.role,
     userRoleType: user?.role ? typeof user.role : 'undefined',
-    userRoleString: user?.role ? String(user.role).toLowerCase() : null,
+    userRoleString: user?.role ? String(user.role).toLowerCase().trim() : null,
     requiredRoleEnum: requiredRole,
-    requiredRoleStr: requiredRole ? String(requiredRole).toLowerCase() : null,
+    requiredRoleStr: requiredRole ? String(requiredRole).toLowerCase().trim() : null,
     loading,
     sessionExists: !!session,
     path: location.pathname,
@@ -106,6 +106,9 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
       requiredRole, 
       requiredRoleType: typeof requiredRole,
       requiredRoleStr: String(requiredRole).toLowerCase().trim(),
+      UserRoleEnum: UserRole,
+      expectedProvider: String(UserRole.PROVIDER).toLowerCase().trim(),
+      expectedAdmin: String(UserRole.ADMIN).toLowerCase().trim(),
       comparison: String(user.role).toLowerCase().trim() === String(requiredRole).toLowerCase().trim()
     });
     

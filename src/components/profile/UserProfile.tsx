@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserRole } from '@/lib/types';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -14,6 +15,20 @@ const UserProfile: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [loading, setLoading] = useState(false);
+  
+  // Log para debug do tipo de usuário
+  useEffect(() => {
+    if (user) {
+      console.log('UserProfile - User data:', {
+        role: user.role,
+        roleType: typeof user.role,
+        roleString: String(user.role).toLowerCase(),
+        isProvider: String(user.role).toLowerCase() === String(UserRole.PROVIDER).toLowerCase(),
+        isAdmin: String(user.role).toLowerCase() === String(UserRole.ADMIN).toLowerCase(),
+        userRoleEnum: UserRole.PROVIDER
+      });
+    }
+  }, [user]);
 
   const handleUpdate = async () => {
     setLoading(true);
@@ -55,6 +70,19 @@ const UserProfile: React.FC = () => {
         .toUpperCase();
     }
     return user.email.substring(0, 2).toUpperCase();
+  };
+
+  // Helper para determinar o tipo de conta de forma mais robusta
+  const getAccountType = () => {
+    const role = String(user.role).toLowerCase().trim();
+    
+    if (role === String(UserRole.PROVIDER).toLowerCase().trim()) {
+      return 'Prestador de Serviços';
+    } else if (role === String(UserRole.ADMIN).toLowerCase().trim()) {
+      return 'Administrador';
+    } else {
+      return 'Cliente';
+    }
   };
 
   return (
@@ -117,9 +145,10 @@ const UserProfile: React.FC = () => {
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
                 <p className="font-medium">
-                  {user.role === 'client' ? 'Cliente' : 
-                   user.role === 'provider' ? 'Prestador de Serviços' : 
-                   'Administrador'}
+                  {getAccountType()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  (Valor no banco: {String(user.role)})
                 </p>
               </div>
             </div>

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/types';
 import { toast } from 'sonner';
@@ -88,7 +87,9 @@ export const hasRole = (user: UserProfile | null, role: UserRole | string): bool
     checkRole: role,
     checkRoleType: typeof role,
     checkRoleString: checkRoleStr,
-    result: userRoleStr === checkRoleStr
+    result: userRoleStr === checkRoleStr,
+    expectedProvider: String(UserRole.PROVIDER).toLowerCase().trim(),
+    expectedAdmin: String(UserRole.ADMIN).toLowerCase().trim()
   });
   
   return userRoleStr === checkRoleStr;

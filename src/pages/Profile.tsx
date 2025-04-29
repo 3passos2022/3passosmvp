@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,7 +18,7 @@ import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { user, loading, session, refreshUser, hasRole } = useAuth();
+  const { user, loading, session, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -30,13 +31,7 @@ const Profile: React.FC = () => {
     userRoleType: user ? typeof user.role : 'undefined',
     roleNormalized: user ? String(user.role).toLowerCase().trim() : null,
     providerRoleNormalized: String(UserRole.PROVIDER).toLowerCase().trim(),
-    adminRoleNormalized: String(UserRole.ADMIN).toLowerCase().trim(),
-    roleChecks: user ? {
-      isProviderStr: String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim(),
-      isProviderEnum: user.role === UserRole.PROVIDER,
-      isAdminStr: String(user.role).toLowerCase().trim() === String(UserRole.ADMIN).toLowerCase().trim(),
-      isAdminEnum: user.role === UserRole.ADMIN
-    } : null
+    adminRoleNormalized: String(UserRole.ADMIN).toLowerCase().trim()
   });
 
   // Effect to attempt profile refresh if session exists but no user
@@ -124,35 +119,61 @@ const Profile: React.FC = () => {
     navigate(path);
   };
 
-  // Helper function to check if user is provider - using provided hasRole
+  // Helper function to check if user is provider - Mais robusta
   const isProvider = () => {
-    const result = hasRole(UserRole.PROVIDER);
-    console.log('isProvider check result:', result);
-    return result;
+    if (!user) return false;
+    
+    const userRole = String(user.role).toLowerCase().trim();
+    const providerRole = String(UserRole.PROVIDER).toLowerCase().trim();
+    
+    console.log('isProvider check details:', {
+      userRole,
+      providerRole, 
+      isEqual: userRole === providerRole
+    });
+    
+    return userRole === providerRole;
   };
   
-  // Helper function to check if user is admin - using provided hasRole
+  // Helper function to check if user is admin - Mais robusta
   const isAdmin = () => {
-    const result = hasRole(UserRole.ADMIN);
-    console.log('isAdmin check result:', result);
-    return result;
+    if (!user) return false;
+    
+    const userRole = String(user.role).toLowerCase().trim();
+    const adminRole = String(UserRole.ADMIN).toLowerCase().trim();
+    
+    console.log('isAdmin check details:', {
+      userRole,
+      adminRole, 
+      isEqual: userRole === adminRole
+    });
+    
+    return userRole === adminRole;
   };
 
-  // Adicionando logs de debug adicionais para verificar valores exatos
   console.log("User role checks details:", {
+    userObj: user,
     roleValue: user?.role,
     roleType: typeof user?.role,
     roleString: user ? String(user.role).toLowerCase().trim() : null,
+    providerEnum: UserRole.PROVIDER,
     providerEnumString: String(UserRole.PROVIDER).toLowerCase().trim(),
     adminEnumString: String(UserRole.ADMIN).toLowerCase().trim(),
     isProvider: isProvider(),
     isAdmin: isAdmin(),
-    UserRoleEnum: UserRole,
-    matchesProviderEnum: user?.role === UserRole.PROVIDER,
-    matchesAdminEnum: user?.role === UserRole.ADMIN,
-    matchesProviderString: user ? String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim() : false,
-    matchesAdminString: user ? String(user.role).toLowerCase().trim() === String(UserRole.ADMIN).toLowerCase().trim() : false,
+    UserRoleEnum: UserRole
   });
+
+  // Função para determinar qual rótulo mostrar para o tipo de conta
+  const getAccountTypeLabel = () => {
+    if (isProvider()) {
+      return 'Prestador de Serviços';
+    } else if (isAdmin()) {
+      return 'Administrador';
+    } else {
+      return 'Cliente';
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -175,8 +196,7 @@ const Profile: React.FC = () => {
                   
                   <div className="flex items-center">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                      {isProvider() ? 'Prestador de Serviços' : 
-                       isAdmin() ? 'Administrador' : 'Cliente'}
+                      {getAccountTypeLabel()}
                     </span>
                   </div>
                 </div>
