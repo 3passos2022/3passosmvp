@@ -16,23 +16,15 @@ const CACHE_TTL = 10 * 60 * 1000;
  * Maps string role from database to UserRole enum
  */
 export const mapDatabaseRoleToEnum = (role: string): UserRole => {
-  console.log('Mapping role from database:', role);
-  
   // Garantir que role seja tratada como string e normalizada
   const roleString = String(role).toLowerCase().trim();
   
-  // Log adicional para debug
-  console.log('Normalized role string:', roleString);
-  
   switch(roleString) {
     case 'provider':
-      console.log('Role matched: PROVIDER');
       return UserRole.PROVIDER;
     case 'admin':
-      console.log('Role matched: ADMIN');
       return UserRole.ADMIN;
     default:
-      console.log('Role defaulted to: CLIENT');
       return UserRole.CLIENT;
   }
 };
@@ -44,17 +36,8 @@ export const transformDatabaseProfile = (
   profileData: any, 
   email: string | null = null
 ): UserProfile => {
-  console.log('Transforming database profile:', profileData);
-  
   // Map database role to UserRole enum
   const userRole = mapDatabaseRoleToEnum(profileData.role);
-  
-  console.log('Role mapping result:', { 
-    originalRole: profileData.role, 
-    originalRoleType: typeof profileData.role,
-    mappedRole: userRole,
-    roleType: typeof userRole
-  });
   
   return {
     id: profileData.id,
@@ -81,18 +64,6 @@ export const hasRole = (user: UserProfile | null, role: UserRole | string): bool
   const userRoleStr = String(user.role).toLowerCase().trim();
   const checkRoleStr = String(role).toLowerCase().trim();
   
-  console.log('Checking role:', {
-    userRole: user.role,
-    userRoleType: typeof user.role,
-    userRoleString: userRoleStr,
-    checkRole: role,
-    checkRoleType: typeof role,
-    checkRoleString: checkRoleStr,
-    result: userRoleStr === checkRoleStr,
-    expectedProvider: String(UserRole.PROVIDER).toLowerCase().trim(),
-    expectedAdmin: String(UserRole.ADMIN).toLowerCase().trim()
-  });
-  
   return userRoleStr === checkRoleStr;
 };
 
@@ -104,8 +75,6 @@ export class ProfileService {
    * Get user profile by ID with fallback mechanisms
    */
   static async getUserProfile(userId: string, email: string | null = null, forceRefresh = false): Promise<UserProfile | null> {
-    console.log('Getting user profile for ID:', userId, 'Force refresh:', forceRefresh);
-    
     if (!userId) {
       console.error('No user ID provided for getUserProfile');
       return null;
@@ -117,27 +86,20 @@ export class ProfileService {
       const now = Date.now();
       
       if (cached && (now - cached.timestamp < CACHE_TTL)) {
-        console.log('Using cached profile for user:', userId);
         return cached.profile;
       }
     }
     
-    // Try multiple approaches to get the profile
     try {
-      console.log('Fetching profile from database for user:', userId);
-      
-      // Approach 1: Use the security definer function to avoid RLS recursion issues (preferred method)
+      // Use the get_role_safely RPC function to avoid RLS issues
       const { data: roleData, error: roleError } = await supabase
         .rpc('get_role_safely', { user_id: userId });
       
       if (roleError) {
         console.error('Error fetching user role using get_role_safely:', roleError);
-        // Continue to next approach
-      } else {
-        console.log('Role data from get_role_safely:', roleData);
       }
       
-      // Approach 2: Get the full profile through direct query
+      // Get the profile through direct query
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -147,10 +109,7 @@ export class ProfileService {
       if (error) {
         console.error('Error fetching user profile directly:', error);
         
-        // Approach 3: Try to use service role if available (server-side only)
-        // This part would require a Supabase Edge Function in production
-        
-        // For now, create a minimal profile if other approaches fail
+        // Create a minimal profile if other approaches fail
         if (email) {
           const minimalProfile: UserProfile = {
             id: userId,
@@ -161,8 +120,6 @@ export class ProfileService {
             subscription_tier: 'free',
             subscription_end: null
           };
-          
-          console.log('Created minimal profile as fallback:', minimalProfile);
           
           // Cache this minimal profile
           profileCache.set(userId, {
@@ -177,14 +134,12 @@ export class ProfileService {
       }
       
       if (!profileData) {
-        console.log('No profile found for user:', userId);
         return null;
       }
       
       // If we got role data from RPC and it doesn't match, use that one
       // This helps avoid any RLS issues
       if (roleData && profileData.role !== roleData) {
-        console.log('Using role from get_role_safely function:', roleData);
         profileData.role = roleData;
       }
       
@@ -195,7 +150,6 @@ export class ProfileService {
         timestamp: Date.now()
       });
       
-      console.log('Profile successfully fetched and cached:', profile);
       return profile;
     } catch (error) {
       console.error('Exception in getUserProfile:', error);
@@ -208,12 +162,8 @@ export class ProfileService {
    */
   static async createDefaultProfile(userId: string, email: string, role: UserRole = UserRole.CLIENT): Promise<UserProfile | null> {
     try {
-      console.log('Creating default profile for user:', userId);
-      
       const defaultName = email?.split('@')[0] || 'User';
       const roleString = String(role).toLowerCase();
-      
-      console.log('Creating profile with role:', roleString);
       
       // Create profile in database
       const { error } = await supabase
@@ -257,8 +207,6 @@ export class ProfileService {
    */
   static async updateProfile(userId: string, data: Partial<UserProfile>): Promise<{ error: Error | null, data: any }> {
     try {
-      console.log('Updating profile for user:', userId, 'with data:', data);
-      
       const { error, data: updatedData } = await supabase
         .from('profiles')
         .update(data)
@@ -271,7 +219,6 @@ export class ProfileService {
       // Invalidate cache
       profileCache.delete(userId);
       
-      console.log('Profile updated successfully');
       return { data: updatedData, error: null };
     } catch (error) {
       console.error('Exception in updateProfile:', error);
@@ -288,7 +235,7 @@ export class ProfileService {
         return { error: new Error('No admin user provided'), data: null };
       }
 
-      // Use our new RPC function to check if user is admin
+      // Use our RPC function to check if user is admin
       const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin', {
         user_id: adminUserId
       });
@@ -323,10 +270,8 @@ export class ProfileService {
   static clearCache(userId?: string) {
     if (userId) {
       profileCache.delete(userId);
-      console.log(`Cleared cached profile for user ${userId}`);
     } else {
       profileCache.clear();
-      console.log('Cleared all cached profiles');
     }
   }
 }

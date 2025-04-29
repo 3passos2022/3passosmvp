@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,21 +16,6 @@ const UserProfile: React.FC = () => {
   const [phone, setPhone] = useState(user?.phone || '');
   const [loading, setLoading] = useState(false);
   
-  // Log para debug do tipo de usuário
-  useEffect(() => {
-    if (user) {
-      console.log('UserProfile - User data:', {
-        role: user.role,
-        roleType: typeof user.role,
-        roleString: String(user.role).toLowerCase().trim(),
-        isProvider: String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim(),
-        isAdmin: String(user.role).toLowerCase().trim() === String(UserRole.ADMIN).toLowerCase().trim(),
-        userRoleEnum: UserRole.PROVIDER,
-        userEnumStr: String(UserRole.PROVIDER).toLowerCase().trim()
-      });
-    }
-  }, [user]);
-
   const handleUpdate = async () => {
     setLoading(true);
     try {
@@ -73,23 +58,13 @@ const UserProfile: React.FC = () => {
     return user.email.substring(0, 2).toUpperCase();
   };
 
-  // Helper para determinar o tipo de conta de forma mais robusta
+  // Helper para determinar o tipo de conta
   const getAccountType = () => {
     const role = String(user.role).toLowerCase().trim();
-    const providerRole = String(UserRole.PROVIDER).toLowerCase().trim();
-    const adminRole = String(UserRole.ADMIN).toLowerCase().trim();
     
-    console.log('Checking account type:', {
-      userRole: role,
-      providerRole: providerRole,
-      adminRole: adminRole,
-      isProvider: role === providerRole,
-      isAdmin: role === adminRole
-    });
-    
-    if (role === providerRole) {
+    if (role === String(UserRole.PROVIDER).toLowerCase().trim()) {
       return 'Prestador de Serviços';
-    } else if (role === adminRole) {
+    } else if (role === String(UserRole.ADMIN).toLowerCase().trim()) {
       return 'Administrador';
     } else {
       return 'Cliente';
@@ -157,10 +132,6 @@ const UserProfile: React.FC = () => {
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
                 <p className="font-medium">
                   {getAccountType()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Valor: {String(user.role)} | Enum: {String(UserRole.PROVIDER)} | 
-                  Comparação: {String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim() ? 'Igual' : 'Diferente'}
                 </p>
               </div>
             </div>
