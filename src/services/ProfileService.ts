@@ -18,14 +18,21 @@ const CACHE_TTL = 10 * 60 * 1000;
 export const mapDatabaseRoleToEnum = (role: string): UserRole => {
   console.log('Mapping role from database:', role);
   
+  // Garantir que role seja tratada como string e normalizada
   const roleString = String(role).toLowerCase().trim();
+  
+  // Log adicional para debug
+  console.log('Normalized role string:', roleString);
   
   switch(roleString) {
     case 'provider':
+      console.log('Role matched: PROVIDER');
       return UserRole.PROVIDER;
     case 'admin':
+      console.log('Role matched: ADMIN');
       return UserRole.ADMIN;
     default:
+      console.log('Role defaulted to: CLIENT');
       return UserRole.CLIENT;
   }
 };
@@ -44,6 +51,7 @@ export const transformDatabaseProfile = (
   
   console.log('Role mapping result:', { 
     originalRole: profileData.role, 
+    originalRoleType: typeof profileData.role,
     mappedRole: userRole,
     roleType: typeof userRole
   });
@@ -69,14 +77,16 @@ export const transformDatabaseProfile = (
 export const hasRole = (user: UserProfile | null, role: UserRole | string): boolean => {
   if (!user) return false;
   
-  // Compare both as strings to avoid enum comparison issues
-  const userRoleStr = String(user.role).toLowerCase();
-  const checkRoleStr = String(role).toLowerCase();
+  // Garantir que ambos os valores sejam tratados como string e normalizados
+  const userRoleStr = String(user.role).toLowerCase().trim();
+  const checkRoleStr = String(role).toLowerCase().trim();
   
   console.log('Checking role:', {
     userRole: user.role,
+    userRoleType: typeof user.role,
     userRoleString: userRoleStr,
     checkRole: role,
+    checkRoleType: typeof role,
     checkRoleString: checkRoleStr,
     result: userRoleStr === checkRoleStr
   });

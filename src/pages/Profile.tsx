@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,18 +21,20 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Debug log for profile page
+  // Debug log melhorado para profile page
   console.log('Profile page rendered with:', {
     hasUser: !!user,
     hasSession: !!session,
     isLoading: loading,
     userRole: user?.role,
     userRoleType: user ? typeof user.role : 'undefined',
-    roleString: user ? String(user.role).toLowerCase() : null,
+    roleNormalized: user ? String(user.role).toLowerCase().trim() : null,
+    providerRoleNormalized: String(UserRole.PROVIDER).toLowerCase().trim(),
+    adminRoleNormalized: String(UserRole.ADMIN).toLowerCase().trim(),
     roleChecks: user ? {
-      isProviderStr: String(user.role).toLowerCase() === String(UserRole.PROVIDER).toLowerCase(),
+      isProviderStr: String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim(),
       isProviderEnum: user.role === UserRole.PROVIDER,
-      isAdminStr: String(user.role).toLowerCase() === String(UserRole.ADMIN).toLowerCase(),
+      isAdminStr: String(user.role).toLowerCase().trim() === String(UserRole.ADMIN).toLowerCase().trim(),
       isAdminEnum: user.role === UserRole.ADMIN
     } : null
   });
@@ -125,26 +126,32 @@ const Profile: React.FC = () => {
 
   // Helper function to check if user is provider - using provided hasRole
   const isProvider = () => {
-    return hasRole(UserRole.PROVIDER);
+    const result = hasRole(UserRole.PROVIDER);
+    console.log('isProvider check result:', result);
+    return result;
   };
   
   // Helper function to check if user is admin - using provided hasRole
   const isAdmin = () => {
-    return hasRole(UserRole.ADMIN);
+    const result = hasRole(UserRole.ADMIN);
+    console.log('isAdmin check result:', result);
+    return result;
   };
 
-  // Debug log for role checks
-  console.log("User role checks:", {
-    roleValue: user.role,
-    roleType: typeof user.role,
-    roleString: String(user.role).toLowerCase(),
+  // Adicionando logs de debug adicionais para verificar valores exatos
+  console.log("User role checks details:", {
+    roleValue: user?.role,
+    roleType: typeof user?.role,
+    roleString: user ? String(user.role).toLowerCase().trim() : null,
+    providerEnumString: String(UserRole.PROVIDER).toLowerCase().trim(),
+    adminEnumString: String(UserRole.ADMIN).toLowerCase().trim(),
     isProvider: isProvider(),
     isAdmin: isAdmin(),
     UserRoleEnum: UserRole,
-    matchesProviderEnum: user.role === UserRole.PROVIDER,
-    matchesAdminEnum: user.role === UserRole.ADMIN,
-    matchesProviderString: String(user.role).toLowerCase() === String(UserRole.PROVIDER).toLowerCase(),
-    matchesAdminString: String(user.role).toLowerCase() === String(UserRole.ADMIN).toLowerCase(),
+    matchesProviderEnum: user?.role === UserRole.PROVIDER,
+    matchesAdminEnum: user?.role === UserRole.ADMIN,
+    matchesProviderString: user ? String(user.role).toLowerCase().trim() === String(UserRole.PROVIDER).toLowerCase().trim() : false,
+    matchesAdminString: user ? String(user.role).toLowerCase().trim() === String(UserRole.ADMIN).toLowerCase().trim() : false,
   });
 
   return (

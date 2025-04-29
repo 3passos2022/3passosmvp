@@ -23,8 +23,9 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
     isAuthenticated: !!user, 
     userRole: user?.role,
     userRoleType: user?.role ? typeof user.role : 'undefined',
+    userRoleString: user?.role ? String(user.role).toLowerCase() : null,
     requiredRoleEnum: requiredRole,
-    requiredRoleStr: requiredRole ? String(requiredRole) : null,
+    requiredRoleStr: requiredRole ? String(requiredRole).toLowerCase() : null,
     loading,
     sessionExists: !!session,
     path: location.pathname,
@@ -97,14 +98,18 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
 
   // Verificar a role do usuário usando o helper hasRole importado do ProfileService
   if (requiredRole) {
-    const hasRequiredRole = hasRole(user, requiredRole);
-    console.log('PrivateRoute: Role check -', { 
+    // Melhorado o log para mostrar valores exatos nas strings
+    console.log('PrivateRoute: Role check details:', { 
       userRole: user.role, 
+      userRoleType: typeof user.role,
+      userRoleStr: String(user.role).toLowerCase().trim(),
       requiredRole, 
-      hasRequiredRole,
-      userRoleStr: String(user.role).toLowerCase(),
-      requiredRoleStr: String(requiredRole).toLowerCase()
+      requiredRoleType: typeof requiredRole,
+      requiredRoleStr: String(requiredRole).toLowerCase().trim(),
+      comparison: String(user.role).toLowerCase().trim() === String(requiredRole).toLowerCase().trim()
     });
+    
+    const hasRequiredRole = hasRole(user, requiredRole);
     
     if (!hasRequiredRole) {
       console.log('PrivateRoute: User lacks required role, redirecting to unauthorized');
