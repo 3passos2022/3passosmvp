@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +19,7 @@ import { UserRole } from '@/lib/types';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 import ServiceNavBar from './ServiceNavBar';
 import { Badge } from './ui/badge';
+import { FileText, Settings } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -97,29 +97,37 @@ const Navbar: React.FC = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="w-full cursor-pointer">
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      Perfil
+                      <User className="mr-2 h-4 w-4" />
+                      Minhas Informações
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/profile/quotes" className="w-full cursor-pointer">
-                      <ClipboardList className="mr-2 h-4 w-4" />
-                      Meus Pedidos
+                      <FileText className="mr-2 h-4 w-4" />
+                      Meus Orçamentos
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link to="/subscription" className="w-full cursor-pointer">
+                    <Link to="/profile/subscription" className="w-full cursor-pointer">
                       <CreditCard className="mr-2 h-4 w-4" />
                       Minha Assinatura
                     </Link>
                   </DropdownMenuItem>
-                  {user.role === UserRole.PROVIDER && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/profile/services" className="w-full cursor-pointer">
-                        <Briefcase className="mr-2 h-4 w-4" />
-                        Meus Serviços
-                      </Link>
-                    </DropdownMenuItem>
+                  {(user.role === UserRole.PROVIDER || user.role === UserRole.ADMIN) && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile/requested" className="w-full cursor-pointer">
+                          <FileText className="mr-2 h-4 w-4" />
+                          Orçamentos Recebidos
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile/settings" className="w-full cursor-pointer">
+                          <Settings className="mr-2 h-4 w-4" />
+                          Configurações de Serviço
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {user.role === UserRole.ADMIN && (
                     <DropdownMenuItem asChild>
@@ -188,14 +196,14 @@ const Navbar: React.FC = () => {
                       <p className="text-sm font-medium text-gray-500">Conta</p>
                     </div>
                     <Link to="/profile" className="flex items-center py-2 hover:text-primary transition-colors">
-                      <UserCircle className="mr-2 h-5 w-5" />
-                      Perfil
+                      <User className="mr-2 h-5 w-5" />
+                      Minhas Informações
                     </Link>
                     <Link to="/profile/quotes" className="flex items-center py-2 hover:text-primary transition-colors">
-                      <ClipboardList className="mr-2 h-5 w-5" />
-                      Meus Pedidos
+                      <FileText className="mr-2 h-5 w-5" />
+                      Meus Orçamentos
                     </Link>
-                    <Link to="/subscription" className="flex items-center py-2 hover:text-primary transition-colors">
+                    <Link to="/profile/subscription" className="flex items-center py-2 hover:text-primary transition-colors">
                       <CreditCard className="mr-2 h-5 w-5" />
                       Minha Assinatura
                       {user.subscribed && (
@@ -204,11 +212,17 @@ const Navbar: React.FC = () => {
                         </Badge>
                       )}
                     </Link>
-                    {user.role === UserRole.PROVIDER && (
-                      <Link to="/profile/services" className="flex items-center py-2 hover:text-primary transition-colors">
-                        <Briefcase className="mr-2 h-5 w-5" />
-                        Meus Serviços
-                      </Link>
+                    {(user.role === UserRole.PROVIDER || user.role === UserRole.ADMIN) && (
+                      <>
+                        <Link to="/profile/requested" className="flex items-center py-2 hover:text-primary transition-colors">
+                          <FileText className="mr-2 h-5 w-5" />
+                          Orçamentos Recebidos
+                        </Link>
+                        <Link to="/profile/settings" className="flex items-center py-2 hover:text-primary transition-colors">
+                          <Settings className="mr-2 h-5 w-5" />
+                          Configurações de Serviço
+                        </Link>
+                      </>
                     )}
                     {user.role === UserRole.ADMIN && (
                       <Link to="/admin" className="flex items-center py-2 hover:text-primary transition-colors">

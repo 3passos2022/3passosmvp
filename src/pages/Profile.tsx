@@ -6,23 +6,27 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/lib/types';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link } from 'react-router-dom';
 import ProviderSettings from '@/components/profile/ProviderSettings';
 import ProviderPortfolio from '@/components/profile/ProviderPortfolio';
 import ProviderServices from '@/components/profile/ProviderServices';
 import QuotesList from '@/components/profile/QuotesList';
 import RequestedQuotes from '@/components/profile/RequestedQuotes';
 import { toast } from 'sonner';
+import UserProfile from '@/components/profile/UserProfile';
+import SubscriptionManager from '@/components/subscription/SubscriptionManager';
+import { User, CreditCard, FileText, Settings } from 'lucide-react';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('quotes');
+  const [activeTab, setActiveTab] = useState('profile');
 
   console.log('Profile page rendered with:', {
     hasUser: !!user,
     hasSession: !!session,
-    isLoading: loading
+    isLoading: loading,
+    userRole: user?.role
   });
 
   // Effect to attempt profile refresh if session exists but no user
@@ -49,6 +53,26 @@ const Profile: React.FC = () => {
     window.scrollTo(0, 0);
   }, []);
 
+  // Extract path from URL to set active tab
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.includes('/profile/quotes')) {
+      setActiveTab('quotes');
+    } else if (path.includes('/profile/requested')) {
+      setActiveTab('requested');
+    } else if (path.includes('/profile/subscription')) {
+      setActiveTab('subscription');
+    } else if (path.includes('/profile/settings')) {
+      setActiveTab('settings');
+    } else if (path.includes('/profile/services')) {
+      setActiveTab('services');
+    } else if (path.includes('/profile/portfolio')) {
+      setActiveTab('portfolio');
+    } else {
+      setActiveTab('profile');
+    }
+  }, []);
+
   if (loading || !user || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -59,6 +83,36 @@ const Profile: React.FC = () => {
       </div>
     );
   }
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    let path = '/profile';
+    switch (value) {
+      case 'quotes':
+        path = '/profile/quotes';
+        break;
+      case 'requested':
+        path = '/profile/requested';
+        break;
+      case 'subscription':
+        path = '/profile/subscription';
+        break;
+      case 'settings':
+        path = '/profile/settings';
+        break;
+      case 'services':
+        path = '/profile/services';
+        break;
+      case 'portfolio':
+        path = '/profile/portfolio';
+        break;
+      default:
+        path = '/profile';
+    }
+    
+    navigate(path);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -89,36 +143,53 @@ const Profile: React.FC = () => {
                 </div>
               </div>
               
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tabs value={activeTab} onValueChange={handleTabChange}>
                 <TabsList className="mb-6 flex flex-wrap">
-                  <TabsTrigger value="quotes">Meus Orçamentos</TabsTrigger>
+                  {/* Tabs comuns a todos os tipos de usuário */}
+                  <TabsTrigger value="profile" className="flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    Minhas Informações
+                  </TabsTrigger>
                   
-                  {user.role === UserRole.PROVIDER && (
+                  <TabsTrigger value="quotes" className="flex items-center">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Meus Orçamentos
+                  </TabsTrigger>
+                  
+                  {/* Tabs para prestadores e admins */}
+                  {(user.role === UserRole.PROVIDER || user.role === UserRole.ADMIN) && (
                     <>
-                      <TabsTrigger value="requested">Orçamentos Solicitados</TabsTrigger>
-                      <TabsTrigger value="services">Meus Serviços</TabsTrigger>
-                      <TabsTrigger value="portfolio">Portfólio</TabsTrigger>
-                      <TabsTrigger value="settings">Configurações</TabsTrigger>
+                      <TabsTrigger value="requested" className="flex items-center">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Orçamentos Recebidos
+                      </TabsTrigger>
+                      
+                      <TabsTrigger value="settings" className="flex items-center">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Configurações de Serviço
+                      </TabsTrigger>
                     </>
                   )}
+                  
+                  {/* Tab de assinatura para todos */}
+                  <TabsTrigger value="subscription" className="flex items-center">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Minha Assinatura
+                  </TabsTrigger>
                 </TabsList>
+                
+                <TabsContent value="profile">
+                  <UserProfile />
+                </TabsContent>
                 
                 <TabsContent value="quotes">
                   <QuotesList />
                 </TabsContent>
                 
-                {user.role === UserRole.PROVIDER && (
+                {(user.role === UserRole.PROVIDER || user.role === UserRole.ADMIN) && (
                   <>
                     <TabsContent value="requested">
                       <RequestedQuotes />
-                    </TabsContent>
-                    
-                    <TabsContent value="services">
-                      <ProviderServices />
-                    </TabsContent>
-                    
-                    <TabsContent value="portfolio">
-                      <ProviderPortfolio />
                     </TabsContent>
                     
                     <TabsContent value="settings">
@@ -126,6 +197,10 @@ const Profile: React.FC = () => {
                     </TabsContent>
                   </>
                 )}
+                
+                <TabsContent value="subscription">
+                  <SubscriptionManager />
+                </TabsContent>
               </Tabs>
             </div>
           </motion.div>
