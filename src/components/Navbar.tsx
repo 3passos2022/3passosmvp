@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -168,7 +169,7 @@ const Navbar: React.FC = () => {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
-              className="md:hidden bg-white shadow-lg"
+              className="md:hidden bg-white shadow-lg absolute w-full"
             >
               <div className="container mx-auto px-4 py-4 flex flex-col space-y-4">
                 <Link to="/" className="flex items-center py-2 hover:text-primary transition-colors">
@@ -246,8 +247,8 @@ const Navbar: React.FC = () => {
         </AnimatePresence>
       </motion.nav>
       
-      {/* Add ServiceNavBar with appropriate spacing */}
-      <div className="pt-16">
+      {/* ServiceNavBar with adjusted spacing to prevent overlapping */}
+      <div className={`pt-16 ${isOpen ? 'mt-[350px] md:mt-0' : ''}`}>
         <ServiceNavBar />
       </div>
     </>

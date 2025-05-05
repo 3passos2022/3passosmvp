@@ -56,7 +56,7 @@ const ServiceNavBar: React.FC = () => {
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.2 }}
-      className="w-full py-2 bg-white shadow-sm border-b"
+      className="w-full py-2 bg-white shadow-sm border-b z-10 relative"
     >
       <div className="container mx-auto">
         <ScrollArea className="w-full">
