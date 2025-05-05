@@ -16,6 +16,8 @@ const CACHE_TTL = 10 * 60 * 1000;
  * Mapeia role string do banco para enum UserRole
  */
 export const mapDatabaseRoleToEnum = (role: string): UserRole => {
+  if (!role) return UserRole.CLIENT;
+  
   const roleString = String(role).toLowerCase().trim();
   
   switch(roleString) {
@@ -302,7 +304,24 @@ export class ProfileService {
         throw error;
       }
       
-      return data.map((profile: any) => transformDatabaseProfile(profile));
+      console.log('Perfis obtidos do banco:', data.length);
+      
+      return data.map((profile: any) => {
+        // Garantir que a role seja mapeada corretamente para o enum
+        const userRole = mapDatabaseRoleToEnum(profile.role);
+        
+        return {
+          id: profile.id,
+          email: profile.email || profile.id,
+          role: userRole,
+          name: profile.name || undefined,
+          created_at: profile.created_at || new Date().toISOString(),
+          // Outros campos opcionais
+          subscribed: profile.subscribed || false,
+          subscription_tier: profile.subscription_tier || 'free',
+          subscription_end: profile.subscription_end || null
+        };
+      });
     } catch (error) {
       console.error('Erro em getAllProfiles:', error);
       return [];
