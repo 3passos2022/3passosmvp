@@ -36,46 +36,24 @@ const UserManagement: React.FC = () => {
     try {
       console.log('Carregando usuários...');
       
-      // Obter todos os perfis usando o ProfileService
+      // Verificar se o usuário atual é admin
+      const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_admin_user', {
+        user_id: user?.id
+      });
+      
+      if (adminCheckError || !isAdmin) {
+        console.error('Erro ou usuário não é admin:', adminCheckError);
+        toast.error('Você precisa ter permissões de administrador para ver usuários');
+        setLoading(false);
+        return;
+      }
+      
+      // Obter todos os perfis usando o ProfileService que agora usa a política correta
       const profiles = await ProfileService.getAllProfiles();
       console.log('Perfis obtidos:', profiles?.length || 0);
       
       if (!profiles || profiles.length === 0) {
-        // Tentar usar método alternativo se nenhum perfil for encontrado
-        console.log('Tentando método alternativo via tabela direta');
-        
-        // Verificar se o usuário atual é admin
-        const { data: isAdmin } = await supabase.rpc('is_admin', {
-          user_id: user?.id
-        });
-        
-        if (!isAdmin) {
-          toast.error('Você precisa ter permissões de administrador para ver usuários');
-          setLoading(false);
-          return;
-        }
-        
-        // Obter diretamente da tabela usando função segura
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*');
-          
-        if (error) {
-          throw error;
-        }
-        
-        // Transformar os dados obtidos diretamente
-        const transformedUsers = data?.map((profile: any) => ({
-          id: profile.id,
-          // Para cada perfil, garantir que tenhamos um email (mesmo que seja só o ID)
-          email: profile.email || profile.id,
-          name: profile.name || '',
-          role: profile.role as UserRole,
-          profileExists: true,
-          created_at: profile.created_at || new Date().toISOString(),
-        })) || [];
-        
-        setUsers(transformedUsers);
+        setUsers([]);
         setLoading(false);
         return;
       }
@@ -113,10 +91,12 @@ const UserManagement: React.FC = () => {
       
       if (!profile) {
         // Se o perfil não existir, criar um perfil primeiro usando ProfileService
+        setCreatingProfile(userId);
         await ProfileService.createDefaultProfile(userId, 'Usuário', UserRole.CLIENT);
+        setCreatingProfile(null);
       }
       
-      // Promover o usuário a administrador
+      // Promover o usuário a administrador usando a nova função de makeAdmin que usa a política correta
       const result = await ProfileService.makeAdmin(user?.id || '', userId);
       
       if (result.error) {

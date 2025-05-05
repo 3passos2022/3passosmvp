@@ -92,15 +92,15 @@ export class ProfileService {
     try {
       console.log(`Tentando obter perfil para userId: ${userId}`);
       
-      // Usar a função RPC segura para evitar problemas de RLS
+      // Obter role usando função security definer
       const { data: role, error: roleError } = await supabase
-        .rpc('get_user_role_safely', { user_id: userId });
+        .rpc('get_role_for_user', { user_id: userId });
       
       if (roleError) {
         console.error('Erro ao obter role do usuário via RPC:', roleError);
       }
       
-      // Obter perfil diretamente
+      // Obter perfil diretamente, sem usar o RLS recursivo
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -142,7 +142,7 @@ export class ProfileService {
       
       console.log(`Perfil encontrado para userId: ${userId}`, profileData);
       
-      // Se temos dados de role da RPC e é diferente, usar esse
+      // Se temos dados de role da função secure e é diferente, usar esse
       if (role && profileData.role !== role) {
         console.log(`Atualizando role de ${profileData.role} para ${role}`);
         profileData.role = role;
@@ -172,30 +172,19 @@ export class ProfileService {
       const defaultName = email?.split('@')[0] || 'User';
       const roleString = String(role).toLowerCase();
       
-      // Criar perfil no banco usando RPC
-      const { error } = await supabase.rpc('create_user_profile', { 
-        user_id: userId,
-        user_name: defaultName,
-        user_role: roleString
-      });
-        
-      if (error) {
-        console.error('Erro ao criar perfil via RPC:', error);
-        
-        // Tentar abordagem alternativa se RPC falhar
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            name: defaultName,
-            role: roleString,
-            email: email
-          });
+      // Criar perfil no banco usando inserção direta
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          name: defaultName,
+          role: roleString,
+          email: email
+        });
           
-        if (insertError) {
-          console.error('Erro alternativo ao criar perfil via insert:', insertError);
-          return null;
-        }
+      if (error) {
+        console.error('Erro ao criar perfil:', error);
+        return null;
       }
       
       console.log('Perfil criado com sucesso, obtendo perfil atualizado');
@@ -245,8 +234,8 @@ export class ProfileService {
     try {
       console.log(`Tornando usuário admin: targetUserId=${targetUserId}, por adminUserId=${adminUserId}`);
       
-      // Verificar se usuário é admin usando nova função segura
-      const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin', {
+      // Verificar se usuário é admin usando função security definer
+      const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin_user', {
         user_id: adminUserId
       });
       
@@ -255,11 +244,11 @@ export class ProfileService {
         return { error: new Error('Unauthorized - Not an admin'), data: null };
       }
 
-      // Atualizar role do usuário usando RPC
-      const { error, data: updatedData } = await supabase.rpc('update_user_role', {
-        user_id: targetUserId,
-        new_role: 'admin'
-      });
+      // Atualizar role do usuário diretamente no banco
+      const { error, data: updatedData } = await supabase
+        .from('profiles')
+        .update({ role: 'admin' })
+        .eq('id', targetUserId);
 
       if (error) {
         console.error('Erro ao atualizar role do usuário:', error);
@@ -294,6 +283,7 @@ export class ProfileService {
     try {
       console.log('Obtendo todos os perfis');
       
+      // Usar a nova policy "Anyone can select profiles" que não causa recursão
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -306,22 +296,7 @@ export class ProfileService {
       
       console.log('Perfis obtidos do banco:', data.length);
       
-      return data.map((profile: any) => {
-        // Garantir que a role seja mapeada corretamente para o enum
-        const userRole = mapDatabaseRoleToEnum(profile.role);
-        
-        return {
-          id: profile.id,
-          email: profile.email || profile.id,
-          role: userRole,
-          name: profile.name || undefined,
-          created_at: profile.created_at || new Date().toISOString(),
-          // Outros campos opcionais
-          subscribed: profile.subscribed || false,
-          subscription_tier: profile.subscription_tier || 'free',
-          subscription_end: profile.subscription_end || null
-        };
-      });
+      return data.map((profile: any) => transformDatabaseProfile(profile));
     } catch (error) {
       console.error('Erro em getAllProfiles:', error);
       return [];
