@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -825,7 +825,7 @@ const ServiceDetailsStep: React.FC<{
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Nome do c�����modo/área (opcional)</Label>
+                        <Label>Nome do cmodo/área (opcional)</Label>
                         <Input 
                           value={measurement.roomName} 
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
@@ -909,10 +909,48 @@ const ServiceDetailsStep: React.FC<{
 const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  
+  // Preencher campos iniciais a partir da query string
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const serviceId = params.get('serviceId');
+    const subServiceId = params.get('subServiceId');
+    const specialtyId = params.get('specialtyId');
+    if (serviceId && services) {
+      const service = services.find(s => s.id === serviceId);
+      let subService, specialty;
+      if (service && subServiceId) {
+        subService = service.subServices.find(ss => ss.id === subServiceId);
+      }
+      if (subService && specialtyId) {
+        specialty = subService.specialties.find(sp => sp.id === specialtyId);
+      }
+      setFormData({
+        serviceId,
+        serviceName: service?.name,
+        subServiceId: subServiceId || undefined,
+        subServiceName: subService?.name,
+        specialtyId: specialtyId || undefined,
+        specialtyName: specialty?.name,
+        description: '',
+        answers: {},
+        itemQuantities: {},
+        measurements: [],
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+        zipCode: ''
+      });
+    }
+  }, [location.search, services]);
   
   const nextStep = () => setCurrentStep(prev => prev + 1);
   
