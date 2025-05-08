@@ -37,7 +37,7 @@ const Features: React.FC = () => {
     },
     {
       title: 'Suporte contínuo',
-      description: 'Nosso time está disponível para ajudar durante todo o processo.',
+      description: 'Nosso time está disponível para ajudar durante todo o processo. ',
       icon: RefreshCw,
       color: 'bg-rose-50 text-rose-600',
     },
