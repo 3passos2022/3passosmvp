@@ -46,6 +46,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Rua é obrigatória'),
@@ -83,7 +84,9 @@ interface FormData {
   specialtyName?: string;
   description?: string;
   answers?: {[key: string]: string};
+  answersText?: {[key: string]: {question: string, answer: string}};
   itemQuantities?: {[key: string]: number};
+  itemNames?: {[key: string]: string};
   measurements?: {
     id: string;
     roomName: string;
@@ -913,6 +916,9 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [questions, setQuestions] = useState<{[id: string]: ServiceQuestion}>({});
+  const [questionOptions, setQuestionOptions] = useState<{[id: string]: QuestionOption}>({});
+  const [items, setItems] = useState<{[id: string]: ServiceItem}>({});
   
   const nextStep = () => setCurrentStep(prev => prev + 1);
   
@@ -921,6 +927,93 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
   const updateFormData = (data: Partial<FormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
   };
+  
+  useEffect(() => {
+    // Carregar informações sobre perguntas e opções para exibição no modal de revisão
+    const fetchQuestionDetails = async () => {
+      if (!formData.serviceId) return;
+      
+      try {
+        // Carregar todas as perguntas relevantes
+        const serviceQuestions = formData.serviceId ? await getQuestions(formData.serviceId) : [];
+        const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
+        const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
+        
+        const allQuestions = [...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions];
+        
+        // Criar mapa de questões e opções para facilitar acesso
+        const questionsMap: {[id: string]: ServiceQuestion} = {};
+        const optionsMap: {[id: string]: QuestionOption} = {};
+        
+        allQuestions.forEach(question => {
+          questionsMap[question.id] = question;
+          question.options.forEach(option => {
+            optionsMap[option.id] = option;
+          });
+        });
+        
+        setQuestions(questionsMap);
+        setQuestionOptions(optionsMap);
+        
+        // Preparar textos das respostas
+        if (formData.answers) {
+          const answersText: {[key: string]: {question: string, answer: string}} = {};
+          
+          Object.entries(formData.answers).forEach(([questionId, optionId]) => {
+            const question = questionsMap[questionId];
+            const option = optionsMap[optionId];
+            
+            if (question && option) {
+              answersText[questionId] = {
+                question: question.question,
+                answer: option.optionText
+              };
+            }
+          });
+          
+          updateFormData({ answersText });
+        }
+      } catch (error) {
+        console.error('Erro ao carregar detalhes das perguntas:', error);
+      }
+    };
+    
+    // Carregar informações sobre itens para exibição no modal de revisão
+    const fetchItemDetails = async () => {
+      if (!formData.serviceId) return;
+      
+      try {
+        // Carregar todos os itens relevantes
+        const serviceItems = formData.serviceId ? await getServiceItems(formData.serviceId) : [];
+        const subServiceItems = formData.subServiceId ? await getServiceItems(undefined, formData.subServiceId) : [];
+        const specialtyItems = formData.specialtyId ? await getServiceItems(undefined, undefined, formData.specialtyId) : [];
+        
+        const allItems = [...serviceItems, ...subServiceItems, ...specialtyItems];
+        
+        // Criar mapa de itens para facilitar acesso
+        const itemsMap: {[id: string]: ServiceItem} = {};
+        const itemNamesMap: {[id: string]: string} = {};
+        
+        allItems.forEach(item => {
+          itemsMap[item.id] = item;
+          
+          if (formData.itemQuantities && formData.itemQuantities[item.id]) {
+            itemNamesMap[item.id] = item.name;
+          }
+        });
+        
+        setItems(itemsMap);
+        updateFormData({ itemNames: itemNamesMap });
+      } catch (error) {
+        console.error('Erro ao carregar detalhes dos itens:', error);
+      }
+    };
+    
+    if (formData.serviceId) {
+      fetchQuestionDetails();
+      fetchItemDetails();
+    }
+  }, [formData.serviceId, formData.subServiceId, formData.specialtyId, formData.answers, formData.itemQuantities]);
   
   const canSubmit = () => {
     return !!(
@@ -1162,7 +1255,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       </div>
       
       <Dialog open={showReview} onOpenChange={setShowReview}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Revisar Orçamento</DialogTitle>
             <DialogDescription>
@@ -1170,60 +1263,164 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6 py-4">
-            <div>
-              <h3 className="font-medium text-lg mb-2">Serviço Selecionado</h3>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Serviço</p>
-                      <p className="font-medium">{formData.serviceName}</p>
-                    </div>
-                    
-                    {formData.subServiceName && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
-                        <p className="font-medium">{formData.subServiceName}</p>
+          <div className="py-4">
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-lg mb-2">Serviço Selecionado</h3>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Serviço</p>
+                          <p className="font-medium">{formData.serviceName}</p>
+                        </div>
+                        
+                        {formData.subServiceName && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
+                            <p className="font-medium">{formData.subServiceName}</p>
+                          </div>
+                        )}
+                        
+                        {formData.specialtyName && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Especialidade</p>
+                            <p className="font-medium">{formData.specialtyName}</p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    
-                    {formData.specialtyName && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Especialidade</p>
-                        <p className="font-medium">{formData.specialtyName}</p>
+                      
+                      {formData.description && (
+                        <div className="mt-4">
+                          <p className="text-sm text-muted-foreground">Descrição</p>
+                          <p className="text-sm mt-1">{formData.description}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Seção de Questionário */}
+                {formData.answersText && Object.keys(formData.answersText).length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-lg mb-2">Questionário</h3>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="space-y-4">
+                          {Object.values(formData.answersText).map((item, index) => (
+                            <div key={index} className="border-b pb-3 last:border-b-0 last:pb-0">
+                              <p className="text-sm text-muted-foreground mb-1">Pergunta</p>
+                              <p className="font-medium mb-2">{item.question}</p>
+                              
+                              <p className="text-sm text-muted-foreground mb-1">Resposta</p>
+                              <p>{item.answer}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Seção de Itens */}
+                {formData.itemQuantities && formData.itemNames && Object.keys(formData.itemQuantities).length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-lg mb-2">Itens do Serviço</h3>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="space-y-4">
+                          {Object.entries(formData.itemQuantities)
+                            .filter(([itemId, quantity]) => quantity > 0 && formData.itemNames?.[itemId])
+                            .map(([itemId, quantity]) => (
+                              <div key={itemId} className="flex justify-between border-b pb-3 last:border-b-0 last:pb-0">
+                                <div>
+                                  <p className="font-medium">{formData.itemNames?.[itemId]}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold">{quantity}</p>
+                                  {items[itemId] && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {items[itemId].type === 'quantity' 
+                                        ? 'unidades' 
+                                        : items[itemId].type === 'square_meter' 
+                                          ? 'm²' 
+                                          : 'm linear'}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Seção de Medidas */}
+                {formData.measurements && formData.measurements.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-lg mb-2">Medidas Informadas</h3>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="space-y-4">
+                          {formData.measurements.map((measurement, index) => (
+                            <div key={index} className="border-b pb-3 last:border-b-0 last:pb-0">
+                              {measurement.roomName && (
+                                <div className="mb-2">
+                                  <p className="text-sm text-muted-foreground">Cômodo/Área</p>
+                                  <p className="font-medium">{measurement.roomName}</p>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-3 gap-4 mt-2">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Largura</p>
+                                  <p>{measurement.width} m</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Comprimento</p>
+                                  <p>{measurement.length} m</p>
+                                </div>
+                                {measurement.height !== undefined && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Altura</p>
+                                    <p>{measurement.height} m</p>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-2 bg-gray-50 p-2 rounded">
+                                <p className="text-sm font-medium">
+                                  Área total: {(measurement.width * measurement.length).toFixed(2)} m²
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+                
+                <div>
+                  <h3 className="font-medium text-lg mb-2">Endereço</h3>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="grid grid-cols-1 gap-2">
+                        <p>
+                          {formData.street}, {formData.number}
+                          {formData.complement && `, ${formData.complement}`}
+                        </p>
+                        <p>{formData.neighborhood}</p>
+                        <p>
+                          {formData.city} - {formData.state}
+                        </p>
+                        <p>CEP: {formData.zipCode}</p>
                       </div>
-                    )}
-                  </div>
-                  
-                  {formData.description && (
-                    <div className="mt-4">
-                      <p className="text-sm text-muted-foreground">Descrição</p>
-                      <p className="text-sm mt-1">{formData.description}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div>
-              <h3 className="font-medium text-lg mb-2">Endereço</h3>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 gap-2">
-                    <p>
-                      {formData.street}, {formData.number}
-                      {formData.complement && `, ${formData.complement}`}
-                    </p>
-                    <p>{formData.neighborhood}</p>
-                    <p>
-                      {formData.city} - {formData.state}
-                    </p>
-                    <p>CEP: {formData.zipCode}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </ScrollArea>
           </div>
           
           <DialogFooter>
@@ -1231,7 +1428,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
               Editar
             </Button>
             <Button 
-              onClick={() => handleSubmit(new Event('submit') as unknown as React.FormEvent<HTMLFormElement>)}
+              onClick={(e) => handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>)}
               disabled={isSubmitting || !canSubmit()}
             >
               {isSubmitting ? (
