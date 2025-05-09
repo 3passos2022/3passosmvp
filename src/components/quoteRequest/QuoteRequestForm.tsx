@@ -903,3 +903,417 @@ const ServiceDetailsStep: React.FC<{
             </div>
           ) : (
             <p className="text-center
+
+const ReviewStep: React.FC<{
+  onBack: () => void;
+  formData: FormData;
+  onSubmit: () => void;
+  submitting: boolean;
+}> = ({ onBack, formData, onSubmit, submitting }) => {
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-medium">Revisar solicitação de orçamento</h3>
+      
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados do solicitante</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Nome:</span>
+                <span className="font-medium">{formData.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Endereço:</span>
+                <span className="font-medium text-right">{formData.street}, {formData.number}{formData.complement ? `, ${formData.complement}` : ''}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bairro:</span>
+                <span className="font-medium">{formData.neighborhood}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cidade/Estado:</span>
+                <span className="font-medium">{formData.city}/{formData.state}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CEP:</span>
+                <span className="font-medium">{formData.zipCode}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Detalhes do serviço</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Serviço:</span>
+                <span className="font-medium">{formData.serviceName}</span>
+              </div>
+              {formData.subServiceName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tipo de serviço:</span>
+                  <span className="font-medium">{formData.subServiceName}</span>
+                </div>
+              )}
+              {formData.specialtyName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Especialidade:</span>
+                  <span className="font-medium">{formData.specialtyName}</span>
+                </div>
+              )}
+              {formData.description && (
+                <div className="mt-4">
+                  <span className="text-muted-foreground block mb-1">Descrição:</span>
+                  <p className="bg-gray-50 p-2 rounded">{formData.description}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        {formData.answers && Object.keys(formData.answers).length > 0 && formData.answersText && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Questionário</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(formData.answersText).map(([key, { question, answer }]) => (
+                  <div key={key}>
+                    <p className="text-muted-foreground">{question}</p>
+                    <p className="font-medium mt-1">{answer}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0 && formData.itemNames && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Itens</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {Object.entries(formData.itemQuantities).filter(([_, quantity]) => quantity > 0).map(([itemId, quantity]) => (
+                  <div key={itemId} className="flex justify-between">
+                    <span className="text-muted-foreground">{formData.itemNames?.[itemId]}</span>
+                    <span className="font-medium">{quantity}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {formData.measurements && formData.measurements.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Medidas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {formData.measurements.map((measurement, index) => (
+                  <div key={measurement.id} className="border-b pb-2 last:border-b-0 last:pb-0">
+                    <p className="font-medium">{measurement.roomName || `Área ${index + 1}`}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Largura:</span> {measurement.width} m
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Comprimento:</span> {measurement.length} m
+                      </div>
+                      {measurement.height && (
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Altura:</span> {measurement.height} m
+                        </div>
+                      )}
+                      <div className="text-sm font-medium">
+                        <span className="text-muted-foreground">Área total:</span> {(measurement.width * measurement.length).toFixed(2)} m²
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+      
+      <div className="flex justify-between pt-4 border-t">
+        <Button type="button" variant="outline" onClick={onBack}>
+          <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+        </Button>
+        <Button onClick={onSubmit} disabled={submitting}>
+          {submitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            <>Enviar solicitação</>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<FormData>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [quoteId, setQuoteId] = useState<string | null>(null);
+  const [requiredSteps, setRequiredSteps] = useState<string[]>(['service', 'details', 'address', 'review']);
+  
+  const updateFormData = (data: Partial<FormData>) => {
+    setFormData(prevData => ({
+      ...prevData,
+      ...data
+    }));
+  };
+
+  const nextStep = () => {
+    setCurrentStep(current => current + 1);
+    window.scrollTo(0, 0);
+  };
+
+  const prevStep = () => {
+    setCurrentStep(current => current - 1);
+    window.scrollTo(0, 0);
+  };
+
+  const handleSubmitQuote = async () => {
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+      
+      console.log('Submitting quote with data:', formData);
+      
+      let answersTextFormatted: {[key: string]: {question: string, answer: string}} = {};
+      
+      // Prepare the request payload
+      const { data, error } = await supabase.rpc('submit_quote', {
+        p_full_name: formData.fullName,
+        p_service_id: formData.serviceId,
+        p_sub_service_id: formData.subServiceId || null,
+        p_specialty_id: formData.specialtyId || null,
+        p_description: formData.description,
+        p_street: formData.street,
+        p_number: formData.number,
+        p_complement: formData.complement,
+        p_neighborhood: formData.neighborhood,
+        p_city: formData.city,
+        p_state: formData.state,
+        p_zip_code: formData.zipCode,
+        p_is_anonymous: !user
+      });
+      
+      if (error) {
+        console.error('Error submitting quote:', error);
+        throw new Error(error.message || 'Erro ao enviar a solicitação de orçamento');
+      }
+      
+      const newQuoteId = data;
+      setQuoteId(newQuoteId);
+      console.log('Quote submitted successfully with ID:', newQuoteId);
+      
+      // Store answers if they exist
+      if (formData.answers && Object.keys(formData.answers).length > 0) {
+        console.log('Storing quote answers...');
+        const answersPromises = Object.entries(formData.answers).map(async ([questionId, optionId]) => {
+          return supabase.from('quote_answers').insert({
+            quote_id: newQuoteId,
+            question_id: questionId,
+            option_id: optionId
+          });
+        });
+        
+        await Promise.all(answersPromises);
+      }
+      
+      // Store item quantities if they exist
+      if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
+        console.log('Storing quote items...');
+        const itemPromises = Object.entries(formData.itemQuantities)
+          .filter(([_, qty]) => qty > 0)
+          .map(async ([itemId, quantity]) => {
+            return supabase.from('quote_items').insert({
+              quote_id: newQuoteId,
+              item_id: itemId,
+              quantity
+            });
+          });
+        
+        await Promise.all(itemPromises);
+      }
+      
+      // Store measurements if they exist
+      if (formData.measurements && formData.measurements.length > 0) {
+        console.log('Storing quote measurements...');
+        const measurementsPromises = formData.measurements.map(async (measurement) => {
+          const area = measurement.width * measurement.length;
+          return supabase.from('quote_measurements').insert({
+            quote_id: newQuoteId,
+            room_name: measurement.roomName,
+            width: measurement.width,
+            length: measurement.length,
+            height: measurement.height,
+            area
+          });
+        });
+        
+        await Promise.all(measurementsPromises);
+      }
+      
+      // Show success message and dialog
+      toast.success('Solicitação de orçamento enviada com sucesso!');
+      setShowSuccessDialog(true);
+      
+    } catch (error) {
+      console.error('Error in submitQuote:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao enviar a solicitação';
+      setSubmitError(errorMessage);
+      toast.error(`Erro ao enviar a solicitação: ${errorMessage}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  const goToHomepage = () => {
+    setShowSuccessDialog(false);
+    navigate('/');
+  };
+  
+  const goToProviders = () => {
+    setShowSuccessDialog(false);
+    navigate('/prestadoresencontrados');
+  };
+
+  return (
+    <form onSubmit={handleFormSubmit} className="space-y-6">
+      <div className="flex justify-center mb-6">
+        {requiredSteps.map((step, index) => (
+          <div key={step} className="flex items-center">
+            <Button 
+              type="button"
+              variant={currentStep === index ? "default" : "outline"}
+              size="sm"
+              className={`rounded-full px-4 ${index === 0 ? "" : "ml-2"}`}
+              onClick={() => {}}
+              disabled
+            >
+              {step === 'service' ? 'Serviço' : 
+               step === 'details' ? 'Detalhes' : 
+               step === 'address' ? 'Endereço' : 'Revisão'}
+            </Button>
+            {index < requiredSteps.length - 1 && (
+              <div className="h-px w-4 bg-gray-200"></div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="text-sm text-muted-foreground">
+            Passo {currentStep + 1} de {requiredSteps.length}
+          </p>
+          <p className="text-sm font-medium">
+            {
+              currentStep === 0 ? 'Serviço' :
+              currentStep === 1 ? 'Detalhes' :
+              currentStep === 2 ? 'Endereço' : 'Revisão'
+            }
+          </p>
+        </div>
+        <Progress 
+          value={((currentStep + 1) / requiredSteps.length) * 100}
+          className="h-1"
+        />
+      </div>
+      
+      {currentStep === 0 && (
+        <ServiceStep 
+          onNext={nextStep} 
+          formData={formData} 
+          updateFormData={updateFormData}
+          services={services}
+        />
+      )}
+      
+      {currentStep === 1 && (
+        <ServiceDetailsStep 
+          onNext={nextStep} 
+          onBack={prevStep}
+          formData={formData} 
+          updateFormData={updateFormData}
+        />
+      )}
+      
+      {currentStep === 2 && (
+        <AddressStep 
+          onNext={nextStep} 
+          onBack={prevStep}
+          formData={formData} 
+          updateFormData={updateFormData}
+        />
+      )}
+      
+      {currentStep === 3 && (
+        <ReviewStep 
+          onBack={prevStep}
+          formData={formData}
+          onSubmit={handleSubmitQuote}
+          submitting={submitting}
+        />
+      )}
+      
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitação enviada com sucesso!</DialogTitle>
+            <DialogDescription>
+              Sua solicitação de orçamento foi enviada e os prestadores de serviço serão notificados.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-center py-4">
+            <div className="bg-green-100 p-6 rounded-full">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={goToHomepage}
+              className="flex-1"
+            >
+              Voltar para o início
+            </Button>
+            <Button 
+              onClick={goToProviders}
+              className="flex-1"
+            >
+              Ver prestadores disponíveis
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </form>
+  );
+};
+
+export default QuoteRequestForm;
