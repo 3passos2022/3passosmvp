@@ -472,6 +472,7 @@ export type Database = {
           complement: string | null
           created_at: string | null
           description: string | null
+          full_name: string | null
           id: string
           is_anonymous: boolean | null
           latitude: number | null
@@ -492,6 +493,7 @@ export type Database = {
           complement?: string | null
           created_at?: string | null
           description?: string | null
+          full_name?: string | null
           id?: string
           is_anonymous?: boolean | null
           latitude?: number | null
@@ -512,6 +514,7 @@ export type Database = {
           complement?: string | null
           created_at?: string | null
           description?: string | null
+          full_name?: string | null
           id?: string
           is_anonymous?: boolean | null
           latitude?: number | null
@@ -939,20 +942,36 @@ export type Database = {
         Returns: boolean
       }
       submit_quote: {
-        Args: {
-          p_service_id: string
-          p_sub_service_id?: string
-          p_specialty_id?: string
-          p_description?: string
-          p_street?: string
-          p_number?: string
-          p_complement?: string
-          p_neighborhood?: string
-          p_city?: string
-          p_state?: string
-          p_zip_code?: string
-          p_is_anonymous?: boolean
-        }
+        Args:
+          | {
+              p_full_name?: string
+              p_service_id?: string
+              p_sub_service_id?: string
+              p_specialty_id?: string
+              p_description?: string
+              p_street?: string
+              p_number?: string
+              p_complement?: string
+              p_neighborhood?: string
+              p_city?: string
+              p_state?: string
+              p_zip_code?: string
+              p_is_anonymous?: boolean
+            }
+          | {
+              p_service_id: string
+              p_sub_service_id?: string
+              p_specialty_id?: string
+              p_description?: string
+              p_street?: string
+              p_number?: string
+              p_complement?: string
+              p_neighborhood?: string
+              p_city?: string
+              p_state?: string
+              p_zip_code?: string
+              p_is_anonymous?: boolean
+            }
         Returns: string
       }
       update_user_role: {

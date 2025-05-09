@@ -15,7 +15,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-  } from '@/components/ui/card';
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -25,7 +25,8 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { ChevronRight, ChevronLeft, Plus, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { format } from "date-fns";
+import { ChevronRight, ChevronLeft, Plus, Trash2, Loader2, CheckCircle2, CalendarIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Progress } from "@/components/ui/progress";
 
 const addressSchema = z.object({
@@ -68,6 +75,7 @@ interface AddressFormData {
 }
 
 interface FormData {
+  fullName?: string;
   street?: string;
   number?: string;
   complement?: string;
@@ -91,6 +99,9 @@ interface FormData {
     length: number;
     height?: number;
   }[];
+  serviceDate?: Date;
+  serviceEndDate?: Date;
+  serviceTimePreference?: string;
 }
 
 interface QuoteRequestFormProps {
@@ -260,6 +271,15 @@ const ServiceStep: React.FC<{
   const [selectedSubService, setSelectedSubService] = useState<string>(formData.subServiceId || '');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>(formData.specialtyId || '');
   const [servicesList, setServicesList] = useState<Service[]>(services || []);
+  const [dateSelectionMode, setDateSelectionMode] = useState<'single' | 'range'>(
+    formData.serviceEndDate && formData.serviceEndDate !== formData.serviceDate ? 'range' : 'single'
+  );
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(formData.serviceDate);
+  const [selectedDateRange, setSelectedDateRange] = useState<{from: Date; to?: Date}>({
+    from: formData.serviceDate || new Date(),
+    to: formData.serviceEndDate || undefined
+  });
+  const [timePreference, setTimePreference] = useState<string>(formData.serviceTimePreference || '');
   
   const subServices = servicesList.find(s => s.id === selectedService)?.subServices || [];
   const specialties = subServices.find(s => s.id === selectedSubService)?.specialties || [];
@@ -295,17 +315,41 @@ const ServiceStep: React.FC<{
       return;
     }
     
+    if (!formData.fullName || formData.fullName.trim() === '') {
+      toast.error('Por favor, informe seu nome completo');
+      return;
+    }
+
+    if (!selectedDate && dateSelectionMode === 'single') {
+      toast.error('Por favor, selecione uma data para o serviço');
+      return;
+    }
+    
+    if (dateSelectionMode === 'range' && (!selectedDateRange.from || !selectedDateRange.to)) {
+      toast.error('Por favor, selecione o período completo para o serviço');
+      return;
+    }
+    
+    if (!timePreference) {
+      toast.error('Por favor, selecione um horário preferencial');
+      return;
+    }
+    
     const serviceName = services.find(s => s.id === selectedService)?.name;
     const subServiceName = selectedSubService ? subServices.find(s => s.id === selectedSubService)?.name : undefined;
     const specialtyName = selectedSpecialty ? specialties.find(s => s.id === selectedSpecialty)?.name : undefined;
     
     console.log('Seleções do usuário:',  {
+      fullName: formData.fullName,
       serviceId: selectedService,
       serviceName, 
       subServiceId: selectedSubService, 
       subServiceName,
       specialtyId: selectedSpecialty,
-      specialtyName
+      specialtyName,
+      serviceDate: dateSelectionMode === 'single' ? selectedDate : selectedDateRange.from,
+      serviceEndDate: dateSelectionMode === 'range' ? selectedDateRange.to : selectedDate,
+      serviceTimePreference: timePreference
     });
     
     updateFormData({
@@ -315,6 +359,9 @@ const ServiceStep: React.FC<{
       serviceName,
       subServiceName,
       specialtyName,
+      serviceDate: dateSelectionMode === 'single' ? selectedDate : selectedDateRange.from,
+      serviceEndDate: dateSelectionMode === 'range' ? selectedDateRange.to : selectedDate,
+      serviceTimePreference: timePreference
     });
     
     onNext();
@@ -327,6 +374,106 @@ const ServiceStep: React.FC<{
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="fullName">Nome completo</Label>
+          <Input
+            id="fullName"
+            placeholder="Digite seu nome completo"
+            value={formData.fullName || ''}
+            onChange={(e) => updateFormData({ fullName: e.target.value })}
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Tipo de seleção de data</Label>
+          <div className="flex space-x-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="radio"
+                checked={dateSelectionMode === 'single'}
+                onChange={() => setDateSelectionMode('single')}
+                className="h-4 w-4"
+              />
+              <span>Data única</span>
+            </label>
+            <label className="flex items-center space-x-2">
+              <input
+                type="radio"
+                checked={dateSelectionMode === 'range'}
+                onChange={() => setDateSelectionMode('range')}
+                className="h-4 w-4"
+              />
+              <span>Intervalo de datas</span>
+            </label>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Data do serviço</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className="w-full justify-start text-left font-normal"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                {dateSelectionMode === 'single' ? (
+                  selectedDate ? (
+                    format(selectedDate, "dd/MM/yyyy")
+                  ) : (
+                    <span>Selecione uma data</span>
+                  )
+                ) : (
+                  <>
+                    {selectedDateRange.from ? (
+                      selectedDateRange.to ? (
+                        `${format(selectedDateRange.from, "dd/MM/yyyy")} até ${format(selectedDateRange.to, "dd/MM/yyyy")}`
+                      ) : (
+                        format(selectedDateRange.from, "dd/MM/yyyy")
+                      )
+                    ) : (
+                      <span>Selecione um período</span>
+                    )}
+                  </>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode={dateSelectionMode === 'single' ? 'single' : 'range'}
+                selected={dateSelectionMode === 'single' ? selectedDate : selectedDateRange}
+                onSelect={dateSelectionMode === 'single' 
+                  ? setSelectedDate 
+                  : (range) => setSelectedDateRange(range || {from: new Date()})
+                }
+                disabled={(date) => date < new Date()}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="timePreference">Horário preferencial</Label>
+          <Select 
+            value={timePreference} 
+            onValueChange={setTimePreference}
+            required
+          >
+            <SelectTrigger id="timePreference">
+              <SelectValue placeholder="Selecione o horário preferencial" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="morning">Manhã</SelectItem>
+              <SelectItem value="afternoon">Tarde</SelectItem>
+              <SelectItem value="evening">Noite</SelectItem>
+              <SelectItem value="business">Horário comercial</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
         <div className="space-y-2">
           <Label htmlFor="service">Selecione o serviço</Label>
           <Select 
@@ -402,7 +549,7 @@ const ServiceStep: React.FC<{
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button type="submit" disabled={!selectedService}>
+        <Button type="submit" disabled={!selectedService || !formData.fullName?.trim() || !selectedDate || !timePreference}>
           Próximo <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
