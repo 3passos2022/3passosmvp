@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -444,17 +443,25 @@ const ServiceStep: React.FC<{
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode={dateSelectionMode === 'single' ? 'single' : 'range'}
-                selected={dateSelectionMode === 'single' ? selectedDate : selectedDateRange}
-                onSelect={dateSelectionMode === 'single' 
-                  ? setSelectedDate 
-                  : (range) => setSelectedDateRange(range || {from: new Date()})
-                }
-                disabled={(date) => date < new Date()}
-                initialFocus
-                className="p-3 pointer-events-auto"
-              />
+              {dateSelectionMode === 'single' ? (
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              ) : (
+                <Calendar
+                  mode="range"
+                  selected={selectedDateRange}
+                  onSelect={(range) => setSelectedDateRange(range || {from: new Date()})}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              )}
             </PopoverContent>
           </Popover>
         </div>
