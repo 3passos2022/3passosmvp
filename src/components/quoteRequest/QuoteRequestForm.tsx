@@ -6,7 +6,9 @@ import { z } from 'zod';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, ServiceItem } from '@/lib/types';
+import { QuoteDetails, QuoteMeasurement } from '@/lib/types/providerMatch';
 import { getQuestions, getServiceItems } from '@/lib/api/services';
+import { storeQuoteData } from '@/lib/utils/quoteStorage';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -579,6 +581,8 @@ const ServiceDetailsStep: React.FC<{
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [answers, setAnswers] = useState<{[key: string]: string}>(formData.answers || {});
   const [itemQuantities, setItemQuantities] = useState<{[key: string]: number}>(formData.itemQuantities || {});
+  const [itemNames, setItemNames] = useState<{[key: string]: string}>(formData.itemNames || {});
+  const [itemTypes, setItemTypes] = useState<{[key: string]: string}>({});
   const [measurements, setMeasurements] = useState<{
     id: string;
     roomName: string;
@@ -614,6 +618,17 @@ const ServiceDetailsStep: React.FC<{
         const allItems = [...serviceItems, ...subServiceItems, ...specialtyItems];
         setItems(allItems);
         
+        // Armazena o tipo de cada item para referência futura
+        const typesMap: {[key: string]: string} = {};
+        const namesMap: {[key: string]: string} = {};
+        allItems.forEach(item => {
+          typesMap[item.id] = item.type;
+          namesMap[item.id] = item.name;
+        });
+        
+        setItemTypes(typesMap);
+        setItemNames(namesMap);
+        
         const hasSquareItems = allItems.some(item => item.type === 'square_meter');
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
         
@@ -624,12 +639,17 @@ const ServiceDetailsStep: React.FC<{
         if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
           neededSteps.push('quiz');
         }
+        
+        // Se temos itens regulares (quantidade) OU itens por metro quadrado ou linear, adicionamos a etapa de itens
         if (allItems.length > 0) {
           neededSteps.push('items');
         }
+        
+        // Se temos itens de metro quadrado ou linear, precisamos da etapa de medidas
         if (hasSquareItems || hasLinearItems) {
           neededSteps.push('measurements');
         }
+        
         setRequiredSteps(neededSteps);
         
         if (neededSteps.length > 0) {
@@ -754,6 +774,7 @@ const ServiceDetailsStep: React.FC<{
     updateFormData({
       answers,
       itemQuantities,
+      itemNames,
       measurements
     });
     
@@ -914,26 +935,49 @@ const ServiceDetailsStep: React.FC<{
           <h3 className="text-lg font-medium mb-4">Informe as quantidades necessárias</h3>
           
           <div className="space-y-4">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {item.type === 'quantity' ? 'Quantidade' : 
-                     item.type === 'square_meter' ? 'Metro Quadrado' : 'Metro Linear'}
-                  </p>
+            {items.map((item) => {
+              // Verifica se o item é do tipo metro quadrado ou linear
+              const isAreaOrLinearType = item.type === 'square_meter' || item.type === 'linear_meter';
+              
+              // Se for um item por área ou linear, mostramos uma mensagem em vez do campo de quantidade
+              if (isAreaOrLinearType) {
+                return (
+                  <div key={item.id} className="flex items-center justify-between border p-4 rounded-md bg-gray-50">
+                    <div className="flex-1">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {item.type === 'square_meter' ? 'Metro Quadrado' : 'Metro Linear'}
+                      </p>
+                      <p className="text-xs text-primary mt-1">
+                        Quantidade calculada automaticamente com base nas medidas informadas
+                      </p>
+                    </div>
+                    <div className="w-24 text-right">
+                      <p className="font-semibold">Automático</p>
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Para itens regulares, mostramos o campo de quantidade como antes
+              return (
+                <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-gray-500">Quantidade</p>
+                  </div>
+                  <div className="w-24">
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step="1"
+                      value={itemQuantities[item.id] || ''}
+                      onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
                 </div>
-                <div className="w-24">
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    step={item.type === 'quantity' ? '1' : '0.01'}
-                    value={itemQuantities[item.id] || ''}
-                    onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           <div className="flex justify-between pt-6 border-t mt-6">
@@ -1131,9 +1175,12 @@ const ReviewStep: React.FC<{
       };
       
       // Store the complete quote details in session storage
-      import('@/lib/utils/quoteStorage').then(module => {
-        module.storeQuoteData(quoteDetails);
-      });
+      const storedSuccessfully = storeQuoteData(quoteDetails);
+      if (!storedSuccessfully) {
+        console.error("Failed to store quote data");
+        toast.error("Erro ao armazenar os dados do orçamento");
+        return;
+      }
       
       // Try to use RPC function if available
       try {

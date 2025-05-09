@@ -73,6 +73,10 @@ export interface QuoteDetails {
   };
   description?: string;
   clientId?: string | null;
+  // Metadados para processamento interno
+  _storedAt?: string;
+  _itemTypes?: Record<string, string>;
+  _itemNames?: Record<string, string>;
 }
 
 export interface ProviderServiceItemPrice {
