@@ -1032,5 +1032,3 @@ const ServiceDetailsStep: React.FC<{
             </div>
           ) : (
             <p className="text-center py-8
-
-</initial_code>
