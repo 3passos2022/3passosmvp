@@ -69,6 +69,7 @@ interface AddressFormData {
 }
 
 interface FormData {
+  fullName?: string;
   street?: string;
   number?: string;
   complement?: string;
@@ -298,11 +299,17 @@ const ServiceStep: React.FC<{
       return;
     }
     
+    if (!formData.fullName || formData.fullName.trim() === '') {
+      toast.error('Por favor, informe seu nome completo');
+      return;
+    }
+    
     const serviceName = services.find(s => s.id === selectedService)?.name;
     const subServiceName = selectedSubService ? subServices.find(s => s.id === selectedSubService)?.name : undefined;
     const specialtyName = selectedSpecialty ? specialties.find(s => s.id === selectedSpecialty)?.name : undefined;
     
     console.log('Seleções do usuário:',  {
+      fullName: formData.fullName,
       serviceId: selectedService,
       serviceName, 
       subServiceId: selectedSubService, 
@@ -330,6 +337,17 @@ const ServiceStep: React.FC<{
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="fullName">Nome completo</Label>
+          <Input
+            id="fullName"
+            placeholder="Digite seu nome completo"
+            value={formData.fullName || ''}
+            onChange={(e) => updateFormData({ fullName: e.target.value })}
+            required
+          />
+        </div>
+        
         <div className="space-y-2">
           <Label htmlFor="service">Selecione o serviço</Label>
           <Select 
@@ -405,7 +423,7 @@ const ServiceStep: React.FC<{
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button type="submit" disabled={!selectedService}>
+        <Button type="submit" disabled={!selectedService || !formData.fullName?.trim()}>
           Próximo <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -1018,6 +1036,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
   const canSubmit = () => {
     return !!(
       formData.serviceId &&
+      formData.fullName &&
       formData.street &&
       formData.number &&
       formData.neighborhood &&
@@ -1040,6 +1059,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
     try {
       console.log("Enviando dados de cotação via RPC...");
       console.log("Dados que serão enviados:", {
+        fullName: formData.fullName,
         service_id: formData.serviceId,
         sub_service_id: formData.subServiceId || null,
         specialty_id: formData.specialtyId || null,
@@ -1059,6 +1079,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
       const { data: quoteId, error } = await supabase.rpc(
         "submit_quote",
         {
+          p_full_name: formData.fullName || '',
           p_service_id: formData.serviceId,
           p_sub_service_id: formData.subServiceId || null,
           p_specialty_id: formData.specialtyId || null,
@@ -1266,6 +1287,15 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
           <div className="py-4">
             <ScrollArea className="max-h-[60vh] pr-4">
               <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-lg mb-2">Informações pessoais</h3>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="font-medium">{formData.fullName}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <div>
                   <h3 className="font-medium text-lg mb-2">Serviço Selecionado</h3>
                   <Card>
