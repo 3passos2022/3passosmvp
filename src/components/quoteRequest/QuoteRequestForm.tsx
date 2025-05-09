@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -1031,4 +1032,339 @@ const ServiceDetailsStep: React.FC<{
               ))}
             </div>
           ) : (
-            <p className="text-center py-8
+            <p className="text-center py-8">Adicione uma medida clicando no botão acima.</p>
+          )}
+          
+          <div className="flex justify-between pt-6 border-t mt-6">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={prevDetailsSubStep}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-between pt-4 border-t">
+        {(detailsSubStep !== 'quiz' || requiredSteps.indexOf('quiz') === requiredSteps.length - 1) && (
+          <Button 
+            type="submit" 
+            className="ml-auto"
+            disabled={detailsSubStep === 'quiz' && !allQuestionsAnswered}
+          >
+            Próximo <ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+};
+
+const ReviewStep: React.FC<{
+  onSubmit: () => void;
+  onBack: () => void;
+  formData: FormData;
+}> = ({ onSubmit, onBack, formData }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const quoteData = {
+        client_id: user?.id,
+        service_id: formData.serviceId,
+        sub_service_id: formData.subServiceId,
+        specialty_id: formData.specialtyId,
+        full_name: formData.fullName,
+        description: formData.description,
+        street: formData.street,
+        number: formData.number,
+        complement: formData.complement,
+        neighborhood: formData.neighborhood,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zipCode,
+        is_anonymous: !user
+      };
+      
+      // Insert the quote
+      const { data: quoteResult, error: quoteError } = await supabase
+        .from('quotes')
+        .insert(quoteData)
+        .select('id')
+        .single();
+      
+      if (quoteError) {
+        console.error('Error creating quote:', quoteError);
+        toast.error('Erro ao criar orçamento');
+        return;
+      }
+      
+      const quoteId = quoteResult.id;
+      
+      // Insert answers if any
+      if (formData.answers && Object.keys(formData.answers).length > 0) {
+        const answersData = Object.entries(formData.answers).map(([questionId, optionId]) => ({
+          quote_id: quoteId,
+          question_id: questionId,
+          option_id: optionId
+        }));
+        
+        const { error: answersError } = await supabase
+          .from('quote_answers')
+          .insert(answersData);
+        
+        if (answersError) {
+          console.error('Error creating quote answers:', answersError);
+        }
+      }
+      
+      // Insert items if any
+      if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
+        const itemsData = Object.entries(formData.itemQuantities)
+          .filter(([_, quantity]) => quantity > 0)
+          .map(([itemId, quantity]) => ({
+            quote_id: quoteId,
+            item_id: itemId,
+            quantity
+          }));
+        
+        if (itemsData.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('quote_items')
+            .insert(itemsData);
+          
+          if (itemsError) {
+            console.error('Error creating quote items:', itemsError);
+          }
+        }
+      }
+      
+      // Insert measurements if any
+      if (formData.measurements && formData.measurements.length > 0) {
+        const measurementsData = formData.measurements.map(m => ({
+          quote_id: quoteId,
+          room_name: m.roomName || null,
+          width: m.width,
+          length: m.length,
+          height: m.height || null,
+          area: m.width * m.length
+        }));
+        
+        const { error: measurementsError } = await supabase
+          .from('quote_measurements')
+          .insert(measurementsData);
+        
+        if (measurementsError) {
+          console.error('Error creating quote measurements:', measurementsError);
+        }
+      }
+      
+      toast.success('Orçamento solicitado com sucesso!');
+      
+      // Redirect based on user login status
+      if (user) {
+        navigate('/profile/quotes');
+      } else {
+        navigate('/prestadoresencontrados');
+      }
+      
+      onSubmit();
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast.error('Erro ao enviar orçamento');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-medium">Revise os dados do seu orçamento</h3>
+      
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados do Serviço</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Nome</p>
+                <p className="font-medium">{formData.fullName}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Serviço</p>
+                <p className="font-medium">{formData.serviceName}</p>
+              </div>
+              
+              {formData.subServiceName && (
+                <div>
+                  <p className="text-sm text-gray-500">Tipo de Serviço</p>
+                  <p className="font-medium">{formData.subServiceName}</p>
+                </div>
+              )}
+              
+              {formData.specialtyName && (
+                <div>
+                  <p className="text-sm text-gray-500">Especialidade</p>
+                  <p className="font-medium">{formData.specialtyName}</p>
+                </div>
+              )}
+              
+              <div>
+                <p className="text-sm text-gray-500">Data</p>
+                <p className="font-medium">
+                  {formData.serviceDate ? format(formData.serviceDate, "dd/MM/yyyy") : '-'}
+                  {formData.serviceEndDate && formData.serviceEndDate !== formData.serviceDate && 
+                   ` até ${format(formData.serviceEndDate, "dd/MM/yyyy")}`}
+                </p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Horário preferencial</p>
+                <p className="font-medium">
+                  {formData.serviceTimePreference === 'morning' ? 'Manhã' :
+                   formData.serviceTimePreference === 'afternoon' ? 'Tarde' :
+                   formData.serviceTimePreference === 'evening' ? 'Noite' :
+                   formData.serviceTimePreference === 'business' ? 'Horário comercial' : '-'}
+                </p>
+              </div>
+            </div>
+            
+            {formData.description && (
+              <div className="pt-2">
+                <p className="text-sm text-gray-500 mb-1">Descrição</p>
+                <p className="text-sm border rounded-md p-3 bg-gray-50">{formData.description}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Endereço</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              {formData.street}, {formData.number}
+              {formData.complement && ` - ${formData.complement}`}
+            </p>
+            <p>{formData.neighborhood}</p>
+            <p>{formData.city} - {formData.state}</p>
+            <p>CEP: {formData.zipCode}</p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="pt-4 flex justify-between">
+        <Button type="button" variant="outline" onClick={onBack}>
+          <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+        </Button>
+        <Button 
+          onClick={handleSubmit} 
+          disabled={isSubmitting}
+          className="relative"
+        >
+          {isSubmitting && (
+            <Loader2 className="animate-spin h-4 w-4 absolute" />
+          )}
+          <span className={isSubmitting ? "opacity-0" : ""}>
+            Solicitar Orçamento
+          </span>
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<FormData>({});
+  
+  const updateFormData = (data: Partial<FormData>) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+  
+  const nextStep = () => {
+    setCurrentStep(prev => prev + 1);
+    window.scrollTo(0, 0);
+  };
+  
+  const prevStep = () => {
+    setCurrentStep(prev => prev - 1);
+    window.scrollTo(0, 0);
+  };
+  
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <ServiceStep 
+            onNext={nextStep}
+            formData={formData}
+            updateFormData={updateFormData}
+            services={services}
+          />
+        );
+      case 1:
+        return (
+          <ServiceDetailsStep 
+            onNext={nextStep}
+            onBack={prevStep}
+            formData={formData}
+            updateFormData={updateFormData}
+          />
+        );
+      case 2:
+        return (
+          <AddressStep 
+            onNext={nextStep}
+            onBack={prevStep}
+            formData={formData}
+            updateFormData={updateFormData}
+          />
+        );
+      case 3:
+        return (
+          <ReviewStep 
+            onSubmit={nextStep}
+            onBack={prevStep}
+            formData={formData}
+          />
+        );
+      default:
+        return <div>Finalizado</div>;
+    }
+  };
+  
+  return (
+    <div>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-muted-foreground">
+            Passo {currentStep + 1} de 4
+          </span>
+          <span className="text-sm font-medium">
+            {currentStep === 0 ? 'Dados do Serviço' : 
+             currentStep === 1 ? 'Detalhes do Serviço' :
+             currentStep === 2 ? 'Endereço' : 'Revisão'}
+          </span>
+        </div>
+        <Progress 
+          value={((currentStep + 1) / 4) * 100} 
+          className="h-2"
+        />
+      </div>
+      
+      {renderStep()}
+    </div>
+  );
+};
+
+export default QuoteRequestForm;
