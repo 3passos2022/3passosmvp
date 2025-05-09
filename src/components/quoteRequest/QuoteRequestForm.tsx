@@ -640,8 +640,9 @@ const ServiceDetailsStep: React.FC<{
           neededSteps.push('quiz');
         }
         
-        // Se temos itens regulares (quantidade) OU itens por metro quadrado ou linear, adicionamos a etapa de itens
-        if (allItems.length > 0) {
+        // Se temos itens regulares (quantidade)
+        const hasRegularItems = allItems.some(item => item.type !== 'square_meter' && item.type !== 'linear_meter');
+        if (hasRegularItems) {
           neededSteps.push('items');
         }
         
@@ -935,32 +936,9 @@ const ServiceDetailsStep: React.FC<{
           <h3 className="text-lg font-medium mb-4">Informe as quantidades necessárias</h3>
           
           <div className="space-y-4">
-            {items.map((item) => {
-              // Verifica se o item é do tipo metro quadrado ou linear
-              const isAreaOrLinearType = item.type === 'square_meter' || item.type === 'linear_meter';
-              
-              // Se for um item por área ou linear, mostramos uma mensagem em vez do campo de quantidade
-              if (isAreaOrLinearType) {
-                return (
-                  <div key={item.id} className="flex items-center justify-between border p-4 rounded-md bg-gray-50">
-                    <div className="flex-1">
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {item.type === 'square_meter' ? 'Metro Quadrado' : 'Metro Linear'}
-                      </p>
-                      <p className="text-xs text-primary mt-1">
-                        Quantidade calculada automaticamente com base nas medidas informadas
-                      </p>
-                    </div>
-                    <div className="w-24 text-right">
-                      <p className="font-semibold">Automático</p>
-                    </div>
-                  </div>
-                );
-              }
-              
-              // Para itens regulares, mostramos o campo de quantidade como antes
-              return (
+            {items
+              .filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter')
+              .map((item) => (
                 <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
                   <div>
                     <p className="font-medium">{item.name}</p>
@@ -976,9 +954,13 @@ const ServiceDetailsStep: React.FC<{
                     />
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
+          
+          {/* Show message if there are no regular items */}
+          {items.filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter').length === 0 && (
+            <p className="text-center py-4">Não há itens que precisam de quantidade manual neste serviço.</p>
+          )}
           
           <div className="flex justify-between pt-6 border-t mt-6">
             <Button 

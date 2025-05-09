@@ -79,6 +79,9 @@ export interface QuoteDetails {
   _itemNames?: Record<string, string>;
 }
 
+// Re-export QuoteMeasurement from lib/types to fix the import issue
+export type { QuoteMeasurement };
+
 export interface ProviderServiceItemPrice {
   id: string;
   name: string;
