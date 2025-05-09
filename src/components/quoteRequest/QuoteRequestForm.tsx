@@ -1081,6 +1081,10 @@ const ReviewStep: React.FC<{
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      console.log("Submitting quote with user:", user?.id);
+      console.log("Is anonymous:", !user);
+      
+      // Prepare the quote data
       const quoteData = {
         client_id: user?.id,
         service_id: formData.serviceId,
@@ -1098,7 +1102,47 @@ const ReviewStep: React.FC<{
         is_anonymous: !user
       };
       
-      // Insert the quote
+      console.log("Quote data:", quoteData);
+      
+      // Try to use RPC function if available
+      try {
+        const { data: quoteResult, error: quoteError } = await supabase
+          .rpc('submit_quote', {
+            p_full_name: formData.fullName,
+            p_service_id: formData.serviceId,
+            p_sub_service_id: formData.subServiceId,
+            p_specialty_id: formData.specialtyId,
+            p_description: formData.description,
+            p_street: formData.street,
+            p_number: formData.number,
+            p_complement: formData.complement,
+            p_neighborhood: formData.neighborhood,
+            p_city: formData.city,
+            p_state: formData.state,
+            p_zip_code: formData.zipCode,
+            p_is_anonymous: !user
+          });
+        
+        if (quoteError) {
+          console.error('Error using RPC function:', quoteError);
+          throw quoteError;
+        }
+        
+        console.log("Quote created via RPC:", quoteResult);
+        const quoteId = quoteResult;
+        
+        // Insert answers if any
+        await handleAdditionalData(quoteId);
+        
+        toast.success('Orçamento solicitado com sucesso!');
+        handleRedirect();
+        onSubmit();
+        return;
+      } catch (rpcError) {
+        console.log("RPC function not available or failed, trying direct insert");
+      }
+      
+      // Fallback to direct insert if RPC fails
       const { data: quoteResult, error: quoteError } = await supabase
         .from('quotes')
         .insert(quoteData)
@@ -1107,20 +1151,38 @@ const ReviewStep: React.FC<{
       
       if (quoteError) {
         console.error('Error creating quote:', quoteError);
-        toast.error('Erro ao criar orçamento');
+        toast.error(`Erro ao criar orçamento: ${quoteError.message}`);
         return;
       }
       
       const quoteId = quoteResult.id;
+      console.log("Quote created via direct insert:", quoteId);
       
-      // Insert answers if any
-      if (formData.answers && Object.keys(formData.answers).length > 0) {
-        const answersData = Object.entries(formData.answers).map(([questionId, optionId]) => ({
-          quote_id: quoteId,
-          question_id: questionId,
-          option_id: optionId
-        }));
-        
+      // Insert additional data
+      await handleAdditionalData(quoteId);
+      
+      toast.success('Orçamento solicitado com sucesso!');
+      handleRedirect();
+      onSubmit();
+      
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast.error('Erro ao enviar orçamento');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleAdditionalData = async (quoteId) => {
+    // Insert answers if any
+    if (formData.answers && Object.keys(formData.answers).length > 0) {
+      const answersData = Object.entries(formData.answers).map(([questionId, optionId]) => ({
+        quote_id: quoteId,
+        question_id: questionId,
+        option_id: optionId
+      }));
+      
+      try {
         const { error: answersError } = await supabase
           .from('quote_answers')
           .insert(answersData);
@@ -1128,19 +1190,23 @@ const ReviewStep: React.FC<{
         if (answersError) {
           console.error('Error creating quote answers:', answersError);
         }
+      } catch (error) {
+        console.error('Exception creating answers:', error);
       }
+    }
+    
+    // Insert items if any
+    if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
+      const itemsData = Object.entries(formData.itemQuantities)
+        .filter(([_, quantity]) => quantity > 0)
+        .map(([itemId, quantity]) => ({
+          quote_id: quoteId,
+          item_id: itemId,
+          quantity
+        }));
       
-      // Insert items if any
-      if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
-        const itemsData = Object.entries(formData.itemQuantities)
-          .filter(([_, quantity]) => quantity > 0)
-          .map(([itemId, quantity]) => ({
-            quote_id: quoteId,
-            item_id: itemId,
-            quantity
-          }));
-        
-        if (itemsData.length > 0) {
+      if (itemsData.length > 0) {
+        try {
           const { error: itemsError } = await supabase
             .from('quote_items')
             .insert(itemsData);
@@ -1148,20 +1214,24 @@ const ReviewStep: React.FC<{
           if (itemsError) {
             console.error('Error creating quote items:', itemsError);
           }
+        } catch (error) {
+          console.error('Exception creating items:', error);
         }
       }
+    }
+    
+    // Insert measurements if any
+    if (formData.measurements && formData.measurements.length > 0) {
+      const measurementsData = formData.measurements.map(m => ({
+        quote_id: quoteId,
+        room_name: m.roomName || null,
+        width: m.width,
+        length: m.length,
+        height: m.height || null,
+        area: m.width * m.length
+      }));
       
-      // Insert measurements if any
-      if (formData.measurements && formData.measurements.length > 0) {
-        const measurementsData = formData.measurements.map(m => ({
-          quote_id: quoteId,
-          room_name: m.roomName || null,
-          width: m.width,
-          length: m.length,
-          height: m.height || null,
-          area: m.width * m.length
-        }));
-        
+      try {
         const { error: measurementsError } = await supabase
           .from('quote_measurements')
           .insert(measurementsData);
@@ -1169,23 +1239,18 @@ const ReviewStep: React.FC<{
         if (measurementsError) {
           console.error('Error creating quote measurements:', measurementsError);
         }
+      } catch (error) {
+        console.error('Exception creating measurements:', error);
       }
-      
-      toast.success('Orçamento solicitado com sucesso!');
-      
-      // Redirect based on user login status
-      if (user) {
-        navigate('/profile/quotes');
-      } else {
-        navigate('/prestadoresencontrados');
-      }
-      
-      onSubmit();
-    } catch (error) {
-      console.error('Error submitting quote:', error);
-      toast.error('Erro ao enviar orçamento');
-    } finally {
-      setIsSubmitting(false);
+    }
+  };
+  
+  const handleRedirect = () => {
+    // Redirect based on user login status
+    if (user) {
+      navigate('/profile/quotes');
+    } else {
+      navigate('/prestadoresencontrados');
     }
   };
   
