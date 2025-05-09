@@ -1104,6 +1104,37 @@ const ReviewStep: React.FC<{
       
       console.log("Quote data:", quoteData);
       
+      // Store detailed quote information for provider matching
+      const quoteDetails: QuoteDetails = {
+        serviceId: formData.serviceId!,
+        subServiceId: formData.subServiceId,
+        specialtyId: formData.specialtyId,
+        serviceName: formData.serviceName!,
+        subServiceName: formData.subServiceName,
+        specialtyName: formData.specialtyName,
+        items: formData.itemQuantities,
+        measurements: formData.measurements?.map(m => ({
+          ...m,
+          area: m.width * m.length
+        })),
+        address: {
+          street: formData.street!,
+          number: formData.number!,
+          complement: formData.complement,
+          neighborhood: formData.neighborhood!,
+          city: formData.city!,
+          state: formData.state!,
+          zipCode: formData.zipCode!,
+        },
+        description: formData.description,
+        clientId: user?.id
+      };
+      
+      // Store the complete quote details in session storage
+      import('@/lib/utils/quoteStorage').then(module => {
+        module.storeQuoteData(quoteDetails);
+      });
+      
       // Try to use RPC function if available
       try {
         const { data: quoteResult, error: quoteError } = await supabase
@@ -1140,6 +1171,7 @@ const ReviewStep: React.FC<{
         return;
       } catch (rpcError) {
         console.log("RPC function not available or failed, trying direct insert");
+        console.error(rpcError);
       }
       
       // Fallback to direct insert if RPC fails

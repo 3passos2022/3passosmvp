@@ -24,6 +24,14 @@ const RequestQuote: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     console.log("RequestQuote: Component mounted");
+    
+    // Clear any incomplete quote from previous sessions
+    const currentRoute = window.location.pathname;
+    if (currentRoute === '/request-quote') {
+      // Only clear if we're starting a new quote
+      console.log("RequestQuote: Clearing any previous incomplete quote data");
+      sessionStorage.removeItem('currentQuote');
+    }
   }, []);
 
   // Display a welcome toast for non-logged in users
