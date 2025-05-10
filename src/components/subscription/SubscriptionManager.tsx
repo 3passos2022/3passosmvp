@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Loader2, ExternalLink, RefreshCw, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SubscriptionManagerProps {
@@ -27,6 +26,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Verificar se há plano selecionado no navegador
@@ -184,6 +184,16 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     }
   };
 
+  const handleSubscribeAction = () => {
+    if (!selectedPlan) {
+      // If no plan is selected, navigate to subscription page
+      navigate('/subscription');
+    } else {
+      // Otherwise proceed with normal subscription flow
+      handleSubscribe();
+    }
+  };
+
   return (
     <Card className="z-10 relative" id="subscription-manager">
       <CardHeader>
@@ -291,16 +301,18 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
           </Button>
         ) : (
           <Button 
-            onClick={handleSubscribe}
+            onClick={handleSubscribeAction}
             className="w-full"
-            disabled={loading || !selectedPlan || (selectedPlan && selectedPlan.tier === 'free')}
+            disabled={loading || (selectedPlan && selectedPlan.tier === 'free')}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Carregando...
               </>
-            ) : selectedPlan && selectedPlan.tier === 'free' ? (
+            ) : !selectedPlan ? (
+              "Ver Planos"
+            ) : selectedPlan.tier === 'free' ? (
               "Plano gratuito já disponível"
             ) : (
               "Assinar Agora"

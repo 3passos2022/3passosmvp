@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +13,7 @@ import RequestedQuotes from '@/components/profile/RequestedQuotes';
 import { toast } from 'sonner';
 import UserProfile from '@/components/profile/UserProfile';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
+import PlansComparison from '@/components/subscription/PlansComparison';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 import { SubscriptionData } from '@/lib/types/subscriptions';
@@ -230,6 +230,14 @@ const Profile: React.FC = () => {
                     onPlanSelect={setSelectedPlan}
                     availablePlans={availablePlans}
                   />
+                  <div className="mt-8">
+                    <PlansComparison 
+                      showTitle={false}
+                      onSelectPlan={setSelectedPlan}
+                      onPlansLoaded={handlePlansLoaded}
+                      selectedPlanId={selectedPlan?.id}
+                    />
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>
