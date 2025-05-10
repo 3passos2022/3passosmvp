@@ -16,11 +16,14 @@ import UserProfile from '@/components/profile/UserProfile';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
+import { SubscriptionData } from '@/lib/types/subscriptions';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionData[]>([]);
 
   // Effect to attempt profile refresh if session exists but no user
   useEffect(() => {
@@ -62,6 +65,19 @@ const Profile: React.FC = () => {
       setActiveTab('profile');
     }
   }, []);
+
+  // Handle plans loaded from subscription component
+  const handlePlansLoaded = (plans: SubscriptionData[]) => {
+    setAvailablePlans(plans);
+    
+    if (!selectedPlan && plans.length > 0) {
+      // Try to find the basic plan first
+      const basicPlan = plans.find(plan => plan.tier === 'basic');
+      // If not found, use the first plan or the second plan if available (first paid plan)
+      const defaultPlan = basicPlan || (plans.length > 1 ? plans[1] : plans[0]);
+      setSelectedPlan(defaultPlan);
+    }
+  };
 
   if (loading || !user || !session) {
     return (
@@ -209,7 +225,11 @@ const Profile: React.FC = () => {
                 )}
                 
                 <TabsContent value="subscription">
-                  <SubscriptionManager />
+                  <SubscriptionManager 
+                    selectedPlan={selectedPlan}
+                    onPlanSelect={setSelectedPlan}
+                    availablePlans={availablePlans}
+                  />
                 </TabsContent>
               </Tabs>
             </div>
