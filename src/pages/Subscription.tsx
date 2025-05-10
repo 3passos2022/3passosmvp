@@ -14,7 +14,7 @@ import { SubscriptionData } from '@/lib/types/subscriptions';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 
 const Subscription: React.FC = () => {
-  const { user, loading, refreshSubscription } = useAuth();
+  const { user, loading: authLoading, refreshSubscription } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -75,7 +75,7 @@ const Subscription: React.FC = () => {
           >
             <h1 className="text-2xl font-bold mb-6">Assinatura</h1>
             
-            {loading ? (
+            {authLoading ? (
               <div className="w-full py-20 flex justify-center">
                 <div className="flex flex-col items-center">
                   <LoadingSpinner />

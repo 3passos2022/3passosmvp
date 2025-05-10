@@ -217,7 +217,7 @@ const SubscriptionManager: React.FC = () => {
           <Button 
             onClick={() => handleSubscribe()}
             className="w-full"
-            disabled={loading || subscriptionLoading || !selectedPlan?.priceId}
+            disabled={loading || (subscriptionLoading && !selectedPlan)}
           >
             {loading ? (
               <>
