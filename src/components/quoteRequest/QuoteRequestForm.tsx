@@ -1112,7 +1112,7 @@ const ReviewStep: React.FC<{
       
       // Prepare the quote data
       const quoteData = {
-        client_id: user?.id,
+        client_id: user?.id || null,
         service_id: formData.serviceId,
         sub_service_id: formData.subServiceId,
         specialty_id: formData.specialtyId,
@@ -1125,7 +1125,11 @@ const ReviewStep: React.FC<{
         city: formData.city,
         state: formData.state,
         zip_code: formData.zipCode,
-        is_anonymous: !user
+        service_date: formData.serviceDate,
+        service_end_date: formData.serviceEndDate,
+        service_time_preference: formData.serviceTimePreference,
+        is_anonymous: !user,
+        status: 'pending'
       };
       
       console.log("Quote data:", quoteData);
@@ -1153,7 +1157,10 @@ const ReviewStep: React.FC<{
           zipCode: formData.zipCode!,
         },
         description: formData.description,
-        clientId: user?.id
+        clientId: user?.id,
+        serviceDate: formData.serviceDate,
+        serviceEndDate: formData.serviceEndDate,
+        serviceTimePreference: formData.serviceTimePreference
       };
       
       // Store the complete quote details in session storage
@@ -1164,7 +1171,7 @@ const ReviewStep: React.FC<{
         return;
       }
       
-      // Try to use RPC function if available
+      // Try to use submit_quote RPC function if available
       try {
         const { data: quoteResult, error: quoteError } = await supabase
           .rpc('submit_quote', {
@@ -1180,7 +1187,10 @@ const ReviewStep: React.FC<{
             p_city: formData.city,
             p_state: formData.state,
             p_zip_code: formData.zipCode,
-            p_is_anonymous: !user
+            p_is_anonymous: !user,
+            p_service_date: formData.serviceDate,
+            p_service_end_date: formData.serviceEndDate,
+            p_service_time_preference: formData.serviceTimePreference
           });
         
         if (quoteError) {
