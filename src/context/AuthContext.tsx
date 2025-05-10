@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -51,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<Error | null>(null);
 
   // Function to check user role
   const checkUserRole = (role: UserRole | string) => {
@@ -283,31 +283,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await ProfileService.makeAdmin(user.id, userId);
   }
 
-  // Gerenciamento de assinatura
+  // Gerenciamento de assinatura com timeout
   async function checkSubscription() {
     if (!session) return;
 
     try {
       setSubscriptionLoading(true);
+      setSubscriptionError(null);
       
-      const { data, error } = await supabase.functions.invoke('check-subscription');
+      // Criar uma promessa que rejeita após o timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Tempo limite excedido ao verificar assinatura")), 10000);
+      });
       
-      if (error) {
-        setSubscription({
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
-        });
-        return;
+      // Corrida entre a chamada à API e o timeout
+      const result = await Promise.race([
+        supabase.functions.invoke('check-subscription'),
+        timeoutPromise
+      ]);
+      
+      if ('error' in result && result.error) {
+        console.error("Erro na resposta da função edge:", result.error);
+        throw new Error(result.error);
       }
       
-      if (data) {
+      if ('data' in result && result.data) {
         setSubscription({
-          subscribed: data.subscribed,
-          subscription_tier: (data.subscription_tier || 'free') as 'free' | 'basic' | 'premium',
-          subscription_end: data.subscription_end
+          subscribed: result.data.subscribed,
+          subscription_tier: (result.data.subscription_tier || 'free') as 'free' | 'basic' | 'premium',
+          subscription_end: result.data.subscription_end
         });
       } else {
+        console.warn("Resposta da verificação de assinatura sem dados");
         setSubscription({
           subscribed: false,
           subscription_tier: 'free',
@@ -315,11 +322,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     } catch (error) {
+      console.error("Erro ao verificar assinatura:", error);
+      setSubscriptionError(error as Error);
+      
+      // Definir um estado básico em caso de erro
       setSubscription({
         subscribed: false,
         subscription_tier: 'free',
         subscription_end: null
       });
+      
+      // Não mostrar toast aqui para evitar spam de erros
     } finally {
       setSubscriptionLoading(false);
     }
@@ -329,7 +342,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) {
       return;
     }
-    await checkSubscription();
+    
+    try {
+      await checkSubscription();
+    } catch (error) {
+      console.error("Erro ao atualizar assinatura:", error);
+      throw error; // Propagar o erro para permitir tratamento específico
+    }
   }
 
   // Context value

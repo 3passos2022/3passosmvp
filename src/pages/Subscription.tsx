@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -16,17 +16,42 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 const Subscription: React.FC = () => {
   const { user, loading: authLoading, refreshSubscription } = useAuth();
   const navigate = useNavigate();
+  const [initAttempted, setInitAttempted] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    // Atualizar informações de assinatura quando a página carregar
-    if (user) {
-      refreshSubscription().catch(err => {
-        console.error("Erro ao verificar assinatura:", err);
-      });
+  }, []);
+  
+  // Separar a inicialização da assinatura em um useEffect isolado
+  useEffect(() => {
+    if (user && !initAttempted) {
+      setInitAttempted(true);
+      const timeout = setTimeout(() => {
+        // Timeout de segurança para garantir que a página não fique presa carregando
+        setInitializing(false);
+      }, 5000);
+      
+      const checkSubscription = async () => {
+        try {
+          await refreshSubscription();
+        } catch (error) {
+          console.error("Erro ao verificar assinatura:", error);
+          toast.error("Não foi possível verificar o status da sua assinatura");
+        } finally {
+          clearTimeout(timeout);
+          setInitializing(false);
+        }
+      };
+      
+      checkSubscription();
+      
+      return () => clearTimeout(timeout);
+    } else if (!user && !authLoading) {
+      // Se não há usuário e não está carregando a autenticação
+      setInitializing(false);
     }
-  }, [user, refreshSubscription]);
+  }, [user, authLoading, initAttempted, refreshSubscription]);
   
   const handleSelectPlan = async (plan: SubscriptionData) => {
     if (!user) {
@@ -40,6 +65,7 @@ const Subscription: React.FC = () => {
     }
     
     try {
+      console.log("Iniciando checkout para o plano:", plan);
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
           tier: plan.tier,
@@ -61,6 +87,9 @@ const Subscription: React.FC = () => {
     }
   };
 
+  // Determinar se devemos mostrar o spinner de carregamento
+  const showLoading = authLoading || (initAttempted && initializing);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -75,7 +104,7 @@ const Subscription: React.FC = () => {
           >
             <h1 className="text-2xl font-bold mb-6">Assinatura</h1>
             
-            {authLoading ? (
+            {showLoading ? (
               <div className="w-full py-20 flex justify-center">
                 <div className="flex flex-col items-center">
                   <LoadingSpinner />

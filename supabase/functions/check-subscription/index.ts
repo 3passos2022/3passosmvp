@@ -15,29 +15,58 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    logStep("OPTIONS request recebida");
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204
+    });
   }
+  
+  // Log request details
+  const url = new URL(req.url);
+  logStep(`Requisição recebida: ${req.method} ${url.pathname}`);
+  logStep("Request headers", Object.fromEntries(req.headers));
 
   try {
     logStep("Função iniciada");
 
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      logStep("Erro: STRIPE_SECRET_KEY não configurada");
+      throw new Error("STRIPE_SECRET_KEY não configurada no ambiente");
+    }
+    logStep("STRIPE_SECRET_KEY verificada");
+
     // Inicializa o cliente Supabase com a chave de serviço para operações administrativas
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      logStep("Erro: Variáveis de ambiente do Supabase não configuradas");
+      throw new Error("Variáveis de ambiente do Supabase não configuradas");
+    }
+    
     const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      supabaseUrl,
+      supabaseServiceKey,
       { auth: { persistSession: false } }
     );
 
     // Verifica a autenticação
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      logStep("Erro: Header de autorização ausente");
       throw new Error("Usuário não autenticado");
     }
 
     const token = authHeader.replace("Bearer ", "");
+    logStep("Token extraído do header");
+    
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError || !userData.user) {
+      logStep("Erro de autenticação", { error: userError?.message });
       throw new Error("Falha na autenticação: " + (userError?.message || "Usuário não encontrado"));
     }
 
@@ -45,11 +74,12 @@ serve(async (req) => {
     logStep("Usuário autenticado", { id: user.id, email: user.email });
 
     // Inicializa o Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
     });
 
     // Verifica se o cliente já existe no Stripe
+    logStep("Buscando cliente no Stripe para o e-mail", { email: user.email });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     
     if (customers.data.length === 0) {
@@ -66,6 +96,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }, { onConflict: "email" });
       
+      logStep("Resposta enviada - usuário sem cliente Stripe");
       return new Response(
         JSON.stringify({ 
           subscribed: false,
@@ -83,6 +114,7 @@ serve(async (req) => {
     logStep("Cliente Stripe encontrado", { customerId });
 
     // Busca assinaturas ativas
+    logStep("Buscando assinaturas ativas para o cliente", { customerId });
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "active",
@@ -117,6 +149,7 @@ serve(async (req) => {
     }
 
     // Atualiza o registro no banco de dados
+    logStep("Atualizando registro na tabela subscribers");
     await supabaseClient.from("subscribers").upsert({
       email: user.email,
       user_id: user.id,
@@ -129,12 +162,16 @@ serve(async (req) => {
 
     logStep("Banco de dados atualizado com informações de assinatura", { subscribed: hasActiveSub, subscriptionTier });
     
+    // Construir resposta
+    const responseData = {
+      subscribed: hasActiveSub,
+      subscription_tier: hasActiveSub ? subscriptionTier : "free",
+      subscription_end: subscriptionEnd
+    };
+    
+    logStep("Resposta enviada com sucesso", responseData);
     return new Response(
-      JSON.stringify({
-        subscribed: hasActiveSub,
-        subscription_tier: hasActiveSub ? subscriptionTier : "free",
-        subscription_end: subscriptionEnd
-      }),
+      JSON.stringify(responseData),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

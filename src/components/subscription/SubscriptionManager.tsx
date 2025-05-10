@@ -15,6 +15,7 @@ const SubscriptionManager: React.FC = () => {
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -40,9 +41,10 @@ const SubscriptionManager: React.FC = () => {
     const checkUserSubscription = async () => {
       if (user) {
         try {
-          await refreshSubscription();
+          await refreshSubscriptionWithTimeout();
         } catch (error) {
           console.error("Erro ao verificar assinatura:", error);
+          toast.error("Não foi possível verificar o status da sua assinatura");
         }
       }
     };
@@ -53,7 +55,7 @@ const SubscriptionManager: React.FC = () => {
     const interval = setInterval(async () => {
       if (user) {
         try {
-          await refreshSubscription();
+          await refreshSubscriptionWithTimeout();
         } catch (error) {
           console.error("Erro ao verificar assinatura no intervalo:", error);
         }
@@ -61,10 +63,25 @@ const SubscriptionManager: React.FC = () => {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [user, refreshSubscription, location]);
+  }, [user, location]);
+
+  // Função para atualizar assinatura com timeout
+  const refreshSubscriptionWithTimeout = async () => {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Tempo limite excedido ao verificar assinatura")), 10000);
+    });
+
+    try {
+      await Promise.race([refreshSubscription(), timeoutPromise]);
+    } catch (error) {
+      console.error("Erro ao verificar assinatura (timeout):", error);
+      // Não mostrar toast aqui para evitar múltiplos toasts
+    }
+  };
 
   const handleSubscribe = async (plan?: SubscriptionData) => {
     const planToUse = plan || selectedPlan;
+    setCheckoutError(null);
     
     if (!user) {
       toast.error("Você precisa estar logado para assinar");
@@ -78,6 +95,7 @@ const SubscriptionManager: React.FC = () => {
     
     setLoading(true);
     try {
+      console.log("Iniciando checkout para o plano:", planToUse);
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           tier: planToUse.tier,
@@ -97,7 +115,9 @@ const SubscriptionManager: React.FC = () => {
       }
     } catch (error) {
       console.error("Erro ao iniciar checkout:", error);
-      toast.error("Erro ao iniciar checkout: " + (error as Error).message);
+      const errorMsg = (error as Error).message || "Tente novamente mais tarde";
+      setCheckoutError(errorMsg);
+      toast.error("Erro ao processar pagamento: " + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -132,7 +152,7 @@ const SubscriptionManager: React.FC = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshSubscription();
+      await refreshSubscriptionWithTimeout();
       toast.success("Informações de assinatura atualizadas");
     } catch (error) {
       console.error("Erro ao atualizar dados da assinatura:", error);
@@ -192,6 +212,13 @@ const SubscriptionManager: React.FC = () => {
               'Assine agora para acessar recursos premium e impulsionar seu negócio.'}
           </p>
         )}
+        
+        {checkoutError && (
+          <div className="mt-4 p-2 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
+            <p>Erro: {checkoutError}</p>
+            <p className="mt-1">Por favor, tente novamente mais tarde ou entre em contato com o suporte.</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         {subscription?.subscribed ? (
@@ -217,7 +244,7 @@ const SubscriptionManager: React.FC = () => {
           <Button 
             onClick={() => handleSubscribe()}
             className="w-full"
-            disabled={loading || (subscriptionLoading && !selectedPlan)}
+            disabled={loading} // Removida a condição que bloqueava o botão durante subscriptionLoading
           >
             {loading ? (
               <>
