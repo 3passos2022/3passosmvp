@@ -77,6 +77,10 @@ export interface QuoteDetails {
   _storedAt?: string;
   _itemTypes?: Record<string, string>;
   _itemNames?: Record<string, string>;
+  // Added service date fields
+  serviceDate?: Date;
+  serviceEndDate?: Date; 
+  serviceTimePreference?: string;
 }
 
 // Re-export QuoteMeasurement from lib/types to fix the import issue
@@ -108,6 +112,9 @@ export interface QuoteWithProviders {
   city: string;
   neighborhood: string;
   created_at: string;
+  service_date?: string;
+  service_end_date?: string;
+  service_time_preference?: string;
   serviceName: string;
   subServiceName: string;
   specialtyName: string;

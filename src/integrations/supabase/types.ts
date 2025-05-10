@@ -479,7 +479,10 @@ export type Database = {
           longitude: number | null
           neighborhood: string
           number: string
+          service_date: string | null
+          service_end_date: string | null
           service_id: string
+          service_time_preference: string | null
           specialty_id: string
           state: string
           status: string
@@ -500,7 +503,10 @@ export type Database = {
           longitude?: number | null
           neighborhood: string
           number: string
+          service_date?: string | null
+          service_end_date?: string | null
           service_id: string
+          service_time_preference?: string | null
           specialty_id: string
           state: string
           status?: string
@@ -521,7 +527,10 @@ export type Database = {
           longitude?: number | null
           neighborhood?: string
           number?: string
+          service_date?: string | null
+          service_end_date?: string | null
           service_id?: string
+          service_time_preference?: string | null
           specialty_id?: string
           state?: string
           status?: string
@@ -957,6 +966,24 @@ export type Database = {
               p_state?: string
               p_zip_code?: string
               p_is_anonymous?: boolean
+            }
+          | {
+              p_full_name?: string
+              p_service_id?: string
+              p_sub_service_id?: string
+              p_specialty_id?: string
+              p_description?: string
+              p_street?: string
+              p_number?: string
+              p_complement?: string
+              p_neighborhood?: string
+              p_city?: string
+              p_state?: string
+              p_zip_code?: string
+              p_is_anonymous?: boolean
+              p_service_date?: string
+              p_service_end_date?: string
+              p_service_time_preference?: string
             }
           | {
               p_service_id: string
