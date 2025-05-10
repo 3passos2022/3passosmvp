@@ -1,5 +1,5 @@
 
-import './env'; // Importa as variáveis de ambiente
+import './env'; // Import environment variables
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
@@ -13,10 +13,22 @@ const rootElement = document.getElementById("root");
 if (!rootElement) {
   console.error("Root element not found");
 } else {
-  createRoot(rootElement).render(
-    <React.StrictMode>
-      <Toaster position="top-right" richColors />
-      <App />
-    </React.StrictMode>
-  );
+  // Wait for the document to be fully loaded before rendering
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      createRoot(rootElement).render(
+        <React.StrictMode>
+          <Toaster position="top-right" richColors />
+          <App />
+        </React.StrictMode>
+      );
+    });
+  } else {
+    createRoot(rootElement).render(
+      <React.StrictMode>
+        <Toaster position="top-right" richColors />
+        <App />
+      </React.StrictMode>
+    );
+  }
 }

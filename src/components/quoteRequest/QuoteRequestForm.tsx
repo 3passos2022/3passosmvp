@@ -1110,6 +1110,10 @@ const ReviewStep: React.FC<{
       console.log("Submitting quote with user:", user?.id);
       console.log("Is anonymous:", !user);
       
+      // Format dates for Supabase (convert Date objects to ISO strings)
+      const serviceDateFormatted = formData.serviceDate ? formData.serviceDate.toISOString() : null;
+      const serviceEndDateFormatted = formData.serviceEndDate ? formData.serviceEndDate.toISOString() : null;
+      
       // Prepare the quote data
       const quoteData = {
         client_id: user?.id || null,
@@ -1125,8 +1129,8 @@ const ReviewStep: React.FC<{
         city: formData.city,
         state: formData.state,
         zip_code: formData.zipCode,
-        service_date: formData.serviceDate,
-        service_end_date: formData.serviceEndDate,
+        service_date: serviceDateFormatted,
+        service_end_date: serviceEndDateFormatted,
         service_time_preference: formData.serviceTimePreference,
         is_anonymous: !user,
         status: 'pending'
@@ -1188,8 +1192,8 @@ const ReviewStep: React.FC<{
             p_state: formData.state,
             p_zip_code: formData.zipCode,
             p_is_anonymous: !user,
-            p_service_date: formData.serviceDate,
-            p_service_end_date: formData.serviceEndDate,
+            p_service_date: serviceDateFormatted,
+            p_service_end_date: serviceEndDateFormatted,
             p_service_time_preference: formData.serviceTimePreference
           });
         
