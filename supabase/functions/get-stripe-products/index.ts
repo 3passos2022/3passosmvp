@@ -14,6 +14,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight request
   if (req.method === "OPTIONS") {
     logStep("OPTIONS request recebida");
     return new Response(null, { 
@@ -24,6 +25,12 @@ serve(async (req) => {
 
   try {
     logStep("Função iniciada");
+    const requestId = crypto.randomUUID();
+    logStep(`Nova requisição [${requestId}]`, {
+      method: req.method,
+      url: req.url,
+      headers: Object.fromEntries(req.headers)
+    });
 
     // Verificar chave do Stripe
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -74,8 +81,29 @@ serve(async (req) => {
       }
     ];
 
+    // Adicionar plano gratuito aos planos padrão
+    defaultPlans.unshift({
+      id: 'free',
+      priceId: undefined,
+      name: 'Gratuito',
+      description: 'Para usuários casuais',
+      price: 0,
+      tier: 'free',
+      features: [
+        'Limite de 5 imagens no portfólio',
+        'Limite de 1 serviço cadastrado',
+        'Visualização de apenas 3 prestadores'
+      ]
+    });
+
     try {
+      // Verificar conexão com o Stripe antes de continuar
+      logStep("Verificando conexão com o Stripe");
+      const connectionTest = await stripe.balance.retrieve();
+      logStep("Conexão com o Stripe confirmada", { status: "success" });
+
       // Buscar produtos ativos
+      logStep("Enviando requisição para o Stripe.products.list");
       const products = await stripe.products.list({
         active: true,
         limit: 10,
@@ -121,17 +149,39 @@ serve(async (req) => {
       logStep("Produtos formatados", { count: formattedProducts.length });
       
       if (formattedProducts.length > 0) {
+        // Garantir que pelo menos temos o plano gratuito
+        if (!formattedProducts.find(p => p.tier === 'free')) {
+          formattedProducts.unshift(defaultPlans[0]);
+          logStep("Adicionado plano gratuito aos produtos do Stripe");
+        }
+        
+        // Ordenar por preço
+        formattedProducts.sort((a, b) => a.price - b.price);
+
+        const response = {
+          products: formattedProducts,
+          cached: false,
+          timestamp: new Date().toISOString()
+        };
+
+        logStep(`Requisição [${requestId}] concluída com sucesso`, { productCount: formattedProducts.length });
+
         return new Response(
-          JSON.stringify({ products: formattedProducts }),
+          JSON.stringify(response),
           {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       } else {
-        logStep("Nenhum produto encontrado, usando planos padrão");
+        logStep(`Requisição [${requestId}] - Nenhum produto encontrado, usando planos padrão`);
         return new Response(
-          JSON.stringify({ products: defaultPlans }),
+          JSON.stringify({ 
+            products: defaultPlans,
+            cached: false,
+            fallback: true,
+            timestamp: new Date().toISOString()
+          }),
           {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -140,11 +190,18 @@ serve(async (req) => {
       }
     } catch (stripeError) {
       // Erro específico na comunicação com o Stripe, usar planos padrão
-      logStep("Erro ao comunicar com Stripe API", { error: stripeError.message });
+      logStep(`Requisição [${requestId}] - Erro ao comunicar com Stripe API`, { 
+        error: stripeError.message,
+        stack: stripeError.stack
+      });
       return new Response(
         JSON.stringify({ 
           products: defaultPlans, 
-          warning: "Usando planos padrão devido a erro na comunicação com Stripe" 
+          warning: "Usando planos padrão devido a erro na comunicação com Stripe",
+          cached: false,
+          fallback: true,
+          error: stripeError.message,
+          timestamp: new Date().toISOString()
         }),
         {
           status: 200,  // Retornar 200 mesmo com erro, mas com os planos padrão
@@ -155,10 +212,14 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("Erro fatal", { message: errorMessage });
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logStep("Erro fatal", { message: errorMessage, stack: errorStack });
     
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ 
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

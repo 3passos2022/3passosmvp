@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Check, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -17,6 +17,11 @@ interface PlansComparisonProps {
   onPlansLoaded?: (plans: SubscriptionData[]) => void;
   selectedPlanId?: string;
 }
+
+// Chave para armazenamento em cache
+const CACHE_KEY = 'subscription_plans_cache';
+// Tempo de expiração do cache em milissegundos (10 minutos)
+const CACHE_EXPIRY = 10 * 60 * 1000;
 
 // Planos padrão para fallback caso não consiga carregar os do Stripe
 const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
@@ -64,6 +69,12 @@ const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
   }
 ];
 
+// Interface para o cache
+interface PlansCache {
+  products: SubscriptionData[];
+  timestamp: number;
+}
+
 const PlansComparison: React.FC<PlansComparisonProps> = ({ 
   showTitle = true,
   onSelectPlan,
@@ -77,16 +88,157 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [plans, setPlans] = useState<SubscriptionData[]>(DEFAULT_SUBSCRIPTION_PLANS);
   const [retryCount, setRetryCount] = useState(0);
+  const [isUsingCache, setIsUsingCache] = useState(false);
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
+  const [networkError, setNetworkError] = useState<boolean>(false);
+  
   const currentTier = user?.subscription_tier || 'free';
   
-  const fetchPlans = async () => {
+  // Função para verificar a conectividade com a rede
+  const checkNetworkConnectivity = useCallback(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
+      const response = await fetch('https://www.google.com', { 
+        method: 'HEAD',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.error("Erro ao verificar conectividade:", error);
+      return false;
+    }
+  }, []);
+  
+  // Função para salvar dados no cache
+  const savePlansToCache = useCallback((productsData: SubscriptionData[]) => {
+    try {
+      const cacheData: PlansCache = {
+        products: productsData,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      console.log("Planos salvos em cache:", productsData);
+    } catch (error) {
+      console.error("Erro ao salvar planos em cache:", error);
+    }
+  }, []);
+  
+  // Função para recuperar dados do cache
+  const getPlansFromCache = useCallback((): SubscriptionData[] | null => {
+    try {
+      const cacheJson = localStorage.getItem(CACHE_KEY);
+      if (!cacheJson) return null;
+      
+      const cache: PlansCache = JSON.parse(cacheJson);
+      const now = Date.now();
+      
+      // Verificar se o cache expirou
+      if (now - cache.timestamp > CACHE_EXPIRY) {
+        console.log("Cache expirado");
+        return null;
+      }
+      
+      console.log("Planos recuperados do cache:", cache.products);
+      return cache.products;
+    } catch (error) {
+      console.error("Erro ao recuperar planos do cache:", error);
+      return null;
+    }
+  }, []);
+
+  // Implementação do exponential backoff para retry
+  const getBackoffTime = useCallback((retryAttempt: number): number => {
+    return Math.min(Math.pow(2, retryAttempt) * 1000, 30000);
+  }, []);
+  
+  const fetchPlans = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
+    setNetworkError(false);
+    
+    // Se não estamos forçando refresh, verificar cache primeiro
+    if (!forceRefresh) {
+      const cachedPlans = getPlansFromCache();
+      if (cachedPlans) {
+        setPlans(cachedPlans);
+        setIsUsingCache(true);
+        setLoading(false);
+        
+        if (onPlansLoaded) {
+          onPlansLoaded(cachedPlans);
+        }
+        
+        console.log("Usando dados do cache enquanto atualizamos");
+        
+        // Ainda assim, tentamos atualizar o cache em background
+        // mas não bloqueamos a UI esperando pelo resultado
+        setTimeout(() => {
+          fetchPlansFromApi(true);
+        }, 100);
+        
+        return;
+      }
+    }
+    
+    // Se não temos cache ou estamos forçando refresh, buscar da API
+    await fetchPlansFromApi(false);
+  }, [getPlansFromCache, onPlansLoaded]);
+  
+  const fetchPlansFromApi = useCallback(async (isBackgroundFetch = false) => {
+    if (!isBackgroundFetch) {
+      setLoading(true);
+      setError(null);
+    }
     
     try {
+      console.log("Verificando conectividade de rede...");
+      const isConnected = await checkNetworkConnectivity();
+      
+      if (!isConnected) {
+        console.log("Sem conectividade de rede detectada");
+        setNetworkError(true);
+        
+        // Se não temos conexão, usar dados do cache ou fallback
+        const cachedPlans = getPlansFromCache();
+        if (cachedPlans) {
+          console.log("Usando dados em cache devido a problemas de rede");
+          setPlans(cachedPlans);
+          setIsUsingCache(true);
+          setIsUsingFallback(false);
+        } else {
+          console.log("Usando planos padrão devido a problemas de rede");
+          setPlans(DEFAULT_SUBSCRIPTION_PLANS);
+          setIsUsingCache(false);
+          setIsUsingFallback(true);
+        }
+        
+        if (!isBackgroundFetch) {
+          setLoading(false);
+          setError("Não foi possível conectar à internet. Usando dados disponíveis offline.");
+        }
+        
+        // Notificar mesmo com dados em cache
+        if (onPlansLoaded) {
+          onPlansLoaded(cachedPlans || DEFAULT_SUBSCRIPTION_PLANS);
+        }
+        
+        return;
+      }
+      
       console.log("Iniciando busca por planos do Stripe...");
       
-      const { data, error } = await supabase.functions.invoke('get-stripe-products');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const { data, error } = await supabase.functions.invoke('get-stripe-products', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (error) {
         console.error("Erro na função get-stripe-products:", error);
@@ -106,7 +258,12 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         // Ordenar por preço
         stripePlans.sort((a, b) => a.price - b.price);
         
+        // Atualizar estado e salvar em cache
         setPlans(stripePlans);
+        savePlansToCache(stripePlans);
+        setIsUsingCache(false);
+        setIsUsingFallback(false);
+        
         console.log("Planos carregados do Stripe:", stripePlans);
 
         // Notificar o componente pai sobre os planos carregados
@@ -118,32 +275,75 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
       } else {
         console.log("Resposta vazia ou inválida, usando planos padrão");
         setPlans(DEFAULT_SUBSCRIPTION_PLANS);
+        setIsUsingCache(false);
+        setIsUsingFallback(true);
+        
         // Mesmo com os planos padrão, notificamos o componente pai
         if (onPlansLoaded) {
           onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
+        }
+        
+        if (!isBackgroundFetch) {
+          setError("Não foi possível carregar os planos de assinatura do servidor, usando planos padrão.");
         }
       }
     } catch (error: any) {
       console.error("Erro ao buscar planos do Stripe:", error);
       
-      // Mensagem de erro mais detalhada
-      setError(`Não foi possível carregar os planos de assinatura. Detalhes: ${error.message || "Erro desconhecido"}`);
+      // Verificar se é um erro de rede
+      const isNetworkError = 
+        error.name === 'AbortError' || 
+        error.message.includes('network') || 
+        error.message.includes('fetch') || 
+        error.message.includes('timeout');
       
-      // Mesmo com erro, notificamos o componente pai com os planos padrão
-      if (onPlansLoaded) {
-        onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
+      if (isNetworkError) {
+        setNetworkError(true);
       }
       
-      // Garantir que temos os planos padrão disponíveis, mesmo com erro
-      setPlans(DEFAULT_SUBSCRIPTION_PLANS);
+      // Tentar usar cache em caso de erro
+      const cachedPlans = getPlansFromCache();
+      if (cachedPlans) {
+        console.log("Usando dados em cache devido a erro na API");
+        setPlans(cachedPlans);
+        setIsUsingCache(true);
+        setIsUsingFallback(false);
+      } else {
+        console.log("Usando planos padrão devido a erro na API");
+        setPlans(DEFAULT_SUBSCRIPTION_PLANS);
+        setIsUsingCache(false);
+        setIsUsingFallback(true);
+      }
+      
+      if (!isBackgroundFetch) {
+        // Mensagem de erro mais detalhada
+        setError(`Não foi possível carregar os planos de assinatura. Detalhes: ${error.message || "Erro desconhecido"}`);
+      }
+      
+      // Mesmo com erro, notificamos o componente pai
+      if (onPlansLoaded) {
+        onPlansLoaded(cachedPlans || DEFAULT_SUBSCRIPTION_PLANS);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundFetch) {
+        setLoading(false);
+      }
     }
-  };
+  }, [checkNetworkConnectivity, getPlansFromCache, savePlansToCache, onPlansLoaded]);
   
   useEffect(() => {
     fetchPlans();
-  }, [retryCount]);
+    
+    // Programar retry automático com backoff exponencial
+    if (retryCount > 0) {
+      const timeoutId = setTimeout(() => {
+        console.log(`Tentativa #${retryCount+1} de carregar planos...`);
+        fetchPlans(true);
+      }, getBackoffTime(retryCount));
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [retryCount, fetchPlans, getBackoffTime]);
   
   const handleSelect = (plan: SubscriptionData) => {
     if (onSelectPlan) {
@@ -159,6 +359,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const handleRetry = () => {
     toast.info("Tentando novamente carregar os planos...");
     setRetryCount(prev => prev + 1);
+    fetchPlans(true);
   };
   
   return (
@@ -169,6 +370,31 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
           <p className="mt-2 text-muted-foreground">
             Selecione o plano ideal para suas necessidades
           </p>
+        </div>
+      )}
+      
+      {(isUsingCache || isUsingFallback) && !error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 flex items-center mb-6">
+          <AlertTriangle className="h-5 w-5 text-yellow-500 mr-3 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm text-yellow-700">
+              {isUsingCache 
+                ? "Mostrando planos salvos anteriormente. " 
+                : "Mostrando planos padrão. "}
+              {networkError 
+                ? "Verifique sua conexão com a internet." 
+                : "Tentando atualizar em segundo plano..."}
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRetry} 
+            className="ml-4 whitespace-nowrap"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar agora
+          </Button>
         </div>
       )}
       
@@ -190,7 +416,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         </div>
       )}
       
-      {loading ? (
+      {loading && !isUsingCache && !isUsingFallback ? (
         <div className="grid gap-6 md:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="rounded-lg border p-6 shadow-sm opacity-70">

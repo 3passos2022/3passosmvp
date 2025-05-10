@@ -1,9 +1,9 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ExternalLink, RefreshCw, ChevronDown, AlertCircle } from 'lucide-react';
+import { Loader2, ExternalLink, RefreshCw, ChevronDown, AlertCircle, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
@@ -26,8 +26,36 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [networkAvailable, setNetworkAvailable] = useState<boolean>(true);
+  const [connectionChecking, setConnectionChecking] = useState<boolean>(false);
+  const [retryAttempts, setRetryAttempts] = useState<number>(0);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Função para verificar a conectividade com a rede
+  const checkNetworkConnectivity = useCallback(async () => {
+    setConnectionChecking(true);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
+      const response = await fetch('https://www.google.com', { 
+        method: 'HEAD',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      const isConnected = response.ok;
+      setNetworkAvailable(isConnected);
+      return isConnected;
+    } catch (error) {
+      console.error("Erro ao verificar conectividade:", error);
+      setNetworkAvailable(false);
+      return false;
+    } finally {
+      setConnectionChecking(false);
+    }
+  }, []);
 
   useEffect(() => {
     // Verificar se há plano selecionado no navegador
@@ -60,21 +88,32 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       }
     };
     
-    checkUserSubscription();
+    // Verificar conectividade de rede primeiro
+    checkNetworkConnectivity().then(isConnected => {
+      if (isConnected) {
+        checkUserSubscription();
+      } else {
+        console.log("Sem conectividade de rede detectada, não verificando assinatura");
+        toast.error("Sem conexão com a internet. Algumas funcionalidades podem estar limitadas.");
+      }
+    });
     
     // Verificar mudanças de assinatura a cada 30 segundos se estiver na página de assinatura
     const interval = setInterval(async () => {
       if (user && location.pathname.includes('subscription')) {
-        try {
-          await refreshSubscriptionWithTimeout();
-        } catch (error) {
-          console.error("Erro ao verificar assinatura no intervalo:", error);
+        const isConnected = await checkNetworkConnectivity();
+        if (isConnected) {
+          try {
+            await refreshSubscriptionWithTimeout();
+          } catch (error) {
+            console.error("Erro ao verificar assinatura no intervalo:", error);
+          }
         }
       }
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [user, location, onPlanSelect]);
+  }, [user, location, onPlanSelect, checkNetworkConnectivity]);
 
   // Função para atualizar assinatura com timeout
   const refreshSubscriptionWithTimeout = async () => {
@@ -110,16 +149,31 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       return;
     }
     
+    // Verificar conectividade primeiro
+    const isConnected = await checkNetworkConnectivity();
+    if (!isConnected) {
+      toast.error("Sem conexão com a internet. Não é possível iniciar o checkout.");
+      setCheckoutError("Sem conexão com a internet. Tente novamente quando estiver online.");
+      return;
+    }
+    
     setLoading(true);
     try {
       console.log("Iniciando checkout para o plano:", selectedPlan);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           tier: selectedPlan.tier,
           priceId: selectedPlan.priceId,
           returnUrl: window.location.origin + '/subscription/success'
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       console.log("Resposta do create-checkout:", data, error);
       
@@ -133,9 +187,30 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       } else {
         throw new Error("URL de checkout não retornada");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao iniciar checkout:", error);
-      const errorMsg = (error as Error).message || "Tente novamente mais tarde";
+      
+      // Análise específica de erros de timeout ou rede
+      const isNetworkError = 
+        error.name === 'AbortError' || 
+        error.message.includes('network') || 
+        error.message.includes('fetch') || 
+        error.message.includes('timeout');
+      
+      if (isNetworkError) {
+        setRetryAttempts(prev => prev + 1);
+        
+        if (retryAttempts < 2) {
+          toast.error("Problemas de conexão detectados. Tentando novamente...");
+          setTimeout(() => handleSubscribe(), 1000 * Math.pow(2, retryAttempts));
+          return;
+        }
+      }
+      
+      const errorMsg = isNetworkError
+        ? "Não foi possível conectar ao servidor de pagamentos. Verifique sua conexão e tente novamente."
+        : (error.message || "Tente novamente mais tarde");
+      
       setCheckoutError(errorMsg);
       toast.error("Erro ao processar pagamento: " + errorMsg);
     } finally {
@@ -148,11 +223,24 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       return;
     }
     
+    // Verificar conectividade primeiro
+    const isConnected = await checkNetworkConnectivity();
+    if (!isConnected) {
+      toast.error("Sem conexão com a internet. Não é possível acessar o portal de gerenciamento.");
+      return;
+    }
+    
     setPortalLoading(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const { data, error } = await supabase.functions.invoke('customer-portal', {
-        body: { url: window.location.origin + '/profile/subscription' }
+        body: { url: window.location.origin + '/profile/subscription' },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       console.log("Resposta do customer-portal:", data, error);
       
@@ -164,9 +252,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         console.log("Redirecionando para portal:", data.url);
         window.location.href = data.url;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao abrir portal do cliente:", error);
-      toast.error("Erro ao abrir portal do cliente: " + (error as Error).message);
+      
+      // Análise específica de erros de timeout ou rede
+      const isNetworkError = 
+        error.name === 'AbortError' || 
+        error.message.includes('network') || 
+        error.message.includes('fetch') || 
+        error.message.includes('timeout');
+      
+      const errorMsg = isNetworkError
+        ? "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente."
+        : error.message;
+      
+      toast.error("Erro ao abrir portal do cliente: " + errorMsg);
     } finally {
       setPortalLoading(false);
     }
@@ -175,6 +275,13 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      // Verificar conectividade primeiro
+      const isConnected = await checkNetworkConnectivity();
+      if (!isConnected) {
+        toast.error("Sem conexão com a internet. Não é possível atualizar as informações.");
+        return;
+      }
+      
       await refreshSubscriptionWithTimeout();
       toast.success("Informações de assinatura atualizadas");
     } catch (error) {
@@ -205,6 +312,16 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     handleSubscribe();
   };
 
+  const handleVerifyConnection = async () => {
+    const isConnected = await checkNetworkConnectivity();
+    if (isConnected) {
+      toast.success("Conexão com a internet restaurada!");
+      setTimeout(() => handleRefresh(), 500);
+    } else {
+      toast.error("Ainda sem conexão com a internet.");
+    }
+  };
+
   return (
     <Card className="z-10 relative" id="subscription-manager">
       <CardHeader>
@@ -218,18 +335,57 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                 : "Você não tem uma assinatura ativa")}
             </CardDescription>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={handleRefresh}
-            disabled={refreshing || subscriptionLoading}
-            title="Atualizar status da assinatura"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing || subscriptionLoading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {!networkAvailable && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleVerifyConnection}
+                disabled={connectionChecking}
+                title="Verificar conexão"
+                className="text-orange-500"
+              >
+                <WifiOff className={`h-4 w-4 ${connectionChecking ? 'animate-pulse' : ''}`} />
+              </Button>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleRefresh}
+              disabled={refreshing || subscriptionLoading || !networkAvailable}
+              title="Atualizar status da assinatura"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing || subscriptionLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
+        {!networkAvailable && (
+          <div className="flex items-center p-3 mb-4 bg-orange-50 border border-orange-200 rounded-md">
+            <WifiOff className="h-5 w-5 text-orange-500 mr-2 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-orange-700">
+                Sem conexão com a internet. Algumas funcionalidades estão indisponíveis.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleVerifyConnection}
+              disabled={connectionChecking}
+              className="ml-2 whitespace-nowrap"
+            >
+              {connectionChecking ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Verificar
+            </Button>
+          </div>
+        )}
+        
         {subscriptionLoading ? (
           <div className="flex items-center justify-center py-6">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -301,7 +457,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
             onClick={handleManageSubscription} 
             variant="outline" 
             className="w-full"
-            disabled={portalLoading || subscriptionLoading}
+            disabled={portalLoading || subscriptionLoading || !networkAvailable}
           >
             {portalLoading ? (
               <>
@@ -319,7 +475,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
           <Button 
             onClick={handleSubscribeAction}
             className="w-full"
-            disabled={loading || (selectedPlan && selectedPlan.tier === 'free') || !selectedPlan}
+            disabled={loading || (selectedPlan && selectedPlan.tier === 'free') || !selectedPlan || !networkAvailable}
           >
             {loading ? (
               <>
@@ -330,6 +486,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
               "Ver Planos"
             ) : selectedPlan.tier === 'free' ? (
               "Plano gratuito já disponível"
+            ) : !networkAvailable ? (
+              "Sem conexão com a internet"
             ) : (
               "Assinar Agora"
             )}
