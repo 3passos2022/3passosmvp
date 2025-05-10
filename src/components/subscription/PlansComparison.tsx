@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 interface PlansComparisonProps {
   showTitle?: boolean;
   onSelectPlan?: (plan: SubscriptionData) => void;
+  onPlansLoaded?: (plans: SubscriptionData[]) => void;
+  selectedPlanId?: string;
 }
 
 // Planos padrão para fallback caso não consiga carregar os do Stripe
@@ -41,7 +43,8 @@ const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
       'Prioridade nos resultados de busca'
     ],
     popular: true,
-    tier: 'basic'
+    tier: 'basic',
+    priceId: 'price_basic'  // ID de exemplo, precisa ser substituído pelo real do Stripe
   },
   {
     id: 'premium',
@@ -55,13 +58,16 @@ const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
       'Destaque especial nos resultados de busca',
       'Suporte prioritário'
     ],
-    tier: 'premium'
+    tier: 'premium',
+    priceId: 'price_premium'  // ID de exemplo, precisa ser substituído pelo real do Stripe
   }
 ];
 
 const PlansComparison: React.FC<PlansComparisonProps> = ({ 
   showTitle = true,
-  onSelectPlan 
+  onSelectPlan,
+  onPlansLoaded,
+  selectedPlanId
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -93,19 +99,33 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
           
           setPlans(stripePlans);
           console.log("Planos carregados do Stripe:", stripePlans);
+
+          // Notificar o componente pai sobre os planos carregados
+          if (onPlansLoaded) {
+            onPlansLoaded(stripePlans);
+          }
         } else {
           console.log("Usando planos padrão (nenhum encontrado no Stripe)");
+          // Mesmo com os planos padrão, notificamos o componente pai
+          if (onPlansLoaded) {
+            onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
+          }
         }
       } catch (error) {
         console.error("Erro ao buscar planos do Stripe:", error);
         toast.error("Erro ao carregar planos de assinatura");
+        
+        // Mesmo com erro, notificamos o componente pai com os planos padrão
+        if (onPlansLoaded) {
+          onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchStripePlans();
-  }, []);
+  }, [onPlansLoaded]);
   
   const handleSelect = (plan: SubscriptionData) => {
     if (onSelectPlan) {
@@ -152,6 +172,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
               plan={plan}
               currentTier={currentTier}
               onSelect={handleSelect}
+              isSelected={plan.id === selectedPlanId}
             />
           ))}
         </div>

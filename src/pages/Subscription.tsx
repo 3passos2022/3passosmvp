@@ -18,6 +18,8 @@ const Subscription: React.FC = () => {
   const navigate = useNavigate();
   const [initAttempted, setInitAttempted] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionData[]>([]);
   
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -87,6 +89,20 @@ const Subscription: React.FC = () => {
     }
   };
 
+  // Função para receber e atualizar a lista de planos disponíveis
+  const handlePlansLoaded = (plans: SubscriptionData[]) => {
+    setAvailablePlans(plans);
+    // Se não houver plano selecionado e houver planos disponíveis, 
+    // selecionar o plano básico ou o segundo plano (geralmente o primeiro pago)
+    if (!selectedPlan && plans.length > 0) {
+      // Tentar encontrar o plano basic primeiro
+      const basicPlan = plans.find(plan => plan.tier === 'basic');
+      // Se não encontrar o plano basic, pegar o segundo plano (geralmente o primeiro pago)
+      const defaultPlan = basicPlan || (plans.length > 1 ? plans[1] : plans[0]);
+      setSelectedPlan(defaultPlan);
+    }
+  };
+
   // Determinar se devemos mostrar o spinner de carregamento
   const showLoading = authLoading || (initAttempted && initializing);
 
@@ -115,11 +131,26 @@ const Subscription: React.FC = () => {
               <>
                 {user && (
                   <div className="mb-10">
-                    <SubscriptionManager />
+                    <SubscriptionManager 
+                      selectedPlan={selectedPlan}
+                      onPlanSelect={setSelectedPlan}
+                      availablePlans={availablePlans}
+                    />
                   </div>
                 )}
                 
-                <PlansComparison onSelectPlan={handleSelectPlan} />
+                <PlansComparison 
+                  onSelectPlan={(plan) => {
+                    setSelectedPlan(plan);
+                    // Rolar para o topo do SubscriptionManager
+                    const element = document.getElementById('subscription-manager');
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }} 
+                  onPlansLoaded={handlePlansLoaded}
+                  selectedPlanId={selectedPlan?.id}
+                />
               </>
             )}
           </motion.div>

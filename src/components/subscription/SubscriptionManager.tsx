@@ -3,18 +3,28 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, ExternalLink, RefreshCw, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
 import { useLocation } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const SubscriptionManager: React.FC = () => {
+interface SubscriptionManagerProps {
+  selectedPlan: SubscriptionData | null;
+  onPlanSelect: (plan: SubscriptionData) => void;
+  availablePlans: SubscriptionData[];
+}
+
+const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ 
+  selectedPlan, 
+  onPlanSelect,
+  availablePlans 
+}) => {
   const { user, subscription, refreshSubscription, subscriptionLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const location = useLocation();
 
@@ -27,7 +37,7 @@ const SubscriptionManager: React.FC = () => {
       try {
         const parsedPlan = JSON.parse(decodeURIComponent(planFromQuery));
         if (parsedPlan && parsedPlan.id) {
-          setSelectedPlan(parsedPlan);
+          onPlanSelect(parsedPlan);
           
           // Limpar parâmetro da URL
           const newUrl = location.pathname;
@@ -63,7 +73,7 @@ const SubscriptionManager: React.FC = () => {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [user, location]);
+  }, [user, location, onPlanSelect]);
 
   // Função para atualizar assinatura com timeout
   const refreshSubscriptionWithTimeout = async () => {
@@ -79,8 +89,7 @@ const SubscriptionManager: React.FC = () => {
     }
   };
 
-  const handleSubscribe = async (plan?: SubscriptionData) => {
-    const planToUse = plan || selectedPlan;
+  const handleSubscribe = async () => {
     setCheckoutError(null);
     
     if (!user) {
@@ -88,18 +97,24 @@ const SubscriptionManager: React.FC = () => {
       return;
     }
     
-    if (!planToUse || !planToUse.priceId) {
+    if (!selectedPlan || !selectedPlan.priceId) {
       toast.error("Selecione um plano válido para continuar");
+      return;
+    }
+    
+    // Se o plano for gratuito, não iniciar checkout
+    if (selectedPlan.tier === 'free') {
+      toast.info('Você já está no plano gratuito');
       return;
     }
     
     setLoading(true);
     try {
-      console.log("Iniciando checkout para o plano:", planToUse);
+      console.log("Iniciando checkout para o plano:", selectedPlan);
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          tier: planToUse.tier,
-          priceId: planToUse.priceId,
+          tier: selectedPlan.tier,
+          priceId: selectedPlan.priceId,
           returnUrl: window.location.origin + '/subscription/success'
         }
       });
@@ -162,8 +177,15 @@ const SubscriptionManager: React.FC = () => {
     }
   };
 
+  const handlePlanChange = (planId: string) => {
+    const plan = availablePlans.find(p => p.id === planId);
+    if (plan) {
+      onPlanSelect(plan);
+    }
+  };
+
   return (
-    <Card className="z-10 relative">
+    <Card className="z-10 relative" id="subscription-manager">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -206,11 +228,38 @@ const SubscriptionManager: React.FC = () => {
             )}
           </div>
         ) : (
-          <p className="text-sm">
-            {selectedPlan ? 
-              `Plano selecionado: ${selectedPlan.name} - ${selectedPlan.price === 0 ? 'Grátis' : `R$${(selectedPlan.price / 100).toFixed(2)}/mês`}` : 
-              'Assine agora para acessar recursos premium e impulsionar seu negócio.'}
-          </p>
+          <div>
+            {availablePlans.length > 0 && (
+              <>
+                <label className="text-sm text-gray-500 mb-2 block">Selecione um plano:</label>
+                <Select 
+                  value={selectedPlan?.id || ''} 
+                  onValueChange={handlePlanChange}
+                >
+                  <SelectTrigger className="w-full mb-4">
+                    <SelectValue placeholder="Selecione um plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePlans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.name} - {plan.price === 0 ? 'Grátis' : `R$${(plan.price / 100).toFixed(2)}/mês`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {selectedPlan && (
+              <div className="mt-4 p-3 bg-muted rounded-md">
+                <p className="font-medium mb-1">{selectedPlan.name}</p>
+                <p className="text-sm mb-2">
+                  {selectedPlan.price === 0 ? 'Grátis' : `R$${(selectedPlan.price / 100).toFixed(2)}/mês`}
+                </p>
+                <p className="text-xs text-muted-foreground">{selectedPlan.description}</p>
+              </div>
+            )}
+          </div>
         )}
         
         {checkoutError && (
@@ -242,15 +291,17 @@ const SubscriptionManager: React.FC = () => {
           </Button>
         ) : (
           <Button 
-            onClick={() => handleSubscribe()}
+            onClick={handleSubscribe}
             className="w-full"
-            disabled={loading} // Removida a condição que bloqueava o botão durante subscriptionLoading
+            disabled={loading || !selectedPlan || (selectedPlan && selectedPlan.tier === 'free')}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Carregando...
               </>
+            ) : selectedPlan && selectedPlan.tier === 'free' ? (
+              "Plano gratuito já disponível"
             ) : (
               "Assinar Agora"
             )}
