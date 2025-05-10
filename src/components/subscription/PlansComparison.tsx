@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, X } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Check, X, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import SubscriptionCard from './SubscriptionCard';
@@ -9,6 +9,7 @@ import { SubscriptionData } from '@/lib/types/subscriptions';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 interface PlansComparisonProps {
   showTitle?: boolean;
@@ -44,7 +45,7 @@ const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
     ],
     popular: true,
     tier: 'basic',
-    priceId: 'price_basic'  // ID de exemplo, precisa ser substituído pelo real do Stripe
+    priceId: 'price_basic'
   },
   {
     id: 'premium',
@@ -59,7 +60,7 @@ const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
       'Suporte prioritário'
     ],
     tier: 'premium',
-    priceId: 'price_premium'  // ID de exemplo, precisa ser substituído pelo real do Stripe
+    priceId: 'price_premium'
   }
 ];
 
@@ -73,59 +74,64 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [plans, setPlans] = useState<SubscriptionData[]>(DEFAULT_SUBSCRIPTION_PLANS);
+  const [retryCount, setRetryCount] = useState(0);
   const currentTier = user?.subscription_tier || 'free';
   
-  useEffect(() => {
-    const fetchStripePlans = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('get-stripe-products');
+  const fetchPlans = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-stripe-products');
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data && data.products && data.products.length > 0) {
+        // Garantir que pelo menos temos o plano gratuito
+        let stripePlans = data.products;
         
-        if (error) {
-          throw error;
+        if (!stripePlans.find(p => p.tier === 'free')) {
+          stripePlans = [DEFAULT_SUBSCRIPTION_PLANS[0], ...stripePlans];
         }
         
-        if (data && data.products && data.products.length > 0) {
-          // Garantir que pelo menos temos o plano gratuito
-          let stripePlans = data.products;
-          
-          if (!stripePlans.find(p => p.tier === 'free')) {
-            stripePlans = [DEFAULT_SUBSCRIPTION_PLANS[0], ...stripePlans];
-          }
-          
-          // Ordenar por preço
-          stripePlans.sort((a, b) => a.price - b.price);
-          
-          setPlans(stripePlans);
-          console.log("Planos carregados do Stripe:", stripePlans);
+        // Ordenar por preço
+        stripePlans.sort((a, b) => a.price - b.price);
+        
+        setPlans(stripePlans);
+        console.log("Planos carregados do Stripe:", stripePlans);
 
-          // Notificar o componente pai sobre os planos carregados
-          if (onPlansLoaded) {
-            onPlansLoaded(stripePlans);
-          }
-        } else {
-          console.log("Usando planos padrão (nenhum encontrado no Stripe)");
-          // Mesmo com os planos padrão, notificamos o componente pai
-          if (onPlansLoaded) {
-            onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
-          }
+        // Notificar o componente pai sobre os planos carregados
+        if (onPlansLoaded) {
+          onPlansLoaded(stripePlans);
         }
-      } catch (error) {
-        console.error("Erro ao buscar planos do Stripe:", error);
-        toast.error("Erro ao carregar planos de assinatura");
         
-        // Mesmo com erro, notificamos o componente pai com os planos padrão
+        setError(null);
+      } else {
+        console.log("Usando planos padrão (nenhum encontrado no Stripe)");
+        // Mesmo com os planos padrão, notificamos o componente pai
         if (onPlansLoaded) {
           onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
         }
-      } finally {
-        setLoading(false);
       }
-    };
-    
-    fetchStripePlans();
-  }, [onPlansLoaded]);
+    } catch (error: any) {
+      console.error("Erro ao buscar planos do Stripe:", error);
+      setError("Não foi possível carregar os planos de assinatura.");
+      
+      // Mesmo com erro, notificamos o componente pai com os planos padrão
+      if (onPlansLoaded) {
+        onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchPlans();
+  }, [retryCount]);
   
   const handleSelect = (plan: SubscriptionData) => {
     if (onSelectPlan) {
@@ -137,6 +143,10 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
     }
   };
   
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
+  
   return (
     <div className="space-y-8">
       {showTitle && (
@@ -145,6 +155,23 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
           <p className="mt-2 text-muted-foreground">
             Selecione o plano ideal para suas necessidades
           </p>
+        </div>
+      )}
+      
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center mb-6">
+          <AlertTriangle className="h-5 w-5 text-red-500 mr-3 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRetry} 
+            className="ml-4"
+          >
+            Tentar novamente
+          </Button>
         </div>
       )}
       
