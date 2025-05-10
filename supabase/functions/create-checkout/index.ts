@@ -23,8 +23,12 @@ serve(async (req) => {
     logStep("Função iniciada");
 
     // Obtém os parâmetros do corpo da requisição
-    const { tier = "basic", returnUrl } = await req.json();
-    logStep("Parâmetros recebidos", { tier, returnUrl });
+    const { tier = "basic", priceId, returnUrl } = await req.json();
+    logStep("Parâmetros recebidos", { tier, priceId, returnUrl });
+
+    if (!priceId) {
+      throw new Error("ID de preço não fornecido");
+    }
 
     // Inicializa o cliente Supabase com a chave de serviço para operações administrativas
     const supabaseClient = createClient(
@@ -61,42 +65,19 @@ serve(async (req) => {
       logStep("Cliente Stripe existente encontrado", { customerId });
     }
 
-    // Determina o preço com base no tier solicitado
-    let priceId: string;
-    let amount: number;
-    
-    switch (tier) {
-      case "premium":
-        amount = 2499; // R$24,99/mês
-        break;
-      case "basic":
-      default:
-        amount = 1499; // R$14,99/mês
-        tier = "basic";
-        break;
-    }
-
-    // Cria a sessão de checkout
+    // Cria a sessão de checkout usando o priceId fornecido
     const origin = new URL(req.url).origin;
     const success_url = returnUrl || `${origin}/subscription/success?tier=${tier}`;
     const cancel_url = `${origin}/subscription/cancel`;
 
-    logStep("Criando sessão de checkout", { tier, amount, customerId });
+    logStep("Criando sessão de checkout", { priceId, customerId });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price_data: {
-            currency: "brl",
-            product_data: {
-              name: `Plano ${tier.charAt(0).toUpperCase() + tier.slice(1)}`,
-              description: tier === "premium" ? "Acesso completo a todas as funcionalidades" : "Acesso a funcionalidades avançadas",
-            },
-            unit_amount: amount,
-            recurring: { interval: "month" },
-          },
+          price: priceId,
           quantity: 1,
         },
       ],

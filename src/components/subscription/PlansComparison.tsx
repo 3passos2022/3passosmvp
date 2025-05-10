@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -7,13 +7,16 @@ import { cn } from '@/lib/utils';
 import SubscriptionCard from './SubscriptionCard';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PlansComparisonProps {
   showTitle?: boolean;
   onSelectPlan?: (plan: SubscriptionData) => void;
 }
 
-const SUBSCRIPTION_PLANS: SubscriptionData[] = [
+// Planos padrão para fallback caso não consiga carregar os do Stripe
+const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionData[] = [
   {
     id: 'free',
     name: 'Gratuito',
@@ -63,7 +66,46 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState<SubscriptionData[]>(DEFAULT_SUBSCRIPTION_PLANS);
   const currentTier = user?.subscription_tier || 'free';
+  
+  useEffect(() => {
+    const fetchStripePlans = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('get-stripe-products');
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data && data.products && data.products.length > 0) {
+          // Garantir que pelo menos temos o plano gratuito
+          let stripePlans = data.products;
+          
+          if (!stripePlans.find(p => p.tier === 'free')) {
+            stripePlans = [DEFAULT_SUBSCRIPTION_PLANS[0], ...stripePlans];
+          }
+          
+          // Ordenar por preço
+          stripePlans.sort((a, b) => a.price - b.price);
+          
+          setPlans(stripePlans);
+          console.log("Planos carregados do Stripe:", stripePlans);
+        } else {
+          console.log("Usando planos padrão (nenhum encontrado no Stripe)");
+        }
+      } catch (error) {
+        console.error("Erro ao buscar planos do Stripe:", error);
+        toast.error("Erro ao carregar planos de assinatura");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchStripePlans();
+  }, []);
   
   const handleSelect = (plan: SubscriptionData) => {
     if (onSelectPlan) {
@@ -71,7 +113,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
     } else if (!user) {
       navigate('/login', { state: { returnTo: '/subscription' } });
     } else {
-      navigate('/subscription');
+      navigate('/subscription', { state: { selectedPlan: plan } });
     }
   };
   
@@ -86,16 +128,34 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         </div>
       )}
       
-      <div className="grid gap-6 md:grid-cols-3">
-        {SUBSCRIPTION_PLANS.map((plan) => (
-          <SubscriptionCard
-            key={plan.id}
-            plan={plan}
-            currentTier={currentTier}
-            onSelect={handleSelect}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="rounded-lg border p-6 shadow-sm opacity-70">
+              <div className="animate-pulse">
+                <div className="h-4 w-24 bg-gray-200 rounded mb-4"></div>
+                <div className="h-8 w-16 bg-gray-200 rounded mb-6"></div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-3">
+          {plans.map((plan) => (
+            <SubscriptionCard
+              key={plan.id}
+              plan={plan}
+              currentTier={currentTier}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

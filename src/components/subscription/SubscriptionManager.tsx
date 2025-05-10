@@ -6,34 +6,44 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { SubscriptionStatus } from '@/lib/types/subscriptions';
+import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
 
 const SubscriptionManager: React.FC = () => {
   const { user, subscription, refreshSubscription, subscriptionLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
 
   useEffect(() => {
+    // Verificar se há plano selecionado no estado da navegação
+    const location = window.location;
+    if (location.state && location.state.selectedPlan) {
+      setSelectedPlan(location.state.selectedPlan);
+      
+      // Limpar o estado para evitar persistência indesejada
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+    
     const checkUserSubscription = async () => {
       if (user) {
         try {
           await refreshSubscription();
         } catch (error) {
-          console.error("Failed to check subscription:", error);
+          console.error("Erro ao verificar assinatura:", error);
         }
       }
     };
     
     checkUserSubscription();
     
-    // Poll for subscription status changes every 30 seconds while on this page
+    // Verificar mudanças de assinatura a cada 30 segundos
     const interval = setInterval(async () => {
       if (user) {
         try {
           await refreshSubscription();
         } catch (error) {
-          console.error("Failed to check subscription in interval:", error);
+          console.error("Erro ao verificar assinatura no intervalo:", error);
         }
       }
     }, 30000);
@@ -41,15 +51,27 @@ const SubscriptionManager: React.FC = () => {
     return () => clearInterval(interval);
   }, [user, refreshSubscription]);
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (plan?: SubscriptionData) => {
+    const planToUse = plan || selectedPlan;
+    
     if (!user) {
       toast.error("Você precisa estar logado para assinar");
       return;
     }
     
+    if (!planToUse || !planToUse.priceId) {
+      toast.error("Selecione um plano válido para continuar");
+      return;
+    }
+    
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout');
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          tier: planToUse.tier,
+          priceId: planToUse.priceId
+        }
+      });
       
       if (error) {
         throw new Error(error.message);
@@ -57,9 +79,11 @@ const SubscriptionManager: React.FC = () => {
       
       if (data?.url) {
         window.location.href = data.url;
+      } else {
+        throw new Error("URL de checkout não retornada");
       }
     } catch (error) {
-      console.error("Error creating checkout:", error);
+      console.error("Erro ao iniciar checkout:", error);
       toast.error("Erro ao iniciar checkout: " + (error as Error).message);
     } finally {
       setLoading(false);
@@ -83,7 +107,7 @@ const SubscriptionManager: React.FC = () => {
         window.location.href = data.url;
       }
     } catch (error) {
-      console.error("Error opening customer portal:", error);
+      console.error("Erro ao abrir portal do cliente:", error);
       toast.error("Erro ao abrir portal do cliente: " + (error as Error).message);
     } finally {
       setPortalLoading(false);
@@ -96,7 +120,7 @@ const SubscriptionManager: React.FC = () => {
       await refreshSubscription();
       toast.success("Informações de assinatura atualizadas");
     } catch (error) {
-      console.error("Error refreshing subscription data:", error);
+      console.error("Erro ao atualizar dados da assinatura:", error);
       toast.error("Erro ao atualizar dados da assinatura");
     } finally {
       setRefreshing(false);
@@ -148,7 +172,9 @@ const SubscriptionManager: React.FC = () => {
           </div>
         ) : (
           <p className="text-sm">
-            Assine agora para acessar recursos premium e impulsionar seu negócio.
+            {selectedPlan ? 
+              `Plano selecionado: ${selectedPlan.name} - ${selectedPlan.price === 0 ? 'Grátis' : `R$${(selectedPlan.price / 100).toFixed(2)}/mês`}` : 
+              'Assine agora para acessar recursos premium e impulsionar seu negócio.'}
           </p>
         )}
       </CardContent>
@@ -174,9 +200,9 @@ const SubscriptionManager: React.FC = () => {
           </Button>
         ) : (
           <Button 
-            onClick={handleSubscribe} 
+            onClick={() => handleSubscribe()}
             className="w-full"
-            disabled={loading || subscriptionLoading}
+            disabled={loading || subscriptionLoading || !selectedPlan?.priceId}
           >
             {loading ? (
               <>
