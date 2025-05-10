@@ -105,18 +105,36 @@ serve(async (req) => {
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
       logStep("Cliente Stripe existente encontrado", { customerId });
+    } else {
+      // Se não existir, criar um novo cliente
+      const newCustomer = await stripe.customers.create({
+        email: user.email,
+        name: user.user_metadata?.name || user.email.split('@')[0],
+        metadata: {
+          user_id: user.id
+        }
+      });
+      customerId = newCustomer.id;
+      logStep("Novo cliente Stripe criado", { customerId });
     }
 
     // Cria a sessão de checkout usando o priceId fornecido
     const origin = new URL(req.url).origin;
-    const success_url = returnUrl || `${origin}/subscription/success?tier=${tier}`;
-    const cancel_url = `${origin}/subscription/cancel`;
+    const baseUrl = returnUrl ? new URL(returnUrl).origin : origin;
+    const success_url = returnUrl || `${baseUrl}/subscription/success?tier=${tier}`;
+    const cancel_url = `${baseUrl}/subscription/cancel`;
 
-    logStep("Criando sessão de checkout", { priceId, customerId, success_url, cancel_url });
+    logStep("Criando sessão de checkout", { 
+      priceId, 
+      customerId, 
+      success_url, 
+      cancel_url,
+      baseUrl,
+      origin
+    });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      customer_email: customerId ? undefined : user.email,
       line_items: [
         {
           price: priceId,
@@ -130,6 +148,7 @@ serve(async (req) => {
         user_id: user.id,
         tier: tier,
       },
+      allow_promotion_codes: true,
     });
 
     logStep("Sessão de checkout criada", { sessionId: session.id, url: session.url });

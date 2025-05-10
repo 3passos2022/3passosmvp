@@ -1,14 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/context/AuthContext';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import PlansComparison from '@/components/subscription/PlansComparison';
 import { supabase } from '@/integrations/supabase/client';
-import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import LoadingSpinner from '@/components/ui/loading-spinner';
@@ -16,6 +15,7 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 const Subscription: React.FC = () => {
   const { user, loading: authLoading, refreshSubscription } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [initAttempted, setInitAttempted] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
@@ -23,7 +23,13 @@ const Subscription: React.FC = () => {
   
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    
+    // Verificar se há plano na navegação
+    if (location.state && location.state.selectedPlan) {
+      console.log("Plano encontrado no estado da navegação:", location.state.selectedPlan);
+      setSelectedPlan(location.state.selectedPlan);
+    }
+  }, [location]);
   
   // Separar a inicialização da assinatura em um useEffect isolado
   useEffect(() => {
@@ -36,7 +42,9 @@ const Subscription: React.FC = () => {
       
       const checkSubscription = async () => {
         try {
+          console.log("Verificando status da assinatura...");
           await refreshSubscription();
+          console.log("Status da assinatura atualizado com sucesso");
         } catch (error) {
           console.error("Erro ao verificar assinatura:", error);
           toast.error("Não foi possível verificar o status da sua assinatura");
@@ -57,7 +65,7 @@ const Subscription: React.FC = () => {
   
   const handleSelectPlan = async (plan: SubscriptionData) => {
     if (!user) {
-      navigate('/login');
+      navigate('/login', { state: { returnTo: '/subscription' } });
       return;
     }
     
@@ -66,8 +74,15 @@ const Subscription: React.FC = () => {
       return;
     }
     
+    if (!plan.priceId) {
+      toast.error('Este plano não possui um ID de preço válido');
+      return;
+    }
+    
     try {
       console.log("Iniciando checkout para o plano:", plan);
+      setSelectedPlan(plan);
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
           tier: plan.tier,
@@ -76,9 +91,15 @@ const Subscription: React.FC = () => {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro na função create-checkout:", error);
+        throw new Error(`Erro ao processar pedido: ${error.message}`);
+      }
+      
+      console.log("Resposta da função create-checkout:", data);
       
       if (data?.url) {
+        console.log("Redirecionando para URL do checkout:", data.url);
         window.location.href = data.url;
       } else {
         throw new Error('Não foi possível obter o link de checkout');
@@ -91,7 +112,9 @@ const Subscription: React.FC = () => {
 
   // Função para receber e atualizar a lista de planos disponíveis
   const handlePlansLoaded = (plans: SubscriptionData[]) => {
+    console.log("Planos carregados no componente Subscription:", plans);
     setAvailablePlans(plans);
+    
     // Se não houver plano selecionado e houver planos disponíveis, 
     // selecionar o plano básico ou o segundo plano (geralmente o primeiro pago)
     if (!selectedPlan && plans.length > 0) {
@@ -99,6 +122,7 @@ const Subscription: React.FC = () => {
       const basicPlan = plans.find(plan => plan.tier === 'basic');
       // Se não encontrar o plano basic, pegar o segundo plano (geralmente o primeiro pago)
       const defaultPlan = basicPlan || (plans.length > 1 ? plans[1] : plans[0]);
+      console.log("Selecionando plano padrão:", defaultPlan);
       setSelectedPlan(defaultPlan);
     }
   };
@@ -130,7 +154,7 @@ const Subscription: React.FC = () => {
             ) : (
               <>
                 {user && (
-                  <div className="mb-10">
+                  <div className="mb-10" id="subscription-manager">
                     <SubscriptionManager 
                       selectedPlan={selectedPlan}
                       onPlanSelect={setSelectedPlan}
@@ -141,6 +165,7 @@ const Subscription: React.FC = () => {
                 
                 <PlansComparison 
                   onSelectPlan={(plan) => {
+                    console.log("Plano selecionado na comparação:", plan);
                     setSelectedPlan(plan);
                     // Rolar para o topo do SubscriptionManager
                     const element = document.getElementById('subscription-manager');

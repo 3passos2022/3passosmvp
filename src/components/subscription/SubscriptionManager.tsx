@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       try {
         const parsedPlan = JSON.parse(decodeURIComponent(planFromQuery));
         if (parsedPlan && parsedPlan.id) {
+          console.log("Plano encontrado na URL:", parsedPlan);
           onPlanSelect(parsedPlan);
           
           // Limpar parâmetro da URL
@@ -54,16 +56,15 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
           await refreshSubscriptionWithTimeout();
         } catch (error) {
           console.error("Erro ao verificar assinatura:", error);
-          toast.error("Não foi possível verificar o status da sua assinatura");
         }
       }
     };
     
     checkUserSubscription();
     
-    // Verificar mudanças de assinatura a cada 30 segundos
+    // Verificar mudanças de assinatura a cada 30 segundos se estiver na página de assinatura
     const interval = setInterval(async () => {
-      if (user) {
+      if (user && location.pathname.includes('subscription')) {
         try {
           await refreshSubscriptionWithTimeout();
         } catch (error) {
@@ -94,11 +95,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     
     if (!user) {
       toast.error("Você precisa estar logado para assinar");
+      navigate('/login', { state: { returnTo: '/subscription' } });
       return;
     }
     
     if (!selectedPlan || !selectedPlan.priceId) {
-      toast.error("Selecione um plano válido para continuar");
+      toast.error("Selecione um plano com preço válido para continuar");
       return;
     }
     
@@ -119,11 +121,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         }
       });
       
+      console.log("Resposta do create-checkout:", data, error);
+      
       if (error) {
         throw new Error(error.message || "Erro ao iniciar checkout");
       }
       
       if (data?.url) {
+        console.log("Redirecionando para checkout:", data.url);
         window.location.href = data.url;
       } else {
         throw new Error("URL de checkout não retornada");
@@ -149,11 +154,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         body: { url: window.location.origin + '/profile/subscription' }
       });
       
+      console.log("Resposta do customer-portal:", data, error);
+      
       if (error) {
         throw new Error(error.message);
       }
       
       if (data?.url) {
+        console.log("Redirecionando para portal:", data.url);
         window.location.href = data.url;
       }
     } catch (error) {
@@ -178,9 +186,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   };
 
   const handlePlanChange = (planId: string) => {
+    console.log("Alterando plano para ID:", planId);
     const plan = availablePlans.find(p => p.id === planId);
     if (plan) {
       onPlanSelect(plan);
+      console.log("Plano selecionado:", plan);
     }
   };
 
@@ -279,9 +289,9 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         )}
         
         {checkoutError && (
-          <div className="mt-4 p-2 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
-            <p>Erro: {checkoutError}</p>
-            <p className="mt-1">Por favor, tente novamente mais tarde ou entre em contato com o suporte.</p>
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
+            <p className="font-medium">Erro: {checkoutError}</p>
+            <p className="mt-1">Por favor, tente novamente ou entre em contato com o suporte.</p>
           </div>
         )}
       </CardContent>
@@ -309,7 +319,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
           <Button 
             onClick={handleSubscribeAction}
             className="w-full"
-            disabled={loading || (selectedPlan && selectedPlan.tier === 'free')}
+            disabled={loading || (selectedPlan && selectedPlan.tier === 'free') || !selectedPlan}
           >
             {loading ? (
               <>

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Check, X, AlertTriangle } from 'lucide-react';
+import { Check, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import SubscriptionCard from './SubscriptionCard';
@@ -82,12 +82,18 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   const fetchPlans = async () => {
     setLoading(true);
     setError(null);
+    
     try {
+      console.log("Iniciando busca por planos do Stripe...");
+      
       const { data, error } = await supabase.functions.invoke('get-stripe-products');
       
       if (error) {
-        throw error;
+        console.error("Erro na função get-stripe-products:", error);
+        throw new Error(`Falha ao buscar planos: ${error.message}`);
       }
+      
+      console.log("Resposta da função get-stripe-products:", data);
       
       if (data && data.products && data.products.length > 0) {
         // Garantir que pelo menos temos o plano gratuito
@@ -110,7 +116,8 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         
         setError(null);
       } else {
-        console.log("Usando planos padrão (nenhum encontrado no Stripe)");
+        console.log("Resposta vazia ou inválida, usando planos padrão");
+        setPlans(DEFAULT_SUBSCRIPTION_PLANS);
         // Mesmo com os planos padrão, notificamos o componente pai
         if (onPlansLoaded) {
           onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
@@ -118,12 +125,17 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
       }
     } catch (error: any) {
       console.error("Erro ao buscar planos do Stripe:", error);
-      setError("Não foi possível carregar os planos de assinatura.");
+      
+      // Mensagem de erro mais detalhada
+      setError(`Não foi possível carregar os planos de assinatura. Detalhes: ${error.message || "Erro desconhecido"}`);
       
       // Mesmo com erro, notificamos o componente pai com os planos padrão
       if (onPlansLoaded) {
         onPlansLoaded(DEFAULT_SUBSCRIPTION_PLANS);
       }
+      
+      // Garantir que temos os planos padrão disponíveis, mesmo com erro
+      setPlans(DEFAULT_SUBSCRIPTION_PLANS);
     } finally {
       setLoading(false);
     }
@@ -135,6 +147,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   
   const handleSelect = (plan: SubscriptionData) => {
     if (onSelectPlan) {
+      console.log("Plano selecionado:", plan);
       onSelectPlan(plan);
     } else if (!user) {
       navigate('/login', { state: { returnTo: '/subscription' } });
@@ -144,6 +157,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   };
   
   const handleRetry = () => {
+    toast.info("Tentando novamente carregar os planos...");
     setRetryCount(prev => prev + 1);
   };
   
@@ -168,8 +182,9 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
             variant="outline" 
             size="sm" 
             onClick={handleRetry} 
-            className="ml-4"
+            className="ml-4 whitespace-nowrap"
           >
+            <RefreshCw className="h-4 w-4 mr-2" />
             Tentar novamente
           </Button>
         </div>

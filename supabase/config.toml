@@ -1,5 +1,45 @@
 
 project_id = "jezfwtknzraaykkjjaaf"
 
-[functions]
-source_dir = "functions"
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+
+[realtime]
+enabled = true
+
+[analytics]
+enabled = false
+
+[vector]
+enabled = false
+
+[edge_functions]
+[edge_functions.get-stripe-products]
+
+[edge_functions.check-subscription]
+
+[edge_functions.create-checkout]
+
+[edge_functions.customer-portal]
