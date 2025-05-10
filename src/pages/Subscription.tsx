@@ -11,14 +11,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { SubscriptionData } from '@/lib/types/subscriptions';
+import LoadingSpinner from '@/components/ui/loading-spinner';
 
 const Subscription: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshSubscription } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    
+    // Atualizar informações de assinatura quando a página carregar
+    if (user) {
+      refreshSubscription().catch(err => {
+        console.error("Erro ao verificar assinatura:", err);
+      });
+    }
+  }, [user, refreshSubscription]);
   
   const handleSelectPlan = async (plan: SubscriptionData) => {
     if (!user) {
@@ -33,7 +41,11 @@ const Subscription: React.FC = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { tier: plan.tier }
+        body: { 
+          tier: plan.tier,
+          priceId: plan.priceId,
+          returnUrl: window.location.origin + '/subscription/success'
+        }
       });
       
       if (error) throw error;
@@ -49,10 +61,6 @@ const Subscription: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -67,13 +75,24 @@ const Subscription: React.FC = () => {
           >
             <h1 className="text-2xl font-bold mb-6">Assinatura</h1>
             
-            {user && (
-              <div className="mb-10">
-                <SubscriptionManager />
+            {loading ? (
+              <div className="w-full py-20 flex justify-center">
+                <div className="flex flex-col items-center">
+                  <LoadingSpinner />
+                  <p className="mt-4 text-gray-500">Carregando informações...</p>
+                </div>
               </div>
+            ) : (
+              <>
+                {user && (
+                  <div className="mb-10">
+                    <SubscriptionManager />
+                  </div>
+                )}
+                
+                <PlansComparison onSelectPlan={handleSelectPlan} />
+              </>
             )}
-            
-            <PlansComparison onSelectPlan={handleSelectPlan} />
           </motion.div>
         </div>
       </main>

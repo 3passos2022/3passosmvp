@@ -7,6 +7,7 @@ import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
+import { useLocation } from 'react-router-dom';
 
 const SubscriptionManager: React.FC = () => {
   const { user, subscription, refreshSubscription, subscriptionLoading } = useAuth();
@@ -14,15 +15,26 @@ const SubscriptionManager: React.FC = () => {
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
-    // Verificar se há plano selecionado no estado da navegação
-    const location = window.location;
-    if (location.state && location.state.selectedPlan) {
-      setSelectedPlan(location.state.selectedPlan);
-      
-      // Limpar o estado para evitar persistência indesejada
-      window.history.replaceState({}, document.title, location.pathname);
+    // Verificar se há plano selecionado no navegador
+    const searchParams = new URLSearchParams(location.search);
+    const planFromQuery = searchParams.get('plan');
+    
+    if (planFromQuery) {
+      try {
+        const parsedPlan = JSON.parse(decodeURIComponent(planFromQuery));
+        if (parsedPlan && parsedPlan.id) {
+          setSelectedPlan(parsedPlan);
+          
+          // Limpar parâmetro da URL
+          const newUrl = location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        }
+      } catch (error) {
+        console.error("Error parsing plan data:", error);
+      }
     }
     
     const checkUserSubscription = async () => {
@@ -49,7 +61,7 @@ const SubscriptionManager: React.FC = () => {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [user, refreshSubscription]);
+  }, [user, refreshSubscription, location]);
 
   const handleSubscribe = async (plan?: SubscriptionData) => {
     const planToUse = plan || selectedPlan;
@@ -69,7 +81,8 @@ const SubscriptionManager: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           tier: planToUse.tier,
-          priceId: planToUse.priceId
+          priceId: planToUse.priceId,
+          returnUrl: window.location.origin + '/subscription/success'
         }
       });
       
@@ -97,7 +110,9 @@ const SubscriptionManager: React.FC = () => {
     
     setPortalLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
+      const { data, error } = await supabase.functions.invoke('customer-portal', {
+        body: { url: window.location.origin + '/profile/subscription' }
+      });
       
       if (error) {
         throw new Error(error.message);
@@ -128,7 +143,7 @@ const SubscriptionManager: React.FC = () => {
   };
 
   return (
-    <Card>
+    <Card className="z-10 relative">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -153,8 +168,8 @@ const SubscriptionManager: React.FC = () => {
       </CardHeader>
       <CardContent>
         {subscriptionLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : subscription?.subscribed ? (
           <div>
