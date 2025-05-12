@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Check, X, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -97,15 +96,19 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   // Função para verificar a conectividade com a rede
   const checkNetworkConnectivity = useCallback(async () => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
-      const response = await fetch('https://www.google.com', { 
-        method: 'HEAD',
-        signal: controller.signal
+      // Use timeout sem AbortController para evitar problemas de compatibilidade
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Tempo limite excedido na verificação de conectividade")), 3000);
       });
       
-      clearTimeout(timeoutId);
+      const fetchPromise = fetch('https://www.google.com', { method: 'HEAD' });
+      
+      // Usar race para implementar timeout sem signal
+      const response = await Promise.race([
+        fetchPromise,
+        timeoutPromise
+      ]) as Response;
+      
       return response.ok;
     } catch (error) {
       console.error("Erro ao verificar conectividade:", error);
@@ -231,14 +234,20 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
       
       console.log("Iniciando busca por planos do Stripe...");
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
-      const { data, error } = await supabase.functions.invoke('get-stripe-products', {
-        signal: controller.signal
+      // Implementar timeout sem usar controller.signal
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Tempo limite excedido ao buscar planos")), 8000);
       });
       
-      clearTimeout(timeoutId);
+      const functionPromise = supabase.functions.invoke('get-stripe-products');
+      
+      // Usar race para implementar timeout
+      const { data, error } = await Promise.race([
+        functionPromise,
+        timeoutPromise.then(() => {
+          throw new Error("Tempo limite excedido ao buscar planos");
+        })
+      ]);
       
       if (error) {
         console.error("Erro na função get-stripe-products:", error);
@@ -295,6 +304,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         error.name === 'AbortError' || 
         error.message.includes('network') || 
         error.message.includes('fetch') || 
+        error.message.includes('tempo limite') ||
         error.message.includes('timeout');
       
       if (isNetworkError) {

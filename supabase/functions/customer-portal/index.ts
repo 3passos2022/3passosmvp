@@ -5,8 +5,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept",
+  "Access-Control-Max-Age": "86400", // 24 horas para reduzir preflight requests
 };
 
 // Helper para logging
@@ -82,6 +83,7 @@ serve(async (req) => {
     // Inicializa o Stripe
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(), // Especificar explicitamente o cliente HTTP
     });
 
     // Verificar conexão com o Stripe

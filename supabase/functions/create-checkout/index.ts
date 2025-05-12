@@ -3,10 +3,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// Expandir headers CORS para garantir compatibilidade em diferentes navegadores
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept",
+  "Access-Control-Max-Age": "86400", // 24 horas para reduzir preflight requests
 };
 
 // Helper para logging
@@ -16,7 +18,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight requests - responder imediatamente para OPTIONS
   if (req.method === "OPTIONS") {
     logStep("OPTIONS request recebida");
     return new Response(null, { 
@@ -101,6 +103,7 @@ serve(async (req) => {
     // Inicializa o Stripe
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(), // Especificar explicitamente o cliente HTTP
     });
 
     // Verificar conexão com o Stripe

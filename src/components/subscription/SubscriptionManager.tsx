@@ -36,12 +36,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   const checkNetworkConnectivity = useCallback(async () => {
     setConnectionChecking(true);
     try {
+      // Use AbortController para implementar timeout sem usar signal na função
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       
+      // Tentativa de fetch para um serviço confiável
       const response = await fetch('https://www.google.com', { 
         method: 'HEAD',
-        signal: controller.signal
+        // Não usamos controller.signal aqui para compatibilidade
       });
       
       clearTimeout(timeoutId);
@@ -161,19 +163,26 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     try {
       console.log("Iniciando checkout para o plano:", selectedPlan);
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      // Implementar timeout sem usar controller.signal
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Tempo limite excedido ao iniciar checkout")), 10000);
+      });
       
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
+      const functionPromise = supabase.functions.invoke('create-checkout', {
         body: {
           tier: selectedPlan.tier,
           priceId: selectedPlan.priceId,
           returnUrl: window.location.origin + '/subscription/success'
-        },
-        signal: controller.signal
+        }
       });
       
-      clearTimeout(timeoutId);
+      // Usar race para implementar timeout
+      const { data, error } = await Promise.race([
+        functionPromise,
+        timeoutPromise.then(() => {
+          throw new Error("Tempo limite excedido ao iniciar checkout");
+        })
+      ]);
       
       console.log("Resposta do create-checkout:", data, error);
       
@@ -195,6 +204,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         error.name === 'AbortError' || 
         error.message.includes('network') || 
         error.message.includes('fetch') || 
+        error.message.includes('tempo limite') ||
         error.message.includes('timeout');
       
       if (isNetworkError) {
@@ -232,15 +242,22 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     
     setPortalLoading(true);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      const { data, error } = await supabase.functions.invoke('customer-portal', {
-        body: { url: window.location.origin + '/profile/subscription' },
-        signal: controller.signal
+      // Implementar timeout sem usar controller.signal
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Tempo limite excedido ao acessar portal do cliente")), 10000);
       });
       
-      clearTimeout(timeoutId);
+      const functionPromise = supabase.functions.invoke('customer-portal', {
+        body: { url: window.location.origin + '/profile/subscription' }
+      });
+      
+      // Usar race para implementar timeout
+      const { data, error } = await Promise.race([
+        functionPromise,
+        timeoutPromise.then(() => {
+          throw new Error("Tempo limite excedido ao acessar portal do cliente");
+        })
+      ]);
       
       console.log("Resposta do customer-portal:", data, error);
       
@@ -260,6 +277,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         error.name === 'AbortError' || 
         error.message.includes('network') || 
         error.message.includes('fetch') || 
+        error.message.includes('tempo limite') ||
         error.message.includes('timeout');
       
       const errorMsg = isNetworkError
