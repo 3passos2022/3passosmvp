@@ -90,14 +90,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         toast({
           title: 'Erro ao fazer login',
           description: result.error.message,
-          variant: "destructive"
         });
         return { error: result.error };
       }
       
       toast({
         title: 'Login realizado com sucesso!',
-        variant: "default"
       });
       
       // Atraso para garantir atualização do estado
@@ -111,7 +109,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error: any) {
       toast({
         title: 'Erro inesperado ao fazer login',
-        variant: "destructive"
       });
       return { error };
     }
@@ -136,7 +133,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         toast({
           title: 'Erro ao criar conta',
           description: error.message,
-          variant: "destructive"
         });
         return { error };
       }
@@ -153,13 +149,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       toast({
         title: 'Conta criada com sucesso!',
         description: 'Verifique seu e-mail para confirmar seu cadastro.',
-        variant: "default"
       });
       return { error: null };
     } catch (error: any) {
       toast({
         title: 'Erro ao criar conta',
-        variant: "destructive"
       });
       return { error };
     }
@@ -175,7 +169,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       toast({
         title: 'Erro ao fazer logout',
         description: error.message,
-        variant: "destructive"
       });
     }
   };
@@ -219,12 +212,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       
-      return { success: true };
+      return;
     } catch (error: any) {
       console.error("Erro ao atualizar informações do usuário:", error);
       toast({
         title: "Falha ao carregar informações do usuário",
-        variant: "destructive"
       });
       throw error;
     } finally {
@@ -249,23 +241,18 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.error("Erro ao atualizar perfil:", profileError);
           toast({
             title: "Falha ao atualizar informações do perfil",
-            variant: "destructive"
           });
         }
       }
 
-      const result = await refreshUser();
-      if (result && result.success) {
-        toast({
-          title: 'Perfil atualizado!',
-          variant: "default"
-        });
-      }
+      await refreshUser();
+      toast({
+        title: 'Perfil atualizado!',
+      });
     } catch (error: any) {
       toast({
         title: 'Erro ao atualizar perfil',
         description: error.message,
-        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -297,7 +284,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         toast({
           title: 'Perfil atualizado com sucesso',
-          variant: "default"
         });
         return { error: null };
       }
@@ -307,7 +293,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       toast({
         title: 'Erro ao atualizar perfil',
         description: error.message,
-        variant: "destructive"
       });
       return { error };
     } finally {
@@ -322,7 +307,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (user?.role !== UserRole.ADMIN) {
         toast({
           title: 'Você não tem permissão para executar esta ação',
-          variant: "destructive"
         });
         return;
       }
@@ -336,14 +320,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       toast({
         title: 'Usuário promovido a administrador com sucesso!',
-        variant: "default"
       });
     } catch (error: any) {
       console.error('Error making admin:', error);
       toast({
         title: 'Erro ao promover a administrador',
         description: 'Tente novamente.',
-        variant: "destructive"
       });
     }
   };

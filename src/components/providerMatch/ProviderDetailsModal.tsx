@@ -71,16 +71,14 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       } else {
         toast({
           title: "Erro",
-          description: result.message,
-          variant: "destructive"
+          description: result.message
         });
       }
     } catch (error) {
       console.error("Erro ao enviar orçamento:", error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao enviar o orçamento",
-        variant: "destructive"
+        description: "Ocorreu um erro ao enviar o orçamento"
       });
     } finally {
       setIsSending(false);
