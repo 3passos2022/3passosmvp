@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole, ExtendedUser } from '@/lib/types';
+import { UserRole, ExtendedUser, UserProfile } from '@/lib/types';
 import { toast } from 'sonner';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 
@@ -77,11 +77,11 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
   }
 
   // Verificar permissão de role usando a nova classe utilitária
-  if (requiredRole) {
-    // Ensure we're passing the user with the expected shape
-    const userProfile = {
+  if (requiredRole && user) {
+    // Convert ExtendedUser to UserProfile for RoleUtils
+    const userProfile: UserProfile = {
       id: user.id,
-      email: user.email || '',
+      email: user.email,
       role: user.role || UserRole.CLIENT,
       name: user.name,
       avatar_url: user.avatar_url,

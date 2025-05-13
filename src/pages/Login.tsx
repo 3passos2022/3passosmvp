@@ -100,7 +100,7 @@ const Login: React.FC = () => {
   const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
     try {
-      const { error } = await signIn(formData.email, formData.password);
+      const { error } = await signIn!(formData.email, formData.password);
       if (error) {
         toast.error(`Erro ao fazer login: ${error.message}`);
       } else {
@@ -113,7 +113,7 @@ const Login: React.FC = () => {
           }
         }, 500);
       }
-    } catch (error) {
+    } catch (error: any) {
       toast.error("Erro inesperado ao fazer login");
     } finally {
       setIsLoading(false);
@@ -123,7 +123,7 @@ const Login: React.FC = () => {
   const handleSignupSubmit = async (formData: z.infer<typeof signupSchema>) => {
     setIsLoading(true);
     try {
-      const { error } = await signUp(formData.email, formData.password, formData.role);
+      const { error } = await signUp!(formData.email, formData.password, formData.role);
 
       if (error) {
         toast.error(`Erro ao criar conta: ${error.message}`);
@@ -136,7 +136,7 @@ const Login: React.FC = () => {
         loginForm.setValue("email", formData.email);
         signupForm.reset();
       }
-    } catch (error) {
+    } catch (error: any) {
       toast.error("Erro ao criar conta");
     } finally {
       setIsLoading(false);

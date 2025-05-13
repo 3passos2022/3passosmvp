@@ -11,6 +11,7 @@ export enum UserRole {
 export interface ExtendedUser extends SupabaseUser {
   role?: UserRole;
   name?: string;
+  email: string; // Make email required
   avatar_url?: string;
   address?: string;
   phone?: string;

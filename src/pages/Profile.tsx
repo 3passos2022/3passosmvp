@@ -17,6 +17,7 @@ import PlansComparison from '@/components/subscription/PlansComparison';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 import { SubscriptionData } from '@/lib/types/subscriptions';
+import { UserProfile as UserProfileType } from '@/lib/types';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
@@ -120,9 +121,22 @@ const Profile: React.FC = () => {
     navigate(path);
   };
 
+  // Convert ExtendedUser to UserProfile for role checks
+  const userProfile: UserProfileType = {
+    id: user.id,
+    email: user.email,
+    role: user.role || 'client',
+    name: user.name,
+    avatar_url: user.avatar_url,
+    created_at: user.created_at || new Date().toISOString(),
+    subscribed: user.subscribed,
+    subscription_tier: user.subscription_tier,
+    subscription_end: user.subscription_end
+  };
+
   // Check if user is provider or admin using our utility
-  const isProvider = RoleUtils.isProvider(user);
-  const isAdmin = RoleUtils.isAdmin(user);
+  const isProvider = RoleUtils.isProvider(userProfile);
+  const isAdmin = RoleUtils.isAdmin(userProfile);
 
   return (
     <div className="min-h-screen flex flex-col">

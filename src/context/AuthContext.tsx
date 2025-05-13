@@ -12,7 +12,7 @@ interface AuthContextType {
   user: ExtendedUser | null;
   session: Session | null;
   loading: boolean;
-  login: (email: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<{ error: any | null }>;
   logout: () => Promise<void>;
   signOut: () => Promise<void>; // Alias for logout
   refreshUser: () => Promise<void>;
@@ -22,8 +22,8 @@ interface AuthContextType {
   subscription: SubscriptionStatus | null;
   subscriptionLoading: boolean;
   makeAdmin?: (userId: string) => Promise<void>;
-  signIn?: (email: string) => Promise<void>; // Alias for login
-  signUp?: (email: string) => Promise<void>; // Alias for login
+  signIn?: (email: string, password?: string) => Promise<{ error: any | null }>;
+  signUp?: (email: string, password: string, role: UserRole) => Promise<{ error: any | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,7 +45,16 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { data: { session } } = await supabase.auth.getSession();
 
       setSession(session);
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        // Cast to ExtendedUser
+        setUser({
+          ...session.user,
+          email: session.user.email || '',
+          role: (session.user.role as UserRole) || UserRole.CLIENT
+        });
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     };
 
@@ -53,30 +62,85 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        // Cast to ExtendedUser
+        setUser({
+          ...session.user,
+          email: session.user.email || '',
+          role: (session.user.role as UserRole) || UserRole.CLIENT
+        });
+      } else {
+        setUser(null);
+      }
     });
   }, []);
 
-  const login = async (email: string) => {
+  const login = async (email: string, password?: string) => {
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email });
-      if (error) throw error;
-      toast({
-        title: 'Verifique seu email',
-        description: 'Enviamos um link mágico para seu email.',
-      });
+      let result;
+      if (password) {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      } else {
+        result = await supabase.auth.signInWithOtp({ email });
+      }
+      
+      if (result.error) {
+        toast.error('Erro ao fazer login: ' + result.error.message);
+        return { error: result.error };
+      }
+      
+      toast.success('Login realizado com sucesso!');
+      
+      // Atraso para garantir atualização do estado
+      setTimeout(() => {
+        if (!user || !session) {
+          navigate('/');
+        }
+      }, 500);
+      
+      return { error: null };
     } catch (error: any) {
-      toast({
-        title: 'Erro ao fazer login',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast.error('Erro inesperado ao fazer login');
+      return { error };
     }
   };
 
   // Provide aliases for consistency with component usage
   const signIn = login;
-  const signUp = login;
+
+  const signUp = async (email: string, password: string, role: UserRole) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            role: role
+          }
+        }
+      });
+      
+      if (error) {
+        toast.error('Erro ao criar conta: ' + error.message);
+        return { error };
+      }
+      
+      // Create user profile
+      if (data.user) {
+        try {
+          await createUserProfile(data.user.id, data.user.email || '', role);
+        } catch (profileError) {
+          console.error("Error creating profile:", profileError);
+        }
+      }
+      
+      toast.success('Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.');
+      return { error: null };
+    } catch (error: any) {
+      toast.error('Erro ao criar conta');
+      return { error };
+    }
+  };
 
   const logout = async () => {
     try {
@@ -85,11 +149,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       navigate('/login');
     } catch (error: any) {
-      toast({
-        title: 'Erro ao fazer logout',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast.error('Erro ao fazer logout: ' + error.message);
     }
   };
 
@@ -108,7 +168,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
       if (data?.user) {
         // Create extended user
-        const extendedUser: ExtendedUser = data.user;
+        const extendedUser: ExtendedUser = {
+          ...data.user,
+          email: data.user.email || '',
+          role: (data.user.role as UserRole) || UserRole.CLIENT
+        };
   
         // Buscar informações adicionais do perfil
         const profileData = await getUserProfile(data.user.id);
@@ -124,13 +188,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(extendedUser);
         }
       }
+
+      return;
     } catch (error: any) {
       console.error("Erro ao atualizar informações do usuário:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar informações do usuário.",
-        variant: "destructive"
-      });
+      toast.error("Falha ao carregar informações do usuário.");
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -151,25 +214,14 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (profileError) {
           console.error("Erro ao atualizar perfil:", profileError);
-          toast({
-            title: "Erro",
-            description: "Falha ao atualizar informações do perfil.",
-            variant: "destructive"
-          });
+          toast.error("Falha ao atualizar informações do perfil.");
         }
       }
 
       await refreshUser();
-      toast({
-        title: 'Perfil atualizado!',
-        description: 'Suas informações foram atualizadas com sucesso.',
-      });
+      toast.success('Perfil atualizado!');
     } catch (error: any) {
-      toast({
-        title: 'Erro ao atualizar perfil',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast.error('Erro ao atualizar perfil: ' + error.message);
     } finally {
       setLoading(false);
     }
