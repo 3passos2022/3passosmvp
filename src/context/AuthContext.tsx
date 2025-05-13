@@ -46,12 +46,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setSession(session);
       if (session?.user) {
-        // Cast to ExtendedUser
-        setUser({
+        // Cast to ExtendedUser with required fields
+        const extendedUser: ExtendedUser = {
           ...session.user,
           email: session.user.email || '',
-          role: (session.user.role as UserRole) || UserRole.CLIENT
-        });
+          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT
+        };
+        setUser(extendedUser);
       } else {
         setUser(null);
       }
@@ -63,12 +64,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session?.user) {
-        // Cast to ExtendedUser
-        setUser({
+        // Cast to ExtendedUser with required fields
+        const extendedUser: ExtendedUser = {
           ...session.user,
           email: session.user.email || '',
-          role: (session.user.role as UserRole) || UserRole.CLIENT
-        });
+          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT
+        };
+        setUser(extendedUser);
       } else {
         setUser(null);
       }
@@ -171,7 +173,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const extendedUser: ExtendedUser = {
           ...data.user,
           email: data.user.email || '',
-          role: (data.user.role as UserRole) || UserRole.CLIENT
+          role: (data.user.user_metadata?.role as UserRole) || UserRole.CLIENT
         };
   
         // Buscar informações adicionais do perfil
@@ -179,17 +181,17 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Atualizar o estado do usuário com as informações do perfil
         if (profileData) {
-          const updatedUser = {
+          setUser({
             ...extendedUser,
-            ...profileData
-          };
-          setUser(updatedUser);
+            ...profileData,
+            // Ensure required fields
+            email: profileData.email || extendedUser.email,
+            role: profileData.role || extendedUser.role
+          });
         } else {
           setUser(extendedUser);
         }
       }
-
-      return;
     } catch (error: any) {
       console.error("Erro ao atualizar informações do usuário:", error);
       toast.error("Falha ao carregar informações do usuário.");
@@ -291,7 +293,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!session || !user) {
       setSubscription({ subscribed: false, subscription_tier: 'free' });
       setSubscriptionLoading(false);
-      return;
+      return { subscribed: false, subscription_tier: 'free' };
     }
 
     setSubscriptionLoading(true);
@@ -316,15 +318,17 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setSubscription(subscriptionStatus);
       
       // Update user's subscription info
-      setUser(prevUser => {
-        if (!prevUser) return null;
-        return { 
-          ...prevUser, 
-          subscribed: data.subscribed || false,
-          subscription_tier: data.subscription_tier || 'free',
-          subscription_end: data.subscription_end
-        };
-      });
+      if (user) {
+        setUser(prevUser => {
+          if (!prevUser) return null;
+          return { 
+            ...prevUser, 
+            subscribed: data.subscribed || false,
+            subscription_tier: data.subscription_tier || 'free',
+            subscription_end: data.subscription_end
+          };
+        });
+      }
       
       return data;
     } catch (error) {

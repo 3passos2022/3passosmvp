@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
-import { ExtendedUser, UserProfile as UserProfileType } from '@/lib/types';
+import { ExtendedUser, UserProfile as UserProfileType, UserRole } from '@/lib/types';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -49,8 +48,8 @@ const UserProfile: React.FC = () => {
   // Create a UserProfile object from the ExtendedUser for RoleUtils
   const userProfile: UserProfileType = {
     id: user.id,
-    email: user.email || '',
-    role: user.role || 'client',
+    email: user.email,
+    role: user.role || UserRole.CLIENT,
     name: user.name,
     avatar_url: user.avatar_url,
     phone: user.phone,
@@ -69,7 +68,7 @@ const UserProfile: React.FC = () => {
         .join('')
         .toUpperCase();
     }
-    return (user.email || '').substring(0, 2).toUpperCase();
+    return user.email.substring(0, 2).toUpperCase();
   };
 
   return (

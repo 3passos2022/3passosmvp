@@ -9,7 +9,7 @@ export enum UserRole {
 
 // Extend the Supabase User type with our custom properties
 export interface ExtendedUser extends SupabaseUser {
-  role?: UserRole;
+  role: UserRole; // Make role required
   name?: string;
   email: string; // Make email required
   avatar_url?: string;

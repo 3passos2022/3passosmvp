@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,7 +18,7 @@ import PlansComparison from '@/components/subscription/PlansComparison';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 import { SubscriptionData } from '@/lib/types/subscriptions';
-import { UserProfile as UserProfileType } from '@/lib/types';
+import { UserProfile as UserProfileType, UserRole } from '@/lib/types';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
@@ -125,7 +126,7 @@ const Profile: React.FC = () => {
   const userProfile: UserProfileType = {
     id: user.id,
     email: user.email,
-    role: user.role || 'client',
+    role: user.role || UserRole.CLIENT,
     name: user.name,
     avatar_url: user.avatar_url,
     created_at: user.created_at || new Date().toISOString(),
@@ -159,7 +160,7 @@ const Profile: React.FC = () => {
                   
                   <div className="flex items-center">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                      {RoleUtils.getAccountTypeLabel(user)}
+                      {RoleUtils.getAccountTypeLabel(userProfile)}
                     </span>
                   </div>
                 </div>
