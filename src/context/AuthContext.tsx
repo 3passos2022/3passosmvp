@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -197,10 +196,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Update user state with profile information
           if (profileData) {
-            // Fix: Removed void check and properly handle the data
+            // Properly handle the profile data
             setUser({
               ...extendedUser,
-              ...(profileData as object), // Fix: Cast to object to ensure spread works
+              ...profileData,
               // Ensure required fields
               email: profileData.email || extendedUser.email,
               role: profileData.role || extendedUser.role
