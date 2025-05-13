@@ -7,43 +7,7 @@ import { SubscriptionStatus } from '@/lib/types/subscriptions';
 import { toast } from 'sonner';
 import ProfileService, { hasRole } from '@/services/ProfileService';
 
-export interface AuthContextProps {
-  user: UserProfile | null;
-  session: Session | null;
-  loading: boolean;
-  signUp: (email: string, password: string, role: UserRole) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  signIn: (email: string, password: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  signOut: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  resetPassword: (newPassword: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  updateProfile: (data: Partial<UserProfile>) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  refreshUser: () => Promise<void>;
-  makeAdmin: (userId: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  subscription: SubscriptionStatus | null;
-  refreshSubscription: () => Promise<void>;
-  subscriptionLoading: boolean;
-  hasRole: (role: UserRole | string) => boolean;
-}
-
-export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -89,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           subscribed: false,
           subscription_tier: 'free',
           subscription_end: null
-        });
+        } as UserProfile);
       }
     } catch (error) {
       // Perfil mínimo em caso de erro
@@ -101,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         subscribed: false,
         subscription_tier: 'free',
         subscription_end: null
-      });
+      } as UserProfile);
     }
   };
 
@@ -333,7 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   // Context value
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     loading,
