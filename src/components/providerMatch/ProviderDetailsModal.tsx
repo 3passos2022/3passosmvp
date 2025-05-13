@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -20,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/utils';
 import { Star, MapPin, Send, Phone } from 'lucide-react';
 import { ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { sendQuoteToProvider } from '@/lib/services/providerMatchService';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,7 +54,7 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       if (result.requiresLogin) {
         toast({
           title: "Login necessário",
-          description: "Você precisa estar logado para enviar um orçamento"
+          description: "Você precisa estar logado para enviar um orçamento",
         });
         
         if (onLoginRequired) {
@@ -65,20 +66,22 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       if (result.success) {
         toast({
           title: "Orçamento enviado",
-          description: "Seu orçamento foi enviado com sucesso para o prestador"
+          description: "Seu orçamento foi enviado com sucesso para o prestador",
         });
         onClose();
       } else {
         toast({
           title: "Erro",
-          description: result.message
+          description: result.message,
+          variant: "destructive"
         });
       }
     } catch (error) {
       console.error("Erro ao enviar orçamento:", error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao enviar o orçamento"
+        description: "Ocorreu um erro ao enviar o orçamento",
+        variant: "destructive"
       });
     } finally {
       setIsSending(false);

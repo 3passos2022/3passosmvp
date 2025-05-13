@@ -17,7 +17,7 @@ import SubscriptionCancel from './pages/SubscriptionCancel';
 import { UserRole } from './lib/types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
-import { Toaster } from '@/components/ui/toaster';
+import { Toaster } from 'sonner';
 
 // Create a query client
 const queryClient = new QueryClient();
@@ -26,8 +26,8 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
+        <Toaster position="top-center" richColors />
         <Router>
-          <Toaster />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/services" element={<Services />} />

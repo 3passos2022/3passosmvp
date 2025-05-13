@@ -8,11 +8,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getAllServices } from '@/lib/api/services';
 import { useAuth } from '@/context/AuthContext';
 import { clearQuoteData } from '@/lib/utils/quoteStorage';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 const RequestQuote: React.FC = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   
   // Use React Query for fetching services with caching
   const { isLoading, error, data: services } = useQuery({
@@ -39,15 +38,17 @@ const RequestQuote: React.FC = () => {
   // Display a welcome toast for non-logged in users
   useEffect(() => {
     if (!user) {
-      toast({
-        title: "Informação",
-        description: "Você não está logado, mas pode continuar! Para acompanhar seu orçamento depois, faça login antes de enviar.",
-        duration: 7000,
-      });
+      toast.info(
+        "Você não está logado, mas pode continuar! Para acompanhar seu orçamento depois, faça login antes de enviar.", 
+        {
+          duration: 7000,
+          id: "anonymous-quote-info" // Prevent duplicate toasts
+        }
+      );
     } else {
       console.log("RequestQuote: User is logged in", user.id);
     }
-  }, [user, toast]);
+  }, [user]);
 
   useEffect(() => {
     if (services) {

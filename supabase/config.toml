@@ -1,43 +1,11 @@
 
 project_id = "jezfwtknzraaykkjjaaf"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-
-[db]
-port = 54322
-
-[realtime]
-enabled = true
-
-[studio]
-enabled = true
-port = 54323
-
-[inbucket]
-enabled = true
-port = 54324
-
-[auth]
-enabled = true
-port = 9999
-
-[storage]
-enabled = true
-
-[functions]
-enabled = true
-
-[functions.stripe-checkout]
+[functions.create-checkout]
 verify_jwt = true
 
-[functions.stripe-products]
-verify_jwt = false
-
-[functions.stripe-portal]
+[functions.check-subscription]
 verify_jwt = true
 
-[functions.stripe-subscription]
+[functions.customer-portal]
 verify_jwt = true
