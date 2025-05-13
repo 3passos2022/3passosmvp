@@ -2,11 +2,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
-// Expand headers CORS to ensure compatibility across different browsers
+// Even more robust CORS headers implementation
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin, referer, sec-fetch-dest, sec-fetch-mode, sec-fetch-site",
   "Access-Control-Max-Age": "86400", // 24 hours to reduce preflight requests
   "Access-Control-Allow-Credentials": "true",
 };
@@ -17,7 +17,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight request
+  // Handle CORS preflight request with expanded headers
   if (req.method === "OPTIONS") {
     logStep("OPTIONS request recebida");
     return new Response(null, { 
@@ -97,10 +97,8 @@ serve(async (req) => {
       const stripe = new Stripe(stripeKey, {
         apiVersion: "2023-10-16",
         httpClient: Stripe.createFetchHttpClient(),
-        timeout: 10000, // Timeout em ms (10 segundos)
       });
 
-      // Conectar diretamente ao Stripe sem verificação de internet
       logStep("Tentando conectar diretamente ao Stripe");
       
       try {
@@ -179,7 +177,19 @@ serve(async (req) => {
       } catch (stripeError) {
         // Erro ao se comunicar com o Stripe
         logStep(`Erro ao comunicar com Stripe API: ${stripeError.message}`);
-        throw stripeError; // Repassar erro para ser tratado no catch externo
+        // Repassar erro para ser tratado no catch externo incluindo headers CORS
+        return new Response(
+          JSON.stringify({ 
+            error: stripeError.message,
+            fallback: true,
+            products: defaultPlans,
+            timestamp: new Date().toISOString() 
+          }),
+          {
+            status: 200, // Usar 200 mesmo em erros para garantir que os headers sejam respeitados
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
     } catch (error) {
       // Usar planos padrão em caso de erro
@@ -220,13 +230,16 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("Erro fatal", { message: errorMessage });
     
+    // Garantir que mesmo em caso de erro fatal, os headers CORS sejam incluídos
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
+        products: [], // Array vazio para evitar erros no frontend
+        fallback: true,
         timestamp: new Date().toISOString()
       }),
       {
-        status: 200, // Retornar 200 mesmo com erro para evitar problemas de CORS
+        status: 200, // Usar 200 mesmo em erros para garantir que os headers sejam respeitados
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

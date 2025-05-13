@@ -3,12 +3,13 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Expandir headers CORS para garantir compatibilidade em diferentes navegadores
+// Enhanced CORS headers for better compatibility
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept",
-  "Access-Control-Max-Age": "86400", // 24 horas para reduzir preflight requests
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin, referer, sec-fetch-dest, sec-fetch-mode, sec-fetch-site",
+  "Access-Control-Max-Age": "86400", // 24 hours to reduce preflight requests
+  "Access-Control-Allow-Credentials": "true",
 };
 
 // Helper para logging
@@ -18,7 +19,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests - responder imediatamente para OPTIONS
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     logStep("OPTIONS request recebida");
     return new Response(null, { 
@@ -26,54 +27,37 @@ serve(async (req) => {
       status: 204
     });
   }
-  
-  // Create a unique request ID for tracing
+
   const requestId = crypto.randomUUID();
-  
-  // Log request details
-  const url = new URL(req.url);
-  logStep(`Nova requisição [${requestId}]`, { 
-    method: req.method, 
-    pathname: url.pathname,
-    headers: Object.fromEntries(req.headers)
-  });
+  logStep(`Requisição [${requestId}] iniciada`);
 
   try {
-    logStep(`Requisição [${requestId}] - Função iniciada`);
-
-    // Validar a existência da chave do Stripe
+    // Verificar API key do Stripe
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       logStep(`Requisição [${requestId}] - Erro: STRIPE_SECRET_KEY não configurada`);
-      throw new Error("STRIPE_SECRET_KEY não configurada no ambiente");
-    }
-    logStep(`Requisição [${requestId}] - STRIPE_SECRET_KEY verificada`);
-
-    // Obtém os parâmetros do corpo da requisição
-    let requestBody;
-    try {
-      requestBody = await req.json();
-      logStep(`Requisição [${requestId}] - Corpo da requisição`, requestBody);
-    } catch (e) {
-      logStep(`Requisição [${requestId}] - Erro ao fazer parse do corpo da requisição`, { error: e.message });
-      throw new Error("Formato de requisição inválido");
-    }
-    
-    const { tier = "basic", priceId, returnUrl } = requestBody;
-    logStep(`Requisição [${requestId}] - Parâmetros recebidos`, { tier, priceId, returnUrl });
-
-    if (!priceId) {
-      logStep(`Requisição [${requestId}] - Erro: ID de preço não fornecido`);
-      throw new Error("ID de preço não fornecido");
+      return new Response(
+        JSON.stringify({ error: "STRIPE_SECRET_KEY não configurada no ambiente" }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
 
-    // Inicializa o cliente Supabase
+    // Inicializar cliente Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     
     if (!supabaseUrl || !supabaseAnonKey) {
       logStep(`Requisição [${requestId}] - Erro: Variáveis de ambiente do Supabase não configuradas`);
-      throw new Error("Variáveis de ambiente do Supabase não configuradas");
+      return new Response(
+        JSON.stringify({ error: "Variáveis de ambiente do Supabase não configuradas" }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
     
     const supabaseClient = createClient(
@@ -81,125 +65,140 @@ serve(async (req) => {
       supabaseAnonKey
     );
 
-    // Verifica a autenticação
+    // Verificar autenticação do usuário
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       logStep(`Requisição [${requestId}] - Erro: Header de autorização ausente`);
-      throw new Error("Usuário não autenticado");
+      return new Response(
+        JSON.stringify({ error: "Usuário não autenticado" }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
-    logStep(`Requisição [${requestId}] - Token extraído do header`);
-    
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError || !userData.user) {
-      logStep(`Requisição [${requestId}] - Erro de autenticação`, { error: userError?.message });
-      throw new Error("Falha na autenticação: " + (userError?.message || "Usuário não encontrado"));
+      logStep(`Requisição [${requestId}] - Erro de autenticação: ${userError?.message || 'Usuário não encontrado'}`);
+      return new Response(
+        JSON.stringify({ error: "Falha na autenticação: " + (userError?.message || "Usuário não encontrado") }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
 
     const user = userData.user;
-    logStep(`Requisição [${requestId}] - Usuário autenticado`, { id: user.id, email: user.email });
-
-    // Inicializa o Stripe
+    logStep(`Requisição [${requestId}] - Usuário autenticado: ${user.email}`);
+    
+    // Inicializar Stripe
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(), // Especificar explicitamente o cliente HTTP
+      httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // Verificar conexão com o Stripe
+    // Verificar se o corpo da requisição é válido
+    let requestBody;
     try {
-      logStep(`Requisição [${requestId}] - Verificando conexão com o Stripe`);
-      await stripe.balance.retrieve();
-      logStep(`Requisição [${requestId}] - Conexão com Stripe confirmada`);
-    } catch (stripeConnectionError) {
-      logStep(`Requisição [${requestId}] - Erro de conexão com Stripe`, { 
-        error: stripeConnectionError.message 
-      });
-      throw new Error(`Não foi possível conectar ao Stripe: ${stripeConnectionError.message}`);
+      requestBody = await req.json();
+      logStep(`Requisição [${requestId}] - Corpo da requisição analisado com sucesso`, requestBody);
+    } catch (e) {
+      logStep(`Requisição [${requestId}] - Erro ao analisar corpo da requisição: ${e instanceof Error ? e.message : String(e)}`);
+      return new Response(
+        JSON.stringify({ error: "Corpo da requisição inválido" }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
 
-    // Verifica se o cliente já existe no Stripe
-    logStep(`Requisição [${requestId}] - Buscando cliente no Stripe para o e-mail`, { email: user.email });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId: string | undefined = undefined;
+    // Verificar se existe priceId no corpo da requisição
+    const { priceId, tier, returnUrl } = requestBody;
+    if (!priceId) {
+      logStep(`Requisição [${requestId}] - Erro: priceId não fornecido`);
+      return new Response(
+        JSON.stringify({ error: "ID de preço não fornecido" }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Verificar se o usuário já é cliente do Stripe
+    logStep(`Requisição [${requestId}] - Verificando se o usuário já é cliente do Stripe`);
+    const customers = await stripe.customers.list({ email: user.email });
     
+    let customerId;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
-      logStep(`Requisição [${requestId}] - Cliente Stripe existente encontrado`, { customerId });
+      logStep(`Requisição [${requestId}] - Cliente existente encontrado: ${customerId}`);
     } else {
-      // Se não existir, criar um novo cliente
+      // Criar novo cliente
       const newCustomer = await stripe.customers.create({
         email: user.email,
-        name: user.user_metadata?.name || user.email.split('@')[0],
         metadata: {
-          user_id: user.id
-        }
+          user_id: user.id,
+        },
       });
       customerId = newCustomer.id;
-      logStep(`Requisição [${requestId}] - Novo cliente Stripe criado`, { customerId });
+      logStep(`Requisição [${requestId}] - Novo cliente criado: ${customerId}`);
     }
-
-    // Cria a sessão de checkout usando o priceId fornecido
-    const origin = new URL(req.url).origin;
-    const baseUrl = returnUrl ? new URL(returnUrl).origin : origin;
-    const success_url = returnUrl || `${baseUrl}/subscription/success?tier=${tier}`;
-    const cancel_url = `${baseUrl}/subscription/cancel`;
-
-    logStep(`Requisição [${requestId}] - Criando sessão de checkout`, { 
-      priceId, 
-      customerId, 
-      success_url, 
-      cancel_url,
-      baseUrl,
-      origin
-    });
-
+    
+    // Criar sessão de checkout
+    logStep(`Requisição [${requestId}] - Criando sessão de checkout`);
     try {
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
+        payment_method_types: ['card'],
         line_items: [
           {
             price: priceId,
             quantity: 1,
           },
         ],
-        mode: "subscription",
-        success_url,
-        cancel_url,
+        mode: 'subscription',
+        success_url: returnUrl || `${req.headers.get("origin") || "http://localhost:3000"}/subscription/success`,
+        cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/subscription/cancel`,
         metadata: {
           user_id: user.id,
-          tier: tier,
+          tier: tier || 'basic',
         },
         allow_promotion_codes: true,
       });
 
-      logStep(`Requisição [${requestId}] - Sessão de checkout criada`, { sessionId: session.id, url: session.url });
-
+      logStep(`Requisição [${requestId}] - Sessão de checkout criada com sucesso: ${session.id}`);
+      
       return new Response(
-        JSON.stringify({ url: session.url, sessionId: session.id }),
-        {
+        JSON.stringify({ url: session.url }),
+        { 
           status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
     } catch (stripeError) {
-      logStep(`Requisição [${requestId}] - Erro ao criar sessão de checkout no Stripe`, { 
-        error: stripeError.message,
-        code: stripeError.code,
-        type: stripeError.type
-      });
-      throw new Error(`Erro ao criar sessão de checkout: ${stripeError.message}`);
+      logStep(`Requisição [${requestId}] - Erro ao criar sessão de checkout: ${stripeError.message}`);
+      return new Response(
+        JSON.stringify({ error: `Erro ao criar sessão de checkout: ${stripeError.message}` }),
+        { 
+          status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    logStep(`Requisição [${requestId}] - Erro`, { message: errorMessage, stack: errorStack });
+    logStep(`Requisição [${requestId}] - Erro fatal: ${errorMessage}`);
     
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      { 
+        status: 200, // Alterado para 200 para melhor compatibilidade com CORS
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
   }

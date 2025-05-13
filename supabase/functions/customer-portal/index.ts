@@ -3,11 +3,13 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// Enhanced CORS headers for better compatibility
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin, referer, sec-fetch-dest, sec-fetch-mode, sec-fetch-site",
   "Access-Control-Max-Age": "86400", // 24 horas para reduzir preflight requests
+  "Access-Control-Allow-Credentials": "true"
 };
 
 // Helper para logging
@@ -95,7 +97,17 @@ serve(async (req) => {
       logStep(`Requisição [${requestId}] - Erro de conexão com Stripe`, { 
         error: stripeConnectionError.message 
       });
-      throw new Error(`Não foi possível conectar ao Stripe: ${stripeConnectionError.message}`);
+      // Return error with CORS headers
+      return new Response(
+        JSON.stringify({ 
+          error: `Não foi possível conectar ao Stripe: ${stripeConnectionError.message}`,
+          timestamp: new Date().toISOString() 
+        }),
+        {
+          status: 200, // Usar 200 mesmo em erros para garantir que os headers sejam respeitados
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Buscar cliente do Stripe pelo email
@@ -104,7 +116,17 @@ serve(async (req) => {
     
     if (customers.data.length === 0) {
       logStep(`Requisição [${requestId}] - Cliente não encontrado no Stripe`);
-      throw new Error("Nenhuma assinatura encontrada para este usuário");
+      // Return error with CORS headers
+      return new Response(
+        JSON.stringify({ 
+          error: "Nenhuma assinatura encontrada para este usuário",
+          timestamp: new Date().toISOString() 
+        }),
+        {
+          status: 200, // Usar 200 mesmo em erros para garantir que os headers sejam respeitados
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const customerId = customers.data[0].id;
@@ -143,7 +165,18 @@ serve(async (req) => {
         code: stripeError.code,
         type: stripeError.type
       });
-      throw new Error(`Erro ao criar sessão do portal: ${stripeError.message}`);
+      
+      // Return error with CORS headers
+      return new Response(
+        JSON.stringify({ 
+          error: `Erro ao criar sessão do portal: ${stripeError.message}`,
+          timestamp: new Date().toISOString() 
+        }),
+        {
+          status: 200, // Usar 200 mesmo em erros para garantir que os headers sejam respeitados
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -153,7 +186,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
-        status: 400,
+        status: 200, // Alterado para 200 para melhor compatibilidade com CORS
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
