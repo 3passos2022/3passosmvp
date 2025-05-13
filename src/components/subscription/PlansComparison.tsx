@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Check, X, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -7,7 +8,7 @@ import SubscriptionCard from './SubscriptionCard';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 
 interface PlansComparisonProps {
@@ -367,7 +368,10 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
   };
   
   const handleRetry = () => {
-    toast.info("Tentando novamente carregar os planos...");
+    toast({
+      title: "Carregando planos",
+      description: "Tentando novamente carregar os planos..."
+    });
     setRetryCount(prev => prev + 1);
     fetchPlans(true);
   };

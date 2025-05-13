@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ExternalLink, RefreshCw, ChevronDown, AlertCircle, WifiOff } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -96,7 +95,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         checkUserSubscription();
       } else {
         console.log("Sem conectividade de rede detectada, não verificando assinatura");
-        toast.error("Sem conexão com a internet. Algumas funcionalidades podem estar limitadas.");
+        toast({
+          title: "Erro de conexão",
+          description: "Sem conexão com a internet. Algumas funcionalidades podem estar limitadas.",
+          variant: "destructive"
+        });
       }
     });
     
@@ -135,26 +138,39 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     setCheckoutError(null);
     
     if (!user) {
-      toast.error("Você precisa estar logado para assinar");
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para assinar"
+      });
       navigate('/login', { state: { returnTo: '/subscription' } });
       return;
     }
     
     if (!selectedPlan || !selectedPlan.priceId) {
-      toast.error("Selecione um plano com preço válido para continuar");
+      toast({
+        title: "Erro",
+        description: "Selecione um plano com preço válido para continuar"
+      });
       return;
     }
     
     // Se o plano for gratuito, não iniciar checkout
     if (selectedPlan.tier === 'free') {
-      toast.info('Você já está no plano gratuito');
+      toast({
+        title: "Plano gratuito",
+        description: 'Você já está no plano gratuito'
+      });
       return;
     }
     
     // Verificar conectividade primeiro
     const isConnected = await checkNetworkConnectivity();
     if (!isConnected) {
-      toast.error("Sem conexão com a internet. Não é possível iniciar o checkout.");
+      toast({
+        title: "Erro de conexão",
+        description: "Sem conexão com a internet. Não é possível iniciar o checkout.",
+        variant: "destructive"
+      });
       setCheckoutError("Sem conexão com a internet. Tente novamente quando estiver online.");
       return;
     }
@@ -211,7 +227,10 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         setRetryAttempts(prev => prev + 1);
         
         if (retryAttempts < 2) {
-          toast.error("Problemas de conexão detectados. Tentando novamente...");
+          toast({
+            title: "Erro de conexão",
+            description: "Problemas de conexão detectados. Tentando novamente..."
+          });
           setTimeout(() => handleSubscribe(), 1000 * Math.pow(2, retryAttempts));
           return;
         }
@@ -222,7 +241,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         : (error.message || "Tente novamente mais tarde");
       
       setCheckoutError(errorMsg);
-      toast.error("Erro ao processar pagamento: " + errorMsg);
+      toast({
+        title: "Erro de pagamento",
+        description: "Erro ao processar pagamento: " + errorMsg,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -236,7 +259,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     // Verificar conectividade primeiro
     const isConnected = await checkNetworkConnectivity();
     if (!isConnected) {
-      toast.error("Sem conexão com a internet. Não é possível acessar o portal de gerenciamento.");
+      toast({
+        title: "Erro de conexão",
+        description: "Sem conexão com a internet. Não é possível acessar o portal de gerenciamento.",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -284,7 +311,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         ? "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente."
         : error.message;
       
-      toast.error("Erro ao abrir portal do cliente: " + errorMsg);
+      toast({
+        title: "Erro",
+        description: "Erro ao abrir portal do cliente: " + errorMsg,
+        variant: "destructive"
+      });
     } finally {
       setPortalLoading(false);
     }
@@ -296,15 +327,26 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       // Verificar conectividade primeiro
       const isConnected = await checkNetworkConnectivity();
       if (!isConnected) {
-        toast.error("Sem conexão com a internet. Não é possível atualizar as informações.");
+        toast({
+          title: "Erro de conexão",
+          description: "Sem conexão com a internet. Não é possível atualizar as informações.",
+          variant: "destructive"
+        });
         return;
       }
       
       await refreshSubscriptionWithTimeout();
-      toast.success("Informações de assinatura atualizadas");
+      toast({
+        title: "Sucesso",
+        description: "Informações de assinatura atualizadas"
+      });
     } catch (error) {
       console.error("Erro ao atualizar dados da assinatura:", error);
-      toast.error("Erro ao atualizar dados da assinatura");
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar dados da assinatura",
+        variant: "destructive"
+      });
     } finally {
       setRefreshing(false);
     }
@@ -333,10 +375,17 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   const handleVerifyConnection = async () => {
     const isConnected = await checkNetworkConnectivity();
     if (isConnected) {
-      toast.success("Conexão com a internet restaurada!");
+      toast({
+        title: "Conexão restaurada",
+        description: "Conexão com a internet restaurada!"
+      });
       setTimeout(() => handleRefresh(), 500);
     } else {
-      toast.error("Ainda sem conexão com a internet.");
+      toast({
+        title: "Sem conexão",
+        description: "Ainda sem conexão com a internet.",
+        variant: "destructive"
+      });
     }
   };
 

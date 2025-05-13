@@ -2,12 +2,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
-// Expandir headers CORS para garantir compatibilidade em diferentes navegadores
+// Expand headers CORS to ensure compatibility across different browsers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin",
-  "Access-Control-Max-Age": "86400", // 24 horas para reduzir preflight requests
+  "Access-Control-Max-Age": "86400", // 24 hours to reduce preflight requests
   "Access-Control-Allow-Credentials": "true",
 };
 
@@ -91,8 +91,6 @@ serve(async (req) => {
         'Visualização de apenas 3 prestadores'
       ]
     });
-
-    // Não vamos mais tentar verificar conexão com Google - isso está causando erro de CORS
     
     try {
       // Inicializa o Stripe com opções de timeout
@@ -102,7 +100,7 @@ serve(async (req) => {
         timeout: 10000, // Timeout em ms (10 segundos)
       });
 
-      // Tentar conectar ao Stripe diretamente, sem verificar conexão com a internet
+      // Conectar diretamente ao Stripe sem verificação de internet
       logStep("Tentando conectar diretamente ao Stripe");
       
       try {
