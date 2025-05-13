@@ -26,7 +26,6 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        <Toaster />
         <Router>
           <Routes>
             <Route path="/" element={<Index />} />

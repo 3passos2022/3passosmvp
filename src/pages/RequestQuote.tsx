@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getAllServices } from '@/lib/api/services';
 import { useAuth } from '@/context/AuthContext';
 import { clearQuoteData } from '@/lib/utils/quoteStorage';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 
 const RequestQuote: React.FC = () => {
   const { user } = useAuth();
@@ -38,13 +38,11 @@ const RequestQuote: React.FC = () => {
   // Display a welcome toast for non-logged in users
   useEffect(() => {
     if (!user) {
-      toast.info(
-        "Você não está logado, mas pode continuar! Para acompanhar seu orçamento depois, faça login antes de enviar.", 
-        {
-          duration: 7000,
-          id: "anonymous-quote-info" // Prevent duplicate toasts
-        }
-      );
+      toast({
+        title: "Informação",
+        description: "Você não está logado, mas pode continuar! Para acompanhar seu orçamento depois, faça login antes de enviar.",
+        duration: 7000,
+      });
     } else {
       console.log("RequestQuote: User is logged in", user.id);
     }
