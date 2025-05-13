@@ -8,38 +8,36 @@ schemas = ["public", "storage", "graphql_public"]
 
 [db]
 port = 54322
-shadow_port = 54320
-major_version = 15
+
+[realtime]
+enabled = true
 
 [studio]
 enabled = true
 port = 54323
-api_url = "http://localhost"
 
 [inbucket]
 enabled = true
 port = 54324
 
+[auth]
+enabled = true
+port = 9999
+
 [storage]
 enabled = true
 
-[auth]
+[functions]
 enabled = true
 
-[realtime]
-enabled = true
+[functions.stripe-checkout]
+verify_jwt = true
 
-[analytics]
-enabled = false
+[functions.stripe-products]
+verify_jwt = false
 
-[vector]
-enabled = false
+[functions.stripe-portal]
+verify_jwt = true
 
-[edge_functions]
-[edge_functions.get-stripe-products]
-
-[edge_functions.check-subscription]
-
-[edge_functions.create-checkout]
-
-[edge_functions.customer-portal]
+[functions.stripe-subscription]
+verify_jwt = true

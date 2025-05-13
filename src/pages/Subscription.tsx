@@ -7,8 +7,7 @@ import Footer from '@/components/Footer';
 import { useAuth } from '@/context/AuthContext';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import PlansComparison from '@/components/subscription/PlansComparison';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 
@@ -16,6 +15,7 @@ const Subscription: React.FC = () => {
   const { user, loading: authLoading, refreshSubscription } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const [initAttempted, setInitAttempted] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionData | null>(null);
@@ -24,29 +24,29 @@ const Subscription: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     
-    // Verificar se há plano na navegação
+    // Check for plan in navigation state
     if (location.state && location.state.selectedPlan) {
-      console.log("Plano encontrado no estado da navegação:", location.state.selectedPlan);
+      console.log("Plan found in navigation state:", location.state.selectedPlan);
       setSelectedPlan(location.state.selectedPlan);
     }
   }, [location]);
   
-  // Separar a inicialização da assinatura em um useEffect isolado
+  // Initialize subscription status
   useEffect(() => {
     if (user && !initAttempted) {
       setInitAttempted(true);
       const timeout = setTimeout(() => {
-        // Timeout de segurança para garantir que a página não fique presa carregando
+        // Safety timeout to ensure page doesn't get stuck loading
         setInitializing(false);
       }, 5000);
       
       const checkSubscription = async () => {
         try {
-          console.log("Verificando status da assinatura...");
+          console.log("Checking subscription status...");
           await refreshSubscription();
-          console.log("Status da assinatura atualizado com sucesso");
+          console.log("Subscription status updated successfully");
         } catch (error) {
-          console.error("Erro ao verificar assinatura:", error);
+          console.error("Error checking subscription:", error);
           toast({
             title: "Erro",
             description: "Não foi possível verificar o status da sua assinatura",
@@ -62,12 +62,12 @@ const Subscription: React.FC = () => {
       
       return () => clearTimeout(timeout);
     } else if (!user && !authLoading) {
-      // Se não há usuário e não está carregando a autenticação
+      // No user and not loading authentication
       setInitializing(false);
     }
   }, [user, authLoading, initAttempted, refreshSubscription]);
   
-  const handleSelectPlan = async (plan: SubscriptionData) => {
+  const handleSelectPlan = (plan: SubscriptionData) => {
     if (!user) {
       navigate('/login', { state: { returnTo: '/subscription' } });
       return;
@@ -90,59 +90,27 @@ const Subscription: React.FC = () => {
       return;
     }
     
-    try {
-      console.log("Iniciando checkout para o plano:", plan);
-      setSelectedPlan(plan);
-      
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { 
-          tier: plan.tier,
-          priceId: plan.priceId,
-          returnUrl: window.location.origin + '/subscription/success'
-        }
-      });
-      
-      if (error) {
-        console.error("Erro na função create-checkout:", error);
-        throw new Error(`Erro ao processar pedido: ${error.message}`);
-      }
-      
-      console.log("Resposta da função create-checkout:", data);
-      
-      if (data?.url) {
-        console.log("Redirecionando para URL do checkout:", data.url);
-        window.location.href = data.url;
-      } else {
-        throw new Error('Não foi possível obter o link de checkout');
-      }
-    } catch (error: any) {
-      console.error('Erro ao iniciar checkout:', error);
-      toast({
-        title: "Erro de pagamento",
-        description: 'Erro ao processar pagamento: ' + (error.message || 'Tente novamente mais tarde'),
-        variant: "destructive"
-      });
-    }
+    console.log("Starting checkout for plan:", plan);
+    setSelectedPlan(plan);
   };
 
-  // Função para receber e atualizar a lista de planos disponíveis
+  // Handle plans loaded from PlansComparison
   const handlePlansLoaded = (plans: SubscriptionData[]) => {
-    console.log("Planos carregados no componente Subscription:", plans);
+    console.log("Plans loaded in Subscription component:", plans);
     setAvailablePlans(plans);
     
-    // Se não houver plano selecionado e houver planos disponíveis, 
-    // selecionar o plano básico ou o segundo plano (geralmente o primeiro pago)
+    // If no plan selected and plans are available, select a default plan
     if (!selectedPlan && plans.length > 0) {
-      // Tentar encontrar o plano basic primeiro
+      // Try to find the basic plan first
       const basicPlan = plans.find(plan => plan.tier === 'basic');
-      // Se não encontrar o plano basic, pegar o segundo plano (geralmente o primeiro pago)
+      // If not found, use the second plan (usually first paid plan)
       const defaultPlan = basicPlan || (plans.length > 1 ? plans[1] : plans[0]);
-      console.log("Selecionando plano padrão:", defaultPlan);
+      console.log("Selecting default plan:", defaultPlan);
       setSelectedPlan(defaultPlan);
     }
   };
 
-  // Determinar se devemos mostrar o spinner de carregamento
+  // Determine if loading spinner should be shown
   const showLoading = authLoading || (initAttempted && initializing);
 
   return (
@@ -180,9 +148,9 @@ const Subscription: React.FC = () => {
                 
                 <PlansComparison 
                   onSelectPlan={(plan) => {
-                    console.log("Plano selecionado na comparação:", plan);
+                    console.log("Plan selected in comparison:", plan);
                     setSelectedPlan(plan);
-                    // Rolar para o topo do SubscriptionManager
+                    // Scroll to SubscriptionManager
                     const element = document.getElementById('subscription-manager');
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });

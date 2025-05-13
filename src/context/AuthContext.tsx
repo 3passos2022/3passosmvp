@@ -1,373 +1,217 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { UserRole, UserProfile } from '@/lib/types';
+import { supabase } from '@/integrations/supabase/client';
+import { createUserProfile, getUserProfile } from '@/integrations/supabase/database-functions';
+import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
-import { toast } from 'sonner';
-import ProfileService, { hasRole } from '@/services/ProfileService';
 
-export interface AuthContextProps {
-  user: UserProfile | null;
+interface AuthContextType {
+  user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, role: UserRole) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  signIn: (email: string, password: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  signOut: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  resetPassword: (newPassword: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
-  updateProfile: (data: Partial<UserProfile>) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
+  login: (email: string) => Promise<void>;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  makeAdmin: (userId: string) => Promise<{
-    error: Error | null;
-    data: any;
-  }>;
+  updateUser: (updates: any) => Promise<void>;
+  refreshSubscription: () => Promise<any>;
   subscription: SubscriptionStatus | null;
-  refreshSubscription: () => Promise<void>;
   subscriptionLoading: boolean;
-  hasRole: (role: UserRole | string) => boolean;
 }
 
-export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
-  const [subscriptionError, setSubscriptionError] = useState<Error | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState<boolean>(true);
+  const navigate = useNavigate();
 
-  // Function to check user role
-  const checkUserRole = (role: UserRole | string) => {
-    return hasRole(user, role);
-  };
-
-  // Buscar perfil do usuário de forma simplificada
-  const fetchUserProfile = async (sessionUser: User) => {
-    try {
-      const profileData = await ProfileService.getUserProfile(
-        sessionUser.id,
-        sessionUser.email || undefined
-      );
-      
-      if (profileData) {
-        setUser(profileData);
-        return;
-      }
-      
-      // Criar um perfil padrão se não encontrado
-      const newProfile = await ProfileService.createDefaultProfile(
-        sessionUser.id,
-        sessionUser.email || '',
-        UserRole.CLIENT
-      );
-      
-      if (newProfile) {
-        setUser(newProfile);
-      } else {
-        // Perfil mínimo para navegação
-        setUser({
-          id: sessionUser.id,
-          email: sessionUser.email || '',
-          role: UserRole.CLIENT,
-          created_at: new Date().toISOString(),
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
-        });
-      }
-    } catch (error) {
-      // Perfil mínimo em caso de erro
-      setUser({
-        id: sessionUser.id,
-        email: sessionUser.email || '',
-        role: UserRole.CLIENT,
-        created_at: new Date().toISOString(),
-        subscribed: false,
-        subscription_tier: 'free',
-        subscription_end: null
-      });
-    }
-  };
-
-  // Configuração do listener de autenticação
   useEffect(() => {
-    // Função para lidar com mudanças de estado de autenticação
-    const handleAuthChange = async (event: string, newSession: Session | null) => {
-      setSession(newSession);
-      
-      if (!newSession) {
-        setUser(null);
-        setSubscription(null);
-        setLoading(false);
-        return;
-      }
-      
-      // Usar setTimeout para evitar recursão
-      setTimeout(async () => {
-        if (newSession.user) {
-          await fetchUserProfile(newSession.user);
-        }
-        setLoading(false);
-      }, 0);
-    };
-    
-    // Configurar o listener de autenticação
-    const { data: authListener } = supabase.auth.onAuthStateChange(handleAuthChange);
+    const loadSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    // Verificar a sessão atual
-    const checkCurrentSession = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          setLoading(false);
-          return;
-        }
-        
-        setSession(data.session);
-        
-        if (data.session?.user) {
-          await fetchUserProfile(data.session.user);
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        setLoading(false);
-      }
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     };
-    
-    checkCurrentSession();
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    loadSession();
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
   }, []);
 
-  // Função de registro simplificada
-  async function signUp(email: string, password: string, role: UserRole) {
+  const login = async (email: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { role },
-        },
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) throw error;
+      toast({
+        title: 'Verifique seu email',
+        description: 'Enviamos um link mágico para seu email.',
       });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao fazer login',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
 
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      navigate('/login');
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao fazer logout',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.getUser();
+  
       if (error) {
-        return { error, data: null };
+        console.error("Erro ao obter usuário:", error);
+        throw error;
       }
-      
+  
       if (data?.user) {
-        // Criar perfil após registro bem-sucedido
-        setTimeout(async () => {
-          await ProfileService.createDefaultProfile(data.user.id, email, role);
-        }, 500);
-      }
-      
-      return { data, error: null };
-    } catch (error) {
-      return { error: error as Error, data: null };
-    }
-  }
-
-  // Função de login simplificada
-  async function signIn(email: string, password: string) {
-    try {
-      return await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-    } catch (error) {
-      return { error: error as Error, data: null };
-    }
-  }
-
-  // Função de logout simplificada
-  async function signOut() {
-    ProfileService.clearCache();
-    await supabase.auth.signOut();
-  }
-
-  // Funções para redefinição de senha
-  async function forgotPassword(email: string) {
-    try {
-      return await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-    } catch (error) {
-      return { error: error as Error, data: null };
-    }
-  }
-
-  async function resetPassword(newPassword: string) {
-    try {
-      return await supabase.auth.updateUser({
-        password: newPassword,
-      });
-    } catch (error) {
-      return { error: error as Error, data: null };
-    }
-  }
-
-  // Gerenciamento de perfil simplificado
-  async function updateProfile(data: Partial<UserProfile>) {
-    if (!user) return { error: new Error('No user logged in'), data: null };
-
-    try {
-      const result = await ProfileService.updateProfile(user.id, data);
-      
-      if (!result.error) {
-        setUser((prev) => (prev ? { ...prev, ...data } : null));
-      }
-      
-      return result;
-    } catch (error) {
-      return { error: error as Error, data: null };
-    }
-  }
-
-  // Atualizar dados do usuário
-  async function refreshUser() {
-    if (!session?.user?.id) {
-      return;
-    }
-    
-    try {
-      const refreshedProfile = await ProfileService.getUserProfile(
-        session.user.id,
-        session.user.email || undefined,
-        true
-      );
-      
-      if (refreshedProfile) {
-        setUser(refreshedProfile);
-      } else {
-        const newProfile = await ProfileService.createDefaultProfile(
-          session.user.id,
-          session.user.email || '',
-          UserRole.CLIENT
-        );
+        setUser(data.user);
+  
+        // Buscar informações adicionais do perfil
+        const profileData = await getUserProfile(data.user.id);
         
-        if (newProfile) {
-          setUser(newProfile);
+        // Atualizar o estado do usuário com as informações do perfil
+        setUser(prevUser => ({
+          ...prevUser,
+          ...profileData
+        }));
+      }
+    } catch (error: any) {
+      console.error("Erro ao atualizar informações do usuário:", error);
+      toast({
+        title: "Erro",
+        description: "Falha ao carregar informações do usuário.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateUser = async (updates: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.updateUser(updates);
+      if (error) throw error;
+
+      // Update user profile in "profiles" table
+      if (updates.name) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ name: updates.name })
+          .eq('id', user?.id);
+
+        if (profileError) {
+          console.error("Erro ao atualizar perfil:", profileError);
+          toast({
+            title: "Erro",
+            description: "Falha ao atualizar informações do perfil.",
+            variant: "destructive"
+          });
         }
       }
-    } catch (error) {
-      toast.error('Falha ao atualizar dados do usuário');
+
+      await refreshUser();
+      toast({
+        title: 'Perfil atualizado!',
+        description: 'Suas informações foram atualizadas com sucesso.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao atualizar perfil',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  // Funções administrativas
-  async function makeAdmin(userId: string) {
-    if (!user) {
-      return { error: new Error('No user logged in'), data: null };
+  // Function to refresh subscription status
+  const refreshSubscription = async () => {
+    if (!session || !user) {
+      setSubscription({ subscribed: false, subscription_tier: 'free' });
+      setSubscriptionLoading(false);
+      return;
     }
-    
-    return await ProfileService.makeAdmin(user.id, userId);
-  }
 
-  // Gerenciamento de assinatura com timeout
-  async function checkSubscription() {
-    if (!session) return;
-
+    setSubscriptionLoading(true);
     try {
-      setSubscriptionLoading(true);
-      setSubscriptionError(null);
+      console.log("Checking subscription status for user:", user.id);
       
-      // Criar uma promessa que rejeita após o timeout
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Tempo limite excedido ao verificar assinatura")), 10000);
-      });
+      const { data, error } = await supabase.functions.invoke('stripe-subscription');
       
-      // Corrida entre a chamada à API e o timeout
-      const result = await Promise.race([
-        supabase.functions.invoke('check-subscription'),
-        timeoutPromise
-      ]);
-      
-      if ('error' in result && result.error) {
-        console.error("Erro na resposta da função edge:", result.error);
-        throw new Error(result.error);
+      if (error) {
+        console.error("Error checking subscription:", error);
+        throw new Error(error.message);
       }
       
-      if ('data' in result && result.data) {
-        setSubscription({
-          subscribed: result.data.subscribed,
-          subscription_tier: (result.data.subscription_tier || 'free') as 'free' | 'basic' | 'premium',
-          subscription_end: result.data.subscription_end
-        });
-      } else {
-        console.warn("Resposta da verificação de assinatura sem dados");
-        setSubscription({
-          subscribed: false,
-          subscription_tier: 'free',
-          subscription_end: null
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao verificar assinatura:", error);
-      setSubscriptionError(error as Error);
+      console.log("Subscription status response:", data);
       
-      // Definir um estado básico em caso de erro
       setSubscription({
-        subscribed: false,
-        subscription_tier: 'free',
-        subscription_end: null
+        subscribed: data.subscribed || false,
+        subscription_tier: data.subscription_tier || 'free',
+        subscription_end: data.subscription_end
       });
       
-      // Não mostrar toast aqui para evitar spam de erros
+      return data;
+    } catch (error) {
+      console.error("Error refreshing subscription:", error);
+      setSubscription({ subscribed: false, subscription_tier: 'free' });
+      throw error;
     } finally {
       setSubscriptionLoading(false);
     }
-  }
+  };
 
-  async function refreshSubscription() {
-    if (!user) {
-      return;
+  // When authentication state changes, refresh subscription
+  useEffect(() => {
+    if (session && user) {
+      refreshSubscription().catch(err => {
+        console.error("Failed to refresh subscription on auth state change:", err);
+      });
     }
-    
-    try {
-      await checkSubscription();
-    } catch (error) {
-      console.error("Erro ao atualizar assinatura:", error);
-      throw error; // Propagar o erro para permitir tratamento específico
-    }
-  }
+  }, [session, user]);
 
-  // Context value
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     loading,
-    signUp,
-    signIn,
-    signOut,
-    forgotPassword,
-    resetPassword,
-    updateProfile,
+    login,
+    logout,
     refreshUser,
-    makeAdmin,
-    subscription,
+    updateUser,
     refreshSubscription,
+    subscription,
     subscriptionLoading,
-    hasRole: checkUserRole
   };
 
   return (
@@ -377,10 +221,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useAuth = () => {
+const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
+
+export { AuthProvider, useAuth };
