@@ -16,3 +16,11 @@ declare module '@supabase/supabase-js' {
     subscription_end?: string | null;
   }
 }
+
+// Add custom toast types for sonner
+declare module 'sonner' {
+  interface ToastT {
+    title?: React.ReactNode;
+    description?: React.ReactNode;
+  }
+}

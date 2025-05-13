@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { createUserProfile, getUserProfile } from '@/integrations/supabase/database-functions';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
 import { ExtendedUser, UserRole } from '@/lib/types';
@@ -87,11 +87,18 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       if (result.error) {
-        toast.error('Erro ao fazer login: ' + result.error.message);
+        toast({
+          title: 'Erro ao fazer login',
+          description: result.error.message,
+          variant: "destructive"
+        });
         return { error: result.error };
       }
       
-      toast.success('Login realizado com sucesso!');
+      toast({
+        title: 'Login realizado com sucesso!',
+        variant: "default"
+      });
       
       // Atraso para garantir atualização do estado
       setTimeout(() => {
@@ -102,7 +109,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       return { error: null };
     } catch (error: any) {
-      toast.error('Erro inesperado ao fazer login');
+      toast({
+        title: 'Erro inesperado ao fazer login',
+        variant: "destructive"
+      });
       return { error };
     }
   };
@@ -123,7 +133,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       if (error) {
-        toast.error('Erro ao criar conta: ' + error.message);
+        toast({
+          title: 'Erro ao criar conta',
+          description: error.message,
+          variant: "destructive"
+        });
         return { error };
       }
       
@@ -136,10 +150,17 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       
-      toast.success('Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.');
+      toast({
+        title: 'Conta criada com sucesso!',
+        description: 'Verifique seu e-mail para confirmar seu cadastro.',
+        variant: "default"
+      });
       return { error: null };
     } catch (error: any) {
-      toast.error('Erro ao criar conta');
+      toast({
+        title: 'Erro ao criar conta',
+        variant: "destructive"
+      });
       return { error };
     }
   };
@@ -151,7 +172,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       navigate('/login');
     } catch (error: any) {
-      toast.error('Erro ao fazer logout: ' + error.message);
+      toast({
+        title: 'Erro ao fazer logout',
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -181,20 +206,26 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Atualizar o estado do usuário com as informações do perfil
         if (profileData) {
-          setUser({
+          const updatedUser: ExtendedUser = {
             ...extendedUser,
-            ...profileData,
+            ...(profileData as Record<string, any>),
             // Ensure required fields
             email: profileData.email || extendedUser.email,
             role: profileData.role || extendedUser.role
-          });
+          };
+          setUser(updatedUser);
         } else {
           setUser(extendedUser);
         }
       }
+      
+      return { success: true };
     } catch (error: any) {
       console.error("Erro ao atualizar informações do usuário:", error);
-      toast.error("Falha ao carregar informações do usuário.");
+      toast({
+        title: "Falha ao carregar informações do usuário",
+        variant: "destructive"
+      });
       throw error;
     } finally {
       setLoading(false);
@@ -216,14 +247,26 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (profileError) {
           console.error("Erro ao atualizar perfil:", profileError);
-          toast.error("Falha ao atualizar informações do perfil.");
+          toast({
+            title: "Falha ao atualizar informações do perfil",
+            variant: "destructive"
+          });
         }
       }
 
-      await refreshUser();
-      toast.success('Perfil atualizado!');
+      const result = await refreshUser();
+      if (result && result.success) {
+        toast({
+          title: 'Perfil atualizado!',
+          variant: "default"
+        });
+      }
     } catch (error: any) {
-      toast.error('Erro ao atualizar perfil: ' + error.message);
+      toast({
+        title: 'Erro ao atualizar perfil',
+        description: error.message,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -252,13 +295,20 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return { ...prevUser, ...updates };
         });
         
-        toast.success('Perfil atualizado com sucesso');
+        toast({
+          title: 'Perfil atualizado com sucesso',
+          variant: "default"
+        });
         return { error: null };
       }
       
       return { error: new Error('Usuário não encontrado') };
     } catch (error: any) {
-      toast.error('Erro ao atualizar perfil: ' + error.message);
+      toast({
+        title: 'Erro ao atualizar perfil',
+        description: error.message,
+        variant: "destructive"
+      });
       return { error };
     } finally {
       setLoading(false);
@@ -270,7 +320,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Only allow admins to make other users admin
       if (user?.role !== UserRole.ADMIN) {
-        toast.error('Você não tem permissão para executar esta ação');
+        toast({
+          title: 'Você não tem permissão para executar esta ação',
+          variant: "destructive"
+        });
         return;
       }
       
@@ -281,10 +334,17 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (error) throw error;
       
-      toast.success('Usuário promovido a administrador com sucesso!');
+      toast({
+        title: 'Usuário promovido a administrador com sucesso!',
+        variant: "default"
+      });
     } catch (error: any) {
       console.error('Error making admin:', error);
-      toast.error('Erro ao promover a administrador. Tente novamente.');
+      toast({
+        title: 'Erro ao promover a administrador',
+        description: 'Tente novamente.',
+        variant: "destructive"
+      });
     }
   };
 

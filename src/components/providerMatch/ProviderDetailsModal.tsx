@@ -54,7 +54,7 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       if (result.requiresLogin) {
         toast({
           title: "Login necessário",
-          description: "Você precisa estar logado para enviar um orçamento",
+          description: "Você precisa estar logado para enviar um orçamento"
         });
         
         if (onLoginRequired) {
@@ -66,7 +66,7 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       if (result.success) {
         toast({
           title: "Orçamento enviado",
-          description: "Seu orçamento foi enviado com sucesso para o prestador",
+          description: "Seu orçamento foi enviado com sucesso para o prestador"
         });
         onClose();
       } else {
