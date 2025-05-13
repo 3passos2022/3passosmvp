@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -25,7 +24,6 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
 

@@ -1,5 +1,10 @@
 
-// Re-export the toast hook and functions from our custom implementation
-import { useToast, toast, type Toast, type ToastProps } from "@/hooks/use-toast";
+// Re-export from our simplified implementation
+import { useToast, toast, type Toast } from "@/hooks/use-toast";
 
-export { useToast, toast, type Toast, type ToastProps };
+export { useToast, toast, type Toast };
+
+// No longer using ToastProps, simplified API
+export type ToastProps = Toast & {
+  id?: string;
+};
