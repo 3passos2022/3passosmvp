@@ -10,13 +10,15 @@ interface SubscriptionCardProps {
   currentTier?: 'free' | 'basic' | 'premium';
   onSelect: (plan: SubscriptionData) => void;
   disabled?: boolean;
+  isSelected?: boolean;
 }
 
 const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   plan,
   currentTier,
   onSelect,
-  disabled = false
+  disabled = false,
+  isSelected = false
 }) => {
   const isCurrentPlan = currentTier === plan.tier;
   
@@ -26,13 +28,21 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         'rounded-lg border p-6 shadow-sm transition-all',
         isCurrentPlan 
           ? 'border-primary/50 bg-primary/5 shadow-primary/10' 
-          : 'border-border bg-card hover:shadow',
+          : isSelected
+            ? 'border-primary bg-primary/5 shadow-primary/10'
+            : 'border-border bg-card hover:shadow',
         plan.popular && 'relative border-primary'
       )}
     >
       {plan.popular && (
         <div className="absolute -top-3 left-0 right-0 mx-auto w-fit rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
           Popular
+        </div>
+      )}
+      
+      {isSelected && !isCurrentPlan && (
+        <div className="absolute -top-3 left-0 right-0 mx-auto w-fit rounded-full bg-blue-500 px-3 py-1 text-xs text-white">
+          Selecionado
         </div>
       )}
       
@@ -56,12 +66,12 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       </ul>
       
       <Button
-        className="w-full"
+        className={`w-full ${isSelected && !isCurrentPlan ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
         disabled={disabled || isCurrentPlan}
         onClick={() => onSelect(plan)}
-        variant={plan.popular ? "default" : "outline"}
+        variant={isSelected || plan.popular ? "default" : "outline"}
       >
-        {isCurrentPlan ? 'Seu Plano Atual' : 'Escolher Plano'}
+        {isCurrentPlan ? 'Seu Plano Atual' : isSelected ? 'Plano Selecionado' : 'Escolher Plano'}
       </Button>
     </div>
   );

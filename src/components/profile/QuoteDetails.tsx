@@ -136,6 +136,37 @@ const QuoteDetails: React.FC<QuoteDetailsProps> = ({ quote, refreshQuotes, isPro
     }
   };
 
+  // Helper function to format service time preference
+  const formatTimePreference = (preference: string) => {
+    if (!preference) return '';
+    
+    switch (preference) {
+      case 'morning':
+        return 'Manhã';
+      case 'afternoon':
+        return 'Tarde';
+      case 'evening':
+        return 'Noite';
+      case 'business':
+        return 'Horário comercial';
+      default:
+        return preference;
+    }
+  };
+
+  // Helper function to format service date display
+  const formatServiceDate = (date: string | null, endDate: string | null) => {
+    if (!date) return null;
+    
+    const formattedStart = formatDate(date);
+    if (endDate && date !== endDate) {
+      const formattedEnd = formatDate(endDate);
+      return `${formattedStart} até ${formattedEnd}`;
+    }
+    
+    return formattedStart;
+  };
+
   return (
     <div className="space-y-6 p-6 bg-white rounded-lg shadow-sm">
       <div className="flex items-center justify-between">
@@ -166,6 +197,16 @@ const QuoteDetails: React.FC<QuoteDetailsProps> = ({ quote, refreshQuotes, isPro
           <p className="text-sm text-muted-foreground">Data da solicitação</p>
           <p>{formatDate(quote.created_at)}</p>
         </div>
+
+        {quote.service_date && (
+          <div>
+            <p className="text-sm text-muted-foreground">Data do serviço</p>
+            <p className="font-medium">
+              {formatServiceDate(quote.service_date, quote.service_end_date)}
+              {quote.service_time_preference && ` - ${formatTimePreference(quote.service_time_preference)}`}
+            </p>
+          </div>
+        )}
 
         {!isProvider && (
           <div>

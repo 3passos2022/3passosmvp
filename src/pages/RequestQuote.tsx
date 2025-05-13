@@ -7,6 +7,7 @@ import QuoteRequestForm from '@/components/quoteRequest/QuoteRequestForm';
 import { useQuery } from '@tanstack/react-query';
 import { getAllServices } from '@/lib/api/services';
 import { useAuth } from '@/context/AuthContext';
+import { clearQuoteData } from '@/lib/utils/quoteStorage';
 import { toast } from 'sonner';
 
 const RequestQuote: React.FC = () => {
@@ -24,6 +25,14 @@ const RequestQuote: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     console.log("RequestQuote: Component mounted");
+    
+    // Clear any incomplete quote from previous sessions
+    const currentRoute = window.location.pathname;
+    if (currentRoute === '/request-quote') {
+      // Only clear if we're starting a new quote
+      console.log("RequestQuote: Clearing any previous incomplete quote data");
+      clearQuoteData();
+    }
   }, []);
 
   // Display a welcome toast for non-logged in users

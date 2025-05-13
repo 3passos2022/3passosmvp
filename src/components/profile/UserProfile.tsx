@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
+import { ExtendedUser, UserProfile as UserProfileType, UserRole } from '@/lib/types';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -44,6 +44,20 @@ const UserProfile: React.FC = () => {
   };
 
   if (!user) return null;
+
+  // Create a UserProfile object from the ExtendedUser for RoleUtils
+  const userProfile: UserProfileType = {
+    id: user.id,
+    email: user.email,
+    role: user.role || UserRole.CLIENT,
+    name: user.name,
+    avatar_url: user.avatar_url,
+    phone: user.phone,
+    created_at: user.created_at || new Date().toISOString(),
+    subscribed: user.subscribed,
+    subscription_tier: user.subscription_tier,
+    subscription_end: user.subscription_end
+  };
 
   const getInitials = () => {
     if (user.name) {
@@ -116,7 +130,7 @@ const UserProfile: React.FC = () => {
               
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
-                <p className="font-medium">{RoleUtils.getAccountTypeLabel(user)}</p>
+                <p className="font-medium">{RoleUtils.getAccountTypeLabel(userProfile)}</p>
               </div>
             </div>
           )}

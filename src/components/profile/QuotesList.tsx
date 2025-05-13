@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,6 +44,9 @@ const QuotesList: React.FC = () => {
           complement,
           state,
           created_at,
+          service_date,
+          service_end_date,
+          service_time_preference,
           services!service_id (name),
           sub_services!sub_service_id (name),
           specialties!specialty_id (name),
@@ -65,6 +69,9 @@ const QuotesList: React.FC = () => {
         city: quote.city,
         neighborhood: quote.neighborhood,
         created_at: quote.created_at,
+        service_date: quote.service_date,
+        service_end_date: quote.service_end_date,
+        service_time_preference: quote.service_time_preference,
         serviceName: quote.services?.name || 'Serviço não encontrado',
         subServiceName: quote.sub_services?.name || '',
         specialtyName: quote.specialties?.name || '',
@@ -114,6 +121,35 @@ const QuotesList: React.FC = () => {
     }
   };
 
+  // Helper function to format service time preference
+  const formatTimePreference = (preference: string) => {
+    switch (preference) {
+      case 'morning':
+        return 'Manhã';
+      case 'afternoon':
+        return 'Tarde';
+      case 'evening':
+        return 'Noite';
+      case 'business':
+        return 'Horário comercial';
+      default:
+        return preference;
+    }
+  };
+
+  // Helper function to format service date display
+  const formatServiceDate = (date: string | null, endDate: string | null) => {
+    if (!date) return 'Data não definida';
+    
+    const formattedStart = formatDate(date);
+    if (endDate && date !== endDate) {
+      const formattedEnd = formatDate(endDate);
+      return `${formattedStart} até ${formattedEnd}`;
+    }
+    
+    return formattedStart;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -153,9 +189,17 @@ const QuotesList: React.FC = () => {
                         {quote.description && (
                           <p className="text-sm line-clamp-2">{quote.description}</p>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          Criado em {formatDate(quote.created_at)}
-                        </p>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>
+                            Criado em {formatDate(quote.created_at)}
+                          </p>
+                          {quote.service_date && (
+                            <p className="font-medium text-primary">
+                              Data do serviço: {formatServiceDate(quote.service_date, quote.service_end_date)}
+                              {quote.service_time_preference && ` - ${formatTimePreference(quote.service_time_preference)}`}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-4">

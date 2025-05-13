@@ -4,63 +4,117 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { SubscriptionStatus } from '@/lib/types/subscriptions';
+import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const SubscriptionManager: React.FC = () => {
+interface SubscriptionManagerProps {
+  selectedPlan: SubscriptionData | null;
+  onPlanSelect: (plan: SubscriptionData) => void;
+  availablePlans: SubscriptionData[];
+}
+
+const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ 
+  selectedPlan, 
+  onPlanSelect,
+  availablePlans 
+}) => {
   const { user, subscription, refreshSubscription, subscriptionLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const checkUserSubscription = async () => {
-      if (user) {
-        try {
-          await refreshSubscription();
-        } catch (error) {
-          console.error("Failed to check subscription:", error);
+    // Check for plan in URL params
+    const searchParams = new URLSearchParams(location.search);
+    const planFromQuery = searchParams.get('plan');
+    
+    if (planFromQuery) {
+      try {
+        const parsedPlan = JSON.parse(decodeURIComponent(planFromQuery));
+        if (parsedPlan && parsedPlan.id) {
+          console.log("Plan found in URL:", parsedPlan);
+          onPlanSelect(parsedPlan);
+          
+          // Clean URL
+          window.history.replaceState({}, document.title, location.pathname);
         }
+      } catch (error) {
+        console.error("Error parsing plan data:", error);
       }
-    };
+    }
     
-    checkUserSubscription();
-    
-    // Poll for subscription status changes every 30 seconds while on this page
-    const interval = setInterval(async () => {
-      if (user) {
-        try {
-          await refreshSubscription();
-        } catch (error) {
-          console.error("Failed to check subscription in interval:", error);
-        }
-      }
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [user, refreshSubscription]);
+    // Check subscription status on mount
+    if (user) {
+      refreshSubscription().catch(error => {
+        console.error("Error checking subscription:", error);
+      });
+    }
+  }, [user, location, onPlanSelect, refreshSubscription]);
 
   const handleSubscribe = async () => {
     if (!user) {
-      toast.error("Você precisa estar logado para assinar");
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para assinar"
+      });
+      navigate('/login', { state: { returnTo: '/subscription' } });
+      return;
+    }
+    
+    if (!selectedPlan || !selectedPlan.priceId) {
+      toast({
+        title: "Erro",
+        description: "Selecione um plano com preço válido para continuar"
+      });
+      return;
+    }
+    
+    // If free plan, no checkout needed
+    if (selectedPlan.tier === 'free') {
+      toast({
+        title: "Plano gratuito",
+        description: 'Você já está no plano gratuito'
+      });
       return;
     }
     
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout');
+      console.log("Starting checkout for plan:", selectedPlan);
+      
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: { 
+          priceId: selectedPlan.priceId,
+          returnUrl: window.location.origin + '/subscription/success'
+        }
+      });
       
       if (error) {
-        throw new Error(error.message);
+        console.error("Error in stripe-checkout function:", error);
+        throw new Error(`Erro ao processar pedido: ${error.message}`);
       }
       
+      console.log("stripe-checkout response:", data);
+      
       if (data?.url) {
+        console.log("Redirecting to checkout URL:", data.url);
         window.location.href = data.url;
+      } else {
+        throw new Error('Não foi possível obter o link de checkout');
       }
-    } catch (error) {
-      console.error("Error creating checkout:", error);
-      toast.error("Erro ao iniciar checkout: " + (error as Error).message);
+    } catch (error: any) {
+      console.error('Error starting checkout:', error);
+      toast({
+        title: "Erro de pagamento",
+        description: 'Erro ao processar pagamento: ' + (error.message || 'Tente novamente mais tarde'),
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -73,18 +127,25 @@ const SubscriptionManager: React.FC = () => {
     
     setPortalLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
+      const { data, error } = await supabase.functions.invoke('stripe-portal', {
+        body: { returnUrl: window.location.origin + '/subscription' }
+      });
       
       if (error) {
         throw new Error(error.message);
       }
       
       if (data?.url) {
+        console.log("Redirecting to portal:", data.url);
         window.location.href = data.url;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error opening customer portal:", error);
-      toast.error("Erro ao abrir portal do cliente: " + (error as Error).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao abrir portal do cliente: " + error.message,
+        variant: "destructive"
+      });
     } finally {
       setPortalLoading(false);
     }
@@ -94,17 +155,33 @@ const SubscriptionManager: React.FC = () => {
     setRefreshing(true);
     try {
       await refreshSubscription();
-      toast.success("Informações de assinatura atualizadas");
+      toast({
+        title: "Sucesso",
+        description: "Informações de assinatura atualizadas"
+      });
     } catch (error) {
-      console.error("Error refreshing subscription data:", error);
-      toast.error("Erro ao atualizar dados da assinatura");
+      console.error("Error updating subscription data:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar dados da assinatura",
+        variant: "destructive"
+      });
     } finally {
       setRefreshing(false);
     }
   };
 
+  const handlePlanChange = (planId: string) => {
+    console.log("Changing plan to ID:", planId);
+    const plan = availablePlans.find(p => p.id === planId);
+    if (plan) {
+      onPlanSelect(plan);
+      console.log("Selected plan:", plan);
+    }
+  };
+
   return (
-    <Card>
+    <Card className="z-10 relative" id="subscription-manager">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -129,8 +206,8 @@ const SubscriptionManager: React.FC = () => {
       </CardHeader>
       <CardContent>
         {subscriptionLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : subscription?.subscribed ? (
           <div>
@@ -147,9 +224,38 @@ const SubscriptionManager: React.FC = () => {
             )}
           </div>
         ) : (
-          <p className="text-sm">
-            Assine agora para acessar recursos premium e impulsionar seu negócio.
-          </p>
+          <div>
+            {availablePlans.length > 0 ? (
+              <>
+                <label className="text-sm text-gray-500 mb-2 block">Selecione um plano:</label>
+                <Select 
+                  value={selectedPlan?.id || ''} 
+                  onValueChange={handlePlanChange}
+                >
+                  <SelectTrigger className="w-full mb-4">
+                    <SelectValue placeholder="Selecione um plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePlans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.name} - {plan.price === 0 ? 'Grátis' : `R$${(plan.price / 100).toFixed(2)}/mês`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            ) : null}
+
+            {selectedPlan && (
+              <div className="mt-4 p-3 bg-muted rounded-md">
+                <p className="font-medium mb-1">{selectedPlan.name}</p>
+                <p className="text-sm mb-2">
+                  {selectedPlan.price === 0 ? 'Grátis' : `R$${(selectedPlan.price / 100).toFixed(2)}/mês`}
+                </p>
+                <p className="text-xs text-muted-foreground">{selectedPlan.description}</p>
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
@@ -174,15 +280,19 @@ const SubscriptionManager: React.FC = () => {
           </Button>
         ) : (
           <Button 
-            onClick={handleSubscribe} 
+            onClick={handleSubscribe}
             className="w-full"
-            disabled={loading || subscriptionLoading}
+            disabled={loading || (selectedPlan && selectedPlan.tier === 'free') || !selectedPlan}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Carregando...
               </>
+            ) : !selectedPlan ? (
+              "Ver Planos"
+            ) : selectedPlan.tier === 'free' ? (
+              "Plano gratuito já disponível"
             ) : (
               "Assinar Agora"
             )}

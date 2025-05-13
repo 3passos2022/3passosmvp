@@ -1,8 +1,23 @@
 
+import { User as SupabaseUser } from '@supabase/supabase-js';
+
 export enum UserRole {
   CLIENT = 'client',
   PROVIDER = 'provider',
   ADMIN = 'admin'
+}
+
+// Extend the Supabase User type with our custom properties
+export interface ExtendedUser extends SupabaseUser {
+  role: UserRole; // Make role required
+  name?: string;
+  email: string; // Make email required
+  avatar_url?: string;
+  address?: string;
+  phone?: string;
+  subscribed?: boolean;
+  subscription_tier?: 'free' | 'basic' | 'premium';
+  subscription_end?: string | null;
 }
 
 export interface UserProfile {

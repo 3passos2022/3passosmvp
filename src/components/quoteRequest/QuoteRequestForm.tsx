@@ -6,7 +6,9 @@ import { z } from 'zod';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, ServiceItem } from '@/lib/types';
+import { QuoteDetails, QuoteMeasurement } from '@/lib/types/providerMatch';
 import { getQuestions, getServiceItems } from '@/lib/api/services';
+import { storeQuoteData } from '@/lib/utils/quoteStorage';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -440,17 +442,25 @@ const ServiceStep: React.FC<{
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode={dateSelectionMode === 'single' ? 'single' : 'range'}
-                selected={dateSelectionMode === 'single' ? selectedDate : selectedDateRange}
-                onSelect={dateSelectionMode === 'single' 
-                  ? setSelectedDate 
-                  : (range) => setSelectedDateRange(range || {from: new Date()})
-                }
-                disabled={(date) => date < new Date()}
-                initialFocus
-                className="p-3 pointer-events-auto"
-              />
+              {dateSelectionMode === 'single' ? (
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              ) : (
+                <Calendar
+                  mode="range"
+                  selected={selectedDateRange}
+                  onSelect={(range) => setSelectedDateRange(range || {from: new Date()})}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              )}
             </PopoverContent>
           </Popover>
         </div>
@@ -568,6 +578,8 @@ const ServiceDetailsStep: React.FC<{
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [answers, setAnswers] = useState<{[key: string]: string}>(formData.answers || {});
   const [itemQuantities, setItemQuantities] = useState<{[key: string]: number}>(formData.itemQuantities || {});
+  const [itemNames, setItemNames] = useState<{[key: string]: string}>(formData.itemNames || {});
+  const [itemTypes, setItemTypes] = useState<{[key: string]: string}>({});
   const [measurements, setMeasurements] = useState<{
     id: string;
     roomName: string;
@@ -603,6 +615,17 @@ const ServiceDetailsStep: React.FC<{
         const allItems = [...serviceItems, ...subServiceItems, ...specialtyItems];
         setItems(allItems);
         
+        // Armazena o tipo de cada item para referência futura
+        const typesMap: {[key: string]: string} = {};
+        const namesMap: {[key: string]: string} = {};
+        allItems.forEach(item => {
+          typesMap[item.id] = item.type;
+          namesMap[item.id] = item.name;
+        });
+        
+        setItemTypes(typesMap);
+        setItemNames(namesMap);
+        
         const hasSquareItems = allItems.some(item => item.type === 'square_meter');
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
         
@@ -613,12 +636,18 @@ const ServiceDetailsStep: React.FC<{
         if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
           neededSteps.push('quiz');
         }
-        if (allItems.length > 0) {
+        
+        // Se temos itens regulares (quantidade)
+        const hasRegularItems = allItems.some(item => item.type !== 'square_meter' && item.type !== 'linear_meter');
+        if (hasRegularItems) {
           neededSteps.push('items');
         }
+        
+        // Se temos itens de metro quadrado ou linear, precisamos da etapa de medidas
         if (hasSquareItems || hasLinearItems) {
           neededSteps.push('measurements');
         }
+        
         setRequiredSteps(neededSteps);
         
         if (neededSteps.length > 0) {
@@ -743,6 +772,7 @@ const ServiceDetailsStep: React.FC<{
     updateFormData({
       answers,
       itemQuantities,
+      itemNames,
       measurements
     });
     
@@ -903,27 +933,31 @@ const ServiceDetailsStep: React.FC<{
           <h3 className="text-lg font-medium mb-4">Informe as quantidades necessárias</h3>
           
           <div className="space-y-4">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {item.type === 'quantity' ? 'Quantidade' : 
-                     item.type === 'square_meter' ? 'Metro Quadrado' : 'Metro Linear'}
-                  </p>
+            {items
+              .filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter')
+              .map((item) => (
+                <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-gray-500">Quantidade</p>
+                  </div>
+                  <div className="w-24">
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step="1"
+                      value={itemQuantities[item.id] || ''}
+                      onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
                 </div>
-                <div className="w-24">
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    step={item.type === 'quantity' ? '1' : '0.01'}
-                    value={itemQuantities[item.id] || ''}
-                    onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
+          
+          {/* Show message if there are no regular items */}
+          {items.filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter').length === 0 && (
+            <p className="text-center py-4">Não há itens que precisam de quantidade manual neste serviço.</p>
+          )}
           
           <div className="flex justify-between pt-6 border-t mt-6">
             <Button 
@@ -1028,9 +1062,7 @@ const ServiceDetailsStep: React.FC<{
               ))}
             </div>
           ) : (
-            <p className="text-center py-8 text-gray-500">
-              Clique em "Adicionar" para incluir as medidas necessárias para o serviço.
-            </p>
+            <p className="text-center py-8">Adicione uma medida clicando no botão acima.</p>
           )}
           
           <div className="flex justify-between pt-6 border-t mt-6">
@@ -1041,396 +1073,440 @@ const ServiceDetailsStep: React.FC<{
             >
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
             </Button>
-            <Button 
-              type="submit"
-            >
-              Finalizar <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
           </div>
         </div>
       )}
+
+      <div className="flex justify-between pt-4 border-t">
+        {(detailsSubStep !== 'quiz' || requiredSteps.indexOf('quiz') === requiredSteps.length - 1) && (
+          <Button 
+            type="submit" 
+            className="ml-auto"
+            disabled={detailsSubStep === 'quiz' && !allQuestionsAnswered}
+          >
+            Próximo <ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </form>
   );
 };
 
-const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services }) => {
+const ReviewStep: React.FC<{
+  onSubmit: () => void;
+  onBack: () => void;
+  formData: FormData;
+}> = ({ onSubmit, onBack, formData }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const location = useLocation();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showReview, setShowReview] = useState(false);
   
-  // Preencher campos iniciais a partir da query string
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const serviceId = params.get('serviceId');
-    const subServiceId = params.get('subServiceId');
-    const specialtyId = params.get('specialtyId');
-    if (serviceId && services) {
-      const service = services.find(s => s.id === serviceId);
-      let subService, specialty;
-      if (service && subServiceId) {
-        subService = service.subServices.find(ss => ss.id === subServiceId);
-      }
-      if (subService && specialtyId) {
-        specialty = subService.specialties.find(sp => sp.id === specialtyId);
-      }
-      setFormData({
-        serviceId,
-        serviceName: service?.name,
-        subServiceId: subServiceId || undefined,
-        subServiceName: subService?.name,
-        specialtyId: specialtyId || undefined,
-        specialtyName: specialty?.name,
-        description: '',
-        answers: {},
-        itemQuantities: {},
-        measurements: [],
-        street: '',
-        number: '',
-        complement: '',
-        neighborhood: '',
-        city: '',
-        state: '',
-        zipCode: ''
-      });
-    }
-  }, [location.search, services]);
-  
-  const nextStep = () => setCurrentStep(prev => prev + 1);
-  
-  const prevStep = () => setCurrentStep(prev => prev - 1);
-  
-  const updateFormData = (data: Partial<FormData>) => {
-    setFormData(prev => ({ ...prev, ...data }));
-  };
-  
-  const canSubmit = () => {
-    return !!(
-      formData.serviceId &&
-      formData.street &&
-      formData.number &&
-      formData.neighborhood &&
-      formData.city &&
-      formData.state &&
-      formData.zipCode
-    );
-  };
-  
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
-    if (!canSubmit()) {
-      toast.error("Por favor, preencha todos os campos obrigatórios");
-      return;
-    }
-    
+  const handleSubmit = async () => {
     setIsSubmitting(true);
-    
     try {
-      console.log("Enviando dados de cotação via RPC...");
-      console.log("Dados que serão enviados:", {
+      console.log("Submitting quote with user:", user?.id);
+      console.log("Is anonymous:", !user);
+      
+      // Format dates for Supabase (convert Date objects to ISO strings)
+      const serviceDateFormatted = formData.serviceDate ? formData.serviceDate.toISOString() : null;
+      const serviceEndDateFormatted = formData.serviceEndDate ? formData.serviceEndDate.toISOString() : null;
+      
+      // Prepare the quote data
+      const quoteData = {
+        client_id: user?.id || null,
         service_id: formData.serviceId,
-        sub_service_id: formData.subServiceId || null,
-        specialty_id: formData.specialtyId || null,
+        sub_service_id: formData.subServiceId,
+        specialty_id: formData.specialtyId,
+        full_name: formData.fullName,
         description: formData.description,
-        address: {
-          street: formData.street, 
-          number: formData.number,
-          complement: formData.complement,
-          neighborhood: formData.neighborhood,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode
-        },
-        is_anonymous: !user
-      });
-      
-      const { data: quoteId, error } = await supabase.rpc(
-        "submit_quote",
-        {
-          p_service_id: formData.serviceId,
-          p_sub_service_id: formData.subServiceId || null,
-          p_specialty_id: formData.specialtyId || null,
-          p_description: formData.description || null,
-          p_street: formData.street || '',
-          p_number: formData.number || '',
-          p_complement: formData.complement || null,
-          p_neighborhood: formData.neighborhood || '',
-          p_city: formData.city || '',
-          p_state: formData.state || '',
-          p_zip_code: formData.zipCode || '',
-          p_is_anonymous: !user
-        }
-      );
-      
-      if (error) {
-        console.error('Erro ao enviar cotação:', error);
-        toast.error(`Erro ao enviar o orçamento: ${error.message}`);
-        return;
-      }
-      
-      console.log("Cotação criada com sucesso. ID:", quoteId);
-      
-      if (formData.answers && Object.keys(formData.answers).length > 0) {
-        for (const [questionId, optionId] of Object.entries(formData.answers)) {
-          const { error: answerError } = await supabase.rpc(
-            "add_quote_answer",
-            {
-              p_quote_id: quoteId as string,
-              p_question_id: questionId,
-              p_option_id: optionId
-            }
-          );
-          
-          if (answerError) {
-            console.error('Erro ao salvar resposta:', answerError);
-          }
-        }
-      }
-      
-      if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
-        for (const [itemId, quantity] of Object.entries(formData.itemQuantities)) {
-          if (quantity > 0) {
-            const { error: itemError } = await supabase.rpc(
-              "add_quote_item",
-              {
-                p_quote_id: quoteId as string, 
-                p_item_id: itemId,
-                p_quantity: quantity
-              }
-            );
-            
-            if (itemError) {
-              console.error('Erro ao salvar item:', itemError);
-            }
-          }
-        }
-      }
-      
-      if (formData.measurements && formData.measurements.length > 0) {
-        for (const measurement of formData.measurements) {
-          const { error: measurementError } = await supabase.rpc(
-            "add_quote_measurement",
-            {
-              p_quote_id: quoteId as string,
-              p_room_name: measurement.roomName,
-              p_width: measurement.width,
-              p_length: measurement.length,
-              p_height: measurement.height || null
-            }
-          );
-          
-          if (measurementError) {
-            console.error('Erro ao salvar medida:', measurementError);
-          }
-        }
-      }
-      
-      const address = {
         street: formData.street,
         number: formData.number,
         complement: formData.complement,
         neighborhood: formData.neighborhood,
         city: formData.city,
         state: formData.state,
-        zipCode: formData.zipCode
+        zip_code: formData.zipCode,
+        service_date: serviceDateFormatted,
+        service_end_date: serviceEndDateFormatted,
+        service_time_preference: formData.serviceTimePreference,
+        is_anonymous: !user,
+        status: 'pending'
       };
       
-      const quoteDetails = {
-        id: quoteId as string,
-        serviceId: formData.serviceId || '',
-        subServiceId: formData.subServiceId || '',
-        specialtyId: formData.specialtyId || '',
-        serviceName: formData.serviceName || '',
-        subServiceName: formData.subServiceName || '',
-        specialtyName: formData.specialtyName || '',
-        items: formData.itemQuantities || {},
-        measurements: formData.measurements || [],
-        address: address,
-        description: formData.description || '',
-        clientId: user?.id || null
+      console.log("Quote data:", quoteData);
+      
+      // Store detailed quote information for provider matching
+      const quoteDetails: QuoteDetails = {
+        serviceId: formData.serviceId!,
+        subServiceId: formData.subServiceId,
+        specialtyId: formData.specialtyId,
+        serviceName: formData.serviceName!,
+        subServiceName: formData.subServiceName,
+        specialtyName: formData.specialtyName,
+        items: formData.itemQuantities,
+        measurements: formData.measurements?.map(m => ({
+          ...m,
+          area: m.width * m.length
+        })),
+        address: {
+          street: formData.street!,
+          number: formData.number!,
+          complement: formData.complement,
+          neighborhood: formData.neighborhood!,
+          city: formData.city!,
+          state: formData.state!,
+          zipCode: formData.zipCode!,
+        },
+        description: formData.description,
+        clientId: user?.id,
+        serviceDate: formData.serviceDate,
+        serviceEndDate: formData.serviceEndDate,
+        serviceTimePreference: formData.serviceTimePreference
       };
       
-      sessionStorage.setItem('currentQuote', JSON.stringify(quoteDetails));
+      // Store the complete quote details in session storage
+      const storedSuccessfully = storeQuoteData(quoteDetails);
+      if (!storedSuccessfully) {
+        console.error("Failed to store quote data");
+        toast.error("Erro ao armazenar os dados do orçamento");
+        return;
+      }
       
-      navigate('/prestadoresencontrados', { state: { quoteDetails } });
+      // Try to use submit_quote RPC function if available
+      try {
+        const { data: quoteResult, error: quoteError } = await supabase
+          .rpc('submit_quote', {
+            p_full_name: formData.fullName,
+            p_service_id: formData.serviceId,
+            p_sub_service_id: formData.subServiceId,
+            p_specialty_id: formData.specialtyId,
+            p_description: formData.description,
+            p_street: formData.street,
+            p_number: formData.number,
+            p_complement: formData.complement,
+            p_neighborhood: formData.neighborhood,
+            p_city: formData.city,
+            p_state: formData.state,
+            p_zip_code: formData.zipCode,
+            p_is_anonymous: !user,
+            p_service_date: serviceDateFormatted,
+            p_service_end_date: serviceEndDateFormatted,
+            p_service_time_preference: formData.serviceTimePreference
+          });
+        
+        if (quoteError) {
+          console.error('Error using RPC function:', quoteError);
+          throw quoteError;
+        }
+        
+        console.log("Quote created via RPC:", quoteResult);
+        const quoteId = quoteResult;
+        
+        // Insert answers if any
+        await handleAdditionalData(quoteId);
+        
+        toast.success('Orçamento solicitado com sucesso!');
+        handleRedirect();
+        onSubmit();
+        return;
+      } catch (rpcError) {
+        console.log("RPC function not available or failed, trying direct insert");
+        console.error(rpcError);
+      }
+      
+      // Fallback to direct insert if RPC fails
+      const { data: quoteResult, error: quoteError } = await supabase
+        .from('quotes')
+        .insert(quoteData)
+        .select('id')
+        .single();
+      
+      if (quoteError) {
+        console.error('Error creating quote:', quoteError);
+        toast.error(`Erro ao criar orçamento: ${quoteError.message}`);
+        return;
+      }
+      
+      const quoteId = quoteResult.id;
+      console.log("Quote created via direct insert:", quoteId);
+      
+      // Insert additional data
+      await handleAdditionalData(quoteId);
+      
+      toast.success('Orçamento solicitado com sucesso!');
+      handleRedirect();
+      onSubmit();
       
     } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Ocorreu um erro inesperado. Por favor tente novamente.');
+      console.error('Error submitting quote:', error);
+      toast.error('Erro ao enviar orçamento');
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  const steps = [
-    {
-      title: 'Serviço',
-      component: (
-        <ServiceStep
-          onNext={nextStep}
-          formData={formData}
-          updateFormData={updateFormData}
-          services={services}
-        />
-      )
-    },
-    {
-      title: 'Detalhes',
-      component: (
-        <ServiceDetailsStep
-          onNext={nextStep}
-          onBack={prevStep}
-          formData={formData}
-          updateFormData={updateFormData}
-        />
-      )
-    },
-    {
-      title: 'Endereço',
-      component: (
-        <AddressStep
-          onNext={() => setShowReview(true)}
-          onBack={prevStep}
-          formData={formData}
-          updateFormData={updateFormData}
-        />
-      )
+  const handleAdditionalData = async (quoteId) => {
+    // Insert answers if any
+    if (formData.answers && Object.keys(formData.answers).length > 0) {
+      const answersData = Object.entries(formData.answers).map(([questionId, optionId]) => ({
+        quote_id: quoteId,
+        question_id: questionId,
+        option_id: optionId
+      }));
+      
+      try {
+        const { error: answersError } = await supabase
+          .from('quote_answers')
+          .insert(answersData);
+        
+        if (answersError) {
+          console.error('Error creating quote answers:', answersError);
+        }
+      } catch (error) {
+        console.error('Exception creating answers:', error);
+      }
     }
-  ];
+    
+    // Insert items if any
+    if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
+      const itemsData = Object.entries(formData.itemQuantities)
+        .filter(([_, quantity]) => quantity > 0)
+        .map(([itemId, quantity]) => ({
+          quote_id: quoteId,
+          item_id: itemId,
+          quantity
+        }));
+      
+      if (itemsData.length > 0) {
+        try {
+          const { error: itemsError } = await supabase
+            .from('quote_items')
+            .insert(itemsData);
+          
+          if (itemsError) {
+            console.error('Error creating quote items:', itemsError);
+          }
+        } catch (error) {
+          console.error('Exception creating items:', error);
+        }
+      }
+    }
+    
+    // Insert measurements if any
+    if (formData.measurements && formData.measurements.length > 0) {
+      const measurementsData = formData.measurements.map(m => ({
+        quote_id: quoteId,
+        room_name: m.roomName || null,
+        width: m.width,
+        length: m.length,
+        height: m.height || null,
+        area: m.width * m.length
+      }));
+      
+      try {
+        const { error: measurementsError } = await supabase
+          .from('quote_measurements')
+          .insert(measurementsData);
+        
+        if (measurementsError) {
+          console.error('Error creating quote measurements:', measurementsError);
+        }
+      } catch (error) {
+        console.error('Exception creating measurements:', error);
+      }
+    }
+  };
+  
+  const handleRedirect = () => {
+    // Redirect based on user login status
+    if (user) {
+      navigate('/profile/quotes');
+    } else {
+      navigate('/prestadoresencontrados');
+    }
+  };
+  
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-medium">Revise os dados do seu orçamento</h3>
+      
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados do Serviço</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Nome</p>
+                <p className="font-medium">{formData.fullName}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Serviço</p>
+                <p className="font-medium">{formData.serviceName}</p>
+              </div>
+              
+              {formData.subServiceName && (
+                <div>
+                  <p className="text-sm text-gray-500">Tipo de Serviço</p>
+                  <p className="font-medium">{formData.subServiceName}</p>
+                </div>
+              )}
+              
+              {formData.specialtyName && (
+                <div>
+                  <p className="text-sm text-gray-500">Especialidade</p>
+                  <p className="font-medium">{formData.specialtyName}</p>
+                </div>
+              )}
+              
+              <div>
+                <p className="text-sm text-gray-500">Data</p>
+                <p className="font-medium">
+                  {formData.serviceDate ? format(formData.serviceDate, "dd/MM/yyyy") : '-'}
+                  {formData.serviceEndDate && formData.serviceEndDate !== formData.serviceDate && 
+                   ` até ${format(formData.serviceEndDate, "dd/MM/yyyy")}`}
+                </p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Horário preferencial</p>
+                <p className="font-medium">
+                  {formData.serviceTimePreference === 'morning' ? 'Manhã' :
+                   formData.serviceTimePreference === 'afternoon' ? 'Tarde' :
+                   formData.serviceTimePreference === 'evening' ? 'Noite' :
+                   formData.serviceTimePreference === 'business' ? 'Horário comercial' : '-'}
+                </p>
+              </div>
+            </div>
+            
+            {formData.description && (
+              <div className="pt-2">
+                <p className="text-sm text-gray-500 mb-1">Descrição</p>
+                <p className="text-sm border rounded-md p-3 bg-gray-50">{formData.description}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Endereço</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              {formData.street}, {formData.number}
+              {formData.complement && ` - ${formData.complement}`}
+            </p>
+            <p>{formData.neighborhood}</p>
+            <p>{formData.city} - {formData.state}</p>
+            <p>CEP: {formData.zipCode}</p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="pt-4 flex justify-between">
+        <Button type="button" variant="outline" onClick={onBack}>
+          <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+        </Button>
+        <Button 
+          onClick={handleSubmit} 
+          disabled={isSubmitting}
+          className="relative"
+        >
+          {isSubmitting && (
+            <Loader2 className="animate-spin h-4 w-4 absolute" />
+          )}
+          <span className={isSubmitting ? "opacity-0" : ""}>
+            Solicitar Orçamento
+          </span>
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<FormData>({});
+  
+  const updateFormData = (data: Partial<FormData>) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+  
+  const nextStep = () => {
+    setCurrentStep(prev => prev + 1);
+    window.scrollTo(0, 0);
+  };
+  
+  const prevStep = () => {
+    setCurrentStep(prev => prev - 1);
+    window.scrollTo(0, 0);
+  };
+  
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <ServiceStep 
+            onNext={nextStep}
+            formData={formData}
+            updateFormData={updateFormData}
+            services={services}
+          />
+        );
+      case 1:
+        return (
+          <ServiceDetailsStep 
+            onNext={nextStep}
+            onBack={prevStep}
+            formData={formData}
+            updateFormData={updateFormData}
+          />
+        );
+      case 2:
+        return (
+          <AddressStep 
+            onNext={nextStep}
+            onBack={prevStep}
+            formData={formData}
+            updateFormData={updateFormData}
+          />
+        );
+      case 3:
+        return (
+          <ReviewStep 
+            onSubmit={nextStep}
+            onBack={prevStep}
+            formData={formData}
+          />
+        );
+      default:
+        return <div>Finalizado</div>;
+    }
+  };
   
   return (
     <div>
-      <div className="flex mb-8">
-        {steps.map((step, index) => (
-          <div key={index} className="flex-1">
-            <div 
-              className={`
-                flex flex-col items-center
-                ${index <= currentStep ? 'text-primary' : 'text-gray-400'}
-              `}
-            >
-              <div 
-                className={`
-                  w-8 h-8 flex items-center justify-center rounded-full mb-2 
-                  ${index < currentStep ? 'bg-primary text-white' : 
-                    index === currentStep ? 'border-2 border-primary text-primary' : 
-                    'border-2 border-gray-300'}
-                `}
-              >
-                {index < currentStep ? (
-                  <CheckCircle2 className="h-5 w-5" />
-                ) : (
-                  index + 1
-                )}
-              </div>
-              <span className="text-sm">{step.title}</span>
-            </div>
-            
-            {index < steps.length - 1 && (
-              <div 
-                className={`
-                  hidden md:block flex-grow h-0.5 mt-4
-                  ${index < currentStep ? 'bg-primary' : 'bg-gray-300'}
-                `}
-              />
-            )}
-          </div>
-        ))}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-muted-foreground">
+            Passo {currentStep + 1} de 4
+          </span>
+          <span className="text-sm font-medium">
+            {currentStep === 0 ? 'Dados do Serviço' : 
+             currentStep === 1 ? 'Detalhes do Serviço' :
+             currentStep === 2 ? 'Endereço' : 'Revisão'}
+          </span>
+        </div>
+        <Progress 
+          value={((currentStep + 1) / 4) * 100} 
+          className="h-2"
+        />
       </div>
       
-      <div className="mt-8">
-        {steps[currentStep].component}
-      </div>
-      
-      <Dialog open={showReview} onOpenChange={setShowReview}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Revisar Orçamento</DialogTitle>
-            <DialogDescription>
-              Verifique as informações abaixo antes de enviar seu orçamento
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-4">
-            <div>
-              <h3 className="font-medium text-lg mb-2">Serviço Selecionado</h3>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Serviço</p>
-                      <p className="font-medium">{formData.serviceName}</p>
-                    </div>
-                    
-                    {formData.subServiceName && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
-                        <p className="font-medium">{formData.subServiceName}</p>
-                      </div>
-                    )}
-                    
-                    {formData.specialtyName && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Especialidade</p>
-                        <p className="font-medium">{formData.specialtyName}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {formData.description && (
-                    <div className="mt-4">
-                      <p className="text-sm text-muted-foreground">Descrição</p>
-                      <p className="text-sm mt-1">{formData.description}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div>
-              <h3 className="font-medium text-lg mb-2">Endereço</h3>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 gap-2">
-                    <p>
-                      {formData.street}, {formData.number}
-                      {formData.complement && `, ${formData.complement}`}
-                    </p>
-                    <p>{formData.neighborhood}</p>
-                    <p>
-                      {formData.city} - {formData.state}
-                    </p>
-                    <p>CEP: {formData.zipCode}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReview(false)}>
-              Editar
-            </Button>
-            <Button 
-              onClick={() => handleSubmit(new Event('submit') as unknown as React.FormEvent<HTMLFormElement>)}
-              disabled={isSubmitting || !canSubmit()}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                'Enviar Orçamento'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {renderStep()}
     </div>
   );
 };

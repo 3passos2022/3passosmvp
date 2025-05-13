@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -19,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { retrieveQuoteData } from '@/lib/utils/quoteStorage';
 
 // Definindo a variável de ambiente do Google Maps
 declare global {
@@ -60,27 +60,23 @@ const ProvidersFound: React.FC = () => {
       try {
         console.log('Starting to load quote details from location state or sessionStorage');
         
+        // First try to get quote details from location state
         if (location.state?.quoteDetails) {
           console.log('Quote details found in router state:', location.state.quoteDetails);
           setQuoteDetails(location.state.quoteDetails);
           return;
         }
         
-        const storedQuote = sessionStorage.getItem('currentQuote');
+        // If not in location state, try to get from sessionStorage using our utility
+        const storedQuote = retrieveQuoteData();
         if (storedQuote) {
-          console.log('Quote details found in sessionStorage');
-          try {
-            const parsedQuote = JSON.parse(storedQuote);
-            console.log('Parsed quote from sessionStorage:', parsedQuote);
-            setQuoteDetails(parsedQuote);
-            return;
-          } catch (parseError) {
-            console.error('Error parsing quote from sessionStorage:', parseError);
-            // Continue to error message
-          }
-        } else {
-          console.error('No quote details found in sessionStorage');
+          console.log('Quote details found in sessionStorage:', storedQuote);
+          setQuoteDetails(storedQuote);
+          return;
         }
+        
+        // If we reach here, no quote details were found
+        console.error('No quote details found in location state or sessionStorage');
         
         toast({
           title: "Informações insuficientes",
@@ -123,9 +119,13 @@ const ProvidersFound: React.FC = () => {
         console.log(`Subservice: ${quoteDetails.subServiceName || 'None'} (${quoteDetails.subServiceId || 'None'})`);
         console.log(`Specialty: ${quoteDetails.specialtyName || 'None'} (${quoteDetails.specialtyId || 'None'})`);
         
-        // Validate quote data
+        // Validate quote data before searching
         if (!quoteDetails.serviceId) {
           throw new Error('Service ID not provided');
+        }
+        
+        if (!quoteDetails.address || !quoteDetails.address.city) {
+          console.warn('Address information incomplete, this may affect provider matching');
         }
         
         // Search for all available providers with improved error handling
@@ -136,8 +136,8 @@ const ProvidersFound: React.FC = () => {
           
           if (!matchingProviders || matchingProviders.length === 0) {
             console.warn('No providers found for the given criteria');
-            sonnerToast.warning('No providers found', {
-              description: 'We couldn\'t find providers for this service at the moment. We\'re working on adding more providers.',
+            sonnerToast.warning('Nenhum prestador encontrado', {
+              description: 'Não conseguimos encontrar prestadores para este serviço no momento. Estamos trabalhando para adicionar mais prestadores.',
               duration: 5000
             });
           } else {

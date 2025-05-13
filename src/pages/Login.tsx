@@ -1,409 +1,247 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import RoleSelector from '@/components/auth/RoleSelector';
 import { UserRole } from '@/lib/types';
-import { User as UserIcon, Briefcase } from 'lucide-react';
-import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 
-const loginSchema = z.object({
-  email: z.string().email({
-    message: "Por favor, insira um e-mail válido",
-  }),
-  password: z.string().min(1, { message: "A senha é obrigatória" }),
-});
+interface LocationState {
+  from: string;
+}
 
-const signupSchema = z.object({
-  name: z.string().min(2, {
-    message: "O nome deve ter pelo menos 2 caracteres",
-  }),
-  email: z.string().email({
-    message: "Por favor, insira um e-mail válido",
-  }),
-  phone: z.string().min(10, {
-    message: "Por favor, insira um telefone válido",
-  }).optional(),
-  password: z.string()
-    .min(8, { message: "A senha deve ter pelo menos 8 caracteres" })
-    .regex(/[A-Z]/, { message: "A senha deve conter pelo menos uma letra maiúscula" })
-    .regex(/[0-9]/, { message: "A senha deve conter pelo menos um número" })
-    .regex(/[^A-Za-z0-9]/, { message: "A senha deve conter pelo menos um caractere especial" }),
-  role: z.enum([UserRole.CLIENT, UserRole.PROVIDER], {
-    message: "Selecione o tipo de conta",
-  }),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
-type SignupFormData = z.infer<typeof signupSchema>;
-
-const Login: React.FC = () => {
-  const { user, session, loading, signIn, signUp } = useAuth();
+const LoginPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.CLIENT);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<string>("login");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { login, signUp } = useAuth();
+  const state = location.state as LocationState;
 
-  // Obter caminho de redirecionamento
-  const from = location.state?.from || "/";
-  
   useEffect(() => {
-    if (user && session) {
-      navigate(from);
-    }
-  }, [user, session, navigate, from]);
+    document.title = 'Login | Nome do App';
+  }, []);
 
-  const loginForm = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
-
-  const signupForm = useForm<z.infer<typeof signupSchema>>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      password: "",
-      role: UserRole.CLIENT,
-    },
-  });
-
-  const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
+    
     try {
-      const { error } = await signIn(formData.email, formData.password);
-      if (error) {
-        toast.error(`Erro ao fazer login: ${error.message}`);
+      const result = await login(email, password);
+      
+      if (result.error) {
+        toast.error('Erro ao fazer login: ' + result.error.message);
       } else {
-        toast.success("Login realizado com sucesso!");
-        
-        // Atraso para garantir atualização do estado
-        setTimeout(() => {
-          if (!user || !session) {
-            navigate(from);
-          }
-        }, 500);
+        const returnUrl = state?.from || '/';
+        navigate(returnUrl);
       }
-    } catch (error) {
-      toast.error("Erro inesperado ao fazer login");
+    } catch (err: any) {
+      toast.error('Falha no login: ' + (err.message || 'Erro desconhecido'));
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleSignupSubmit = async (formData: z.infer<typeof signupSchema>) => {
+  
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast.error('As senhas não correspondem');
+      return;
+    }
+    
     setIsLoading(true);
+    
     try {
-      const { error } = await signUp(formData.email, formData.password, formData.role);
-
-      if (error) {
-        toast.error(`Erro ao criar conta: ${error.message}`);
-      } else {
-        toast.success(
-          "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
-        );
+      if (signUp) {
+        const result = await signUp(email, password, selectedRole);
         
-        setActiveTab("login");
-        loginForm.setValue("email", formData.email);
-        signupForm.reset();
+        if (result.error) {
+          toast.error('Erro ao criar conta: ' + result.error.message);
+        } else {
+          toast.success('Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.');
+          setActiveTab('login');
+        }
       }
-    } catch (error) {
-      toast.error("Erro ao criar conta");
+    } catch (err: any) {
+      toast.error('Falha ao criar conta: ' + (err.message || 'Erro desconhecido'));
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Redirecionar se já estiver logado
-  if (!loading && user && session) {
-    navigate(from);
-    return null;
-  }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-md w-full"
-        >
-          <div className="text-center mb-8">
-            <Link to="/" className="inline-block">
-                 <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
-            </Link>
-          </div>
+    <motion.div
+      className="flex flex-col items-center justify-center min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Bem-vindo(a) de volta!
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Ou <Link to="/register" className="font-medium text-primary hover:text-primary-focus">crie sua conta</Link>
+          </p>
+        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="register">Criar Conta</TabsTrigger>
+          </TabsList>
+          <TabsContent value="login" className="space-y-6">
+            <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+              <div className="rounded-md shadow-sm -space-y-px">
+                <div>
+                  <Label htmlFor="email-address">Email</Label>
+                  <Input
+                    id="email-address"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="Seu email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="Sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
 
-          <Tabs
-            defaultValue="login"
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
-            </TabsList>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                    Lembrar de mim
+                  </label>
+                </div>
 
-            <TabsContent value="login">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Entrar</CardTitle>
-                  <CardDescription>
-                    Entre com sua conta para acessar o sistema
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...loginForm}>
-                    <form
-                      onSubmit={loginForm.handleSubmit(handleLoginSubmit)}
-                      className="space-y-4"
-                    >
-                      <FormField
-                        control={loginForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>E-mail</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="seu@email.com"
-                                type="email"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                <div className="text-sm">
+                  <Link to="/forgot-password" className="font-medium text-primary hover:text-primary-focus">
+                    Esqueceu sua senha?
+                  </Link>
+                </div>
+              </div>
 
-                      <FormField
-                        control={loginForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Senha</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Sua senha"
-                                type="password"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+              <div>
+                <Button type="submit" className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-focus focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Entrando...
+                    </>
+                  ) : (
+                    'Entrar'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+          <TabsContent value="register" className="space-y-6">
+            <form className="mt-8 space-y-6" onSubmit={handleSignup}>
+              <div className="rounded-md shadow-sm -space-y-px">
+                <div>
+                  <Label htmlFor="email-address">Email</Label>
+                  <Input
+                    id="email-address"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="Seu email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="Sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                  <Input
+                    id="confirm-password"
+                    name="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                    placeholder="Confirme sua senha"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+              </div>
 
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Entrando..." : "Entrar"}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-                <CardFooter className="flex justify-center">
-                  <Button
-                    variant="link"
-                    onClick={() => setActiveTab("signup")}
-                    className="text-sm"
-                  >
-                    Não tem uma conta? Crie agora
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
+              <div>
+                <RoleSelector selectedRole={selectedRole} onSelectRole={setSelectedRole} />
+              </div>
 
-            <TabsContent value="signup">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Criar Conta</CardTitle>
-                  <CardDescription>
-                    Preencha os dados para criar sua conta
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...signupForm}>
-                    <form
-                      onSubmit={signupForm.handleSubmit(handleSignupSubmit)}
-                      className="space-y-4"
-                    >
-                      <FormField
-                        control={signupForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Seu nome completo"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={signupForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>E-mail</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="seu@email.com"
-                                type="email"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={signupForm.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="(00) 00000-0000"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={signupForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Senha</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Sua senha"
-                                type="password"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={signupForm.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem className="space-y-2">
-                            <FormLabel>Tipo de Conta</FormLabel>
-                            <FormControl>
-                              <RadioGroup
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                                className="grid grid-cols-2 gap-4"
-                              >
-                                <div>
-                                  <RadioGroupItem
-                                    value={UserRole.CLIENT}
-                                    id="client"
-                                    className="peer sr-only"
-                                  />
-                                  <Label
-                                    htmlFor="client"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                                  >
-                                    <UserIcon className="mb-2 h-6 w-6" />
-                                    Cliente
-                                  </Label>
-                                </div>
-                                <div>
-                                  <RadioGroupItem
-                                    value={UserRole.PROVIDER}
-                                    id="provider"
-                                    className="peer sr-only"
-                                  />
-                                  <Label
-                                    htmlFor="provider"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                                  >
-                                    <Briefcase className="mb-2 h-6 w-6" />
-                                    Prestador
-                                  </Label>
-                                </div>
-                              </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Criando conta..." : "Criar Conta"}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-                <CardFooter className="flex justify-center">
-                  <Button
-                    variant="link"
-                    onClick={() => setActiveTab("login")}
-                    className="text-sm"
-                  >
-                    Já tem uma conta? Entre agora
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </motion.div>
-      </main>
-    </div>
+              <div>
+                <Button type="submit" className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-focus focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Criando conta...
+                    </>
+                  ) : (
+                    'Criar Conta'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </motion.div>
   );
 };
 
-export default Login;
+export default LoginPage;
