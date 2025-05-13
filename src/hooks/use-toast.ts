@@ -1,87 +1,76 @@
 
-import { toast as sonnerToast } from "sonner";
+import { toast as sonnerToast } from 'sonner';
 
-// Define ToastProps to include all the properties being used in the project
+// Define the ToastProps type based on sonner's interface
 export interface ToastProps {
   title?: string;
-  description?: string;
+  description?: string | React.ReactNode;
   variant?: "default" | "destructive";
   duration?: number;
-  // Add any other properties that are used in the project
+  action?: React.ReactNode;
+  // Add any other properties that might be needed
 }
 
 // Define the Toast type
-export type Toast = ToastProps & {
+export type Toast = {
   id: string;
+  title?: string;
+  description?: string | React.ReactNode;
+  // Additional properties as needed
 };
 
-// Simple toast function that avoids JSX syntax in TypeScript
-function createToast(props: ToastProps | string) {
-  if (typeof props === 'string') {
-    return sonnerToast(props);
+// Create a wrapper function that normalizes our API with sonner
+export function toast(props: ToastProps): void;
+export function toast(title: string, props?: Omit<ToastProps, 'title'>): void;
+export function toast(titleOrProps: string | ToastProps, props?: Omit<ToastProps, 'title'>): void {
+  if (typeof titleOrProps === 'string') {
+    const title = titleOrProps;
+    const options = props || {};
+    if (options.variant === 'destructive') {
+      sonnerToast.error(title, options);
+    } else {
+      sonnerToast(title, options);
+    }
+    return;
   }
   
-  const { title, description, variant, duration, ...options } = props;
+  const { title, description, variant, ...options } = titleOrProps;
   
-  // Map our variant to sonner's properties
-  const toastOptions: any = {
-    description,
-    duration,
-    ...options
-  };
-  
-  // Set error type if variant is destructive
+  // Handle variants
   if (variant === "destructive") {
-    return sonnerToast.error(title || '', toastOptions);
+    sonnerToast.error(title || '', {
+      description,
+      ...options
+    });
+    return;
   }
   
-  // Use sonner's built-in title/description pattern
-  return sonnerToast(title || '', toastOptions);
+  // Default toast
+  sonnerToast(title || '', {
+    description,
+    ...options
+  });
 }
 
-// Add required methods to our toast function
-const toast = Object.assign(createToast, {
-  success: (props: ToastProps | string) => {
-    if (typeof props === 'string') {
-      return sonnerToast.success(props);
-    }
-    const { title, description, duration, ...options } = props;
-    return sonnerToast.success(title || '', { description, duration, ...options });
-  },
-  error: (props: ToastProps | string) => {
-    if (typeof props === 'string') {
-      return sonnerToast.error(props);
-    }
-    const { title, description, duration, ...options } = props;
-    return sonnerToast.error(title || '', { description, duration, ...options });
-  },
-  info: (props: ToastProps | string) => {
-    if (typeof props === 'string') {
-      return sonnerToast.info(props);
-    }
-    const { title, description, duration, ...options } = props;
-    return sonnerToast.info(title || '', { description, duration, ...options });
-  },
-  warning: (props: ToastProps | string) => {
-    if (typeof props === 'string') {
-      return sonnerToast.warning(props);
-    }
-    const { title, description, duration, ...options } = props;
-    return sonnerToast.warning(title || '', { description, duration, ...options });
-  },
-  // Copy other methods from sonnerToast
-  promise: sonnerToast.promise,
-  loading: sonnerToast.loading,
-  dismiss: sonnerToast.dismiss,
-  custom: sonnerToast.custom,
-  message: sonnerToast.message,
-});
+// Add success, error, and other methods
+toast.success = (title: string, props?: Omit<ToastProps, 'title'>) => {
+  sonnerToast.success(title, props);
+};
 
-// Export hook to match shadcn's API
+toast.error = (title: string, props?: Omit<ToastProps, 'title'>) => {
+  sonnerToast.error(title, props);
+};
+
+toast.info = (title: string, props?: Omit<ToastProps, 'title'>) => {
+  sonnerToast.info(title, props);
+};
+
+toast.warning = (title: string, props?: Omit<ToastProps, 'title'>) => {
+  sonnerToast.warning(title, props);
+};
+
 export const useToast = () => {
   return {
     toast
   };
 };
-
-export { toast };
