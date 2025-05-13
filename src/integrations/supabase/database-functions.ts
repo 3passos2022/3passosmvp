@@ -1,5 +1,6 @@
 
 import { supabase } from './client';
+import { UserProfile, UserRole } from '@/lib/types';
 
 // This file contains helper functions for database operations
 // These functions call RPC functions defined in the Supabase database
@@ -44,7 +45,7 @@ export async function updateUserRole(userId: string, role: string) {
  * @param userId The user ID to get the profile for
  * @returns Promise with the user profile data
  */
-export async function getUserProfile(userId: string) {
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -53,6 +54,34 @@ export async function getUserProfile(userId: string) {
 
   if (error) throw error;
   
-  console.log("PROFILE DATA:", data);
-  return data;
+  // If we have data, map it to our UserProfile type
+  if (data) {
+    const userRole = mapDatabaseRoleToEnum(data.role);
+    
+    // Return a properly typed UserProfile
+    return {
+      id: data.id,
+      role: userRole,
+      name: data.name || undefined,
+      phone: data.phone || undefined,
+      created_at: data.created_at || undefined,
+    };
+  }
+  
+  console.log("No profile data found for user:", userId);
+  return null;
+}
+
+/**
+ * Maps a string role from the database to our UserRole enum
+ */
+function mapDatabaseRoleToEnum(role: string): UserRole {
+  switch(role.toLowerCase()) {
+    case 'provider':
+      return UserRole.PROVIDER;
+    case 'admin':
+      return UserRole.ADMIN;
+    default:
+      return UserRole.CLIENT;
+  }
 }

@@ -1,4 +1,3 @@
-
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export enum UserRole {
@@ -22,13 +21,13 @@ export interface ExtendedUser extends SupabaseUser {
 
 export interface UserProfile {
   id: string;
-  email: string;
+  email?: string; // Make email optional since it might not come from the profiles table
   role: UserRole;
   name?: string;
   avatar_url?: string;
   address?: string;
   phone?: string;
-  created_at: string;
+  created_at?: string;
   subscribed?: boolean;
   subscription_tier?: 'free' | 'basic' | 'premium';
   subscription_end?: string | null;

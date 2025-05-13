@@ -196,12 +196,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Update user state with profile information
           if (profileData) {
-            // Properly handle the profile data
+            // Properly merge the profile data with extendedUser
             setUser({
               ...extendedUser,
-              ...profileData,
-              // Ensure required fields
-              email: profileData.email || extendedUser.email,
+              // Only add properties from profileData that exist
+              name: profileData.name,
+              phone: profileData.phone,
+              // Always use UserRole enum for role
               role: profileData.role || extendedUser.role
             });
           } else {
