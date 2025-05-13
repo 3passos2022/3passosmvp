@@ -1,18 +1,13 @@
 
-import { Toaster as SonnerToaster } from "sonner";
+import { Toast, Toaster as ToasterProvider } from "sonner";
 
 export function Toaster() {
   return (
-    <SonnerToaster 
-      position="bottom-right" 
-      toastOptions={{
-        classNames: {
-          title: "text-foreground font-medium text-sm",
-          description: "text-muted-foreground text-sm",
-          error: "bg-destructive text-destructive-foreground border-destructive",
-          success: "bg-green-50 text-green-800 border-green-200",
-        }
-      }}
+    <ToasterProvider
+      position="top-right"
+      richColors
+      expand={false}
+      duration={4000}
     />
   );
 }
