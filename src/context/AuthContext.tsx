@@ -197,9 +197,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Update user state with profile information
           if (profileData) {
+            // Fix: Removed void check and properly handle the data
             setUser({
               ...extendedUser,
-              ...profileData,
+              ...(profileData as object), // Fix: Cast to object to ensure spread works
               // Ensure required fields
               email: profileData.email || extendedUser.email,
               role: profileData.role || extendedUser.role
