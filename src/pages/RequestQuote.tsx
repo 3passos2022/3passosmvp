@@ -8,10 +8,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getAllServices } from '@/lib/api/services';
 import { useAuth } from '@/context/AuthContext';
 import { clearQuoteData } from '@/lib/utils/quoteStorage';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const RequestQuote: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   
   // Use React Query for fetching services with caching
   const { isLoading, error, data: services } = useQuery({
@@ -46,7 +47,7 @@ const RequestQuote: React.FC = () => {
     } else {
       console.log("RequestQuote: User is logged in", user.id);
     }
-  }, [user]);
+  }, [user, toast]);
 
   useEffect(() => {
     if (services) {

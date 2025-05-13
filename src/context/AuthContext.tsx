@@ -61,7 +61,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     loadSession();
 
-    supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session?.user) {
         // Cast to ExtendedUser with required fields
@@ -75,6 +75,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
       }
     });
+
+    return () => {
+      authSubscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password?: string) => {
@@ -180,10 +184,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
       if (data?.user) {
         // Create extended user
+        const userMetadata = data.user.user_metadata || {};
         const extendedUser: ExtendedUser = {
           ...data.user,
           email: data.user.email || '',
-          role: (data.user.user_metadata?.role as UserRole) || UserRole.CLIENT
+          role: (userMetadata.role as UserRole) || UserRole.CLIENT
         };
   
         // Fetch additional profile information
@@ -192,14 +197,13 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Update user state with profile information
           if (profileData) {
-            const updatedUser: ExtendedUser = {
+            setUser({
               ...extendedUser,
               ...profileData,
               // Ensure required fields
               email: profileData.email || extendedUser.email,
               role: profileData.role || extendedUser.role
-            };
-            setUser(updatedUser);
+            });
           } else {
             setUser(extendedUser);
           }
@@ -371,6 +375,99 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     }
   }, [session, user]);
+
+  const updateUser = async (updates: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.updateUser(updates);
+      if (error) throw error;
+
+      // Update user profile in "profiles" table
+      if (updates.name && user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ name: updates.name })
+          .eq('id', user.id);
+
+        if (profileError) {
+          console.error("Erro ao atualizar perfil:", profileError);
+          toast.error("Falha ao atualizar informações do perfil");
+        }
+      }
+
+      await refreshUser();
+      toast.success('Perfil atualizado!');
+    } catch (error: any) {
+      toast.error('Erro ao atualizar perfil', {
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add updateProfile function with the expected return type
+  const updateProfile = async (updates: any) => {
+    try {
+      setLoading(true);
+      
+      // Handle profile updates
+      if (user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+          
+        if (profileError) {
+          console.error("Erro ao atualizar perfil:", profileError);
+          return { error: profileError };
+        }
+        
+        // Update local user state with the new profile info
+        setUser(prevUser => {
+          if (!prevUser) return null;
+          return { ...prevUser, ...updates };
+        });
+        
+        toast.success('Perfil atualizado com sucesso');
+        return { error: null };
+      }
+      
+      return { error: new Error('Usuário não encontrado') };
+    } catch (error: any) {
+      toast.error('Erro ao atualizar perfil', {
+        description: error.message,
+      });
+      return { error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add makeAdmin function
+  const makeAdmin = async (userId: string) => {
+    try {
+      // Only allow admins to make other users admin
+      if (user?.role !== UserRole.ADMIN) {
+        toast.error('Você não tem permissão para executar esta ação');
+        return;
+      }
+      
+      const { error } = await supabase.rpc('update_user_role', { 
+        user_id: userId,
+        new_role: UserRole.ADMIN
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Usuário promovido a administrador com sucesso!');
+    } catch (error: any) {
+      console.error('Error making admin:', error);
+      toast.error('Erro ao promover a administrador', {
+        description: 'Tente novamente.',
+      });
+    }
+  };
 
   const value: AuthContextType = {
     user,
