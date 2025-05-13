@@ -6,8 +6,9 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin",
   "Access-Control-Max-Age": "86400", // 24 horas para reduzir preflight requests
+  "Access-Control-Allow-Credentials": "true",
 };
 
 const logStep = (step: string, details?: any) => {
@@ -41,14 +42,6 @@ serve(async (req) => {
       throw new Error("STRIPE_SECRET_KEY não configurada no ambiente");
     }
     logStep("STRIPE_SECRET_KEY verificada");
-
-    // Inicializa o Stripe
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(), // Especificar explicitamente o cliente HTTP
-    });
-
-    logStep("Buscando produtos e preços ativos");
 
     // Definir planos padrão para fallback
     const defaultPlans = [
@@ -99,124 +92,135 @@ serve(async (req) => {
       ]
     });
 
+    // Não vamos mais tentar verificar conexão com Google - isso está causando erro de CORS
+    
     try {
-      // Verificar conexão com o Stripe antes de continuar
-      logStep("Verificando conexão com o Stripe");
-      const connectionTest = await stripe.balance.retrieve();
-      logStep("Conexão com o Stripe confirmada", { status: "success" });
-
-      // Buscar produtos ativos
-      logStep("Enviando requisição para o Stripe.products.list");
-      const products = await stripe.products.list({
-        active: true,
-        limit: 10,
-        expand: ['data.default_price']
+      // Inicializa o Stripe com opções de timeout
+      const stripe = new Stripe(stripeKey, {
+        apiVersion: "2023-10-16",
+        httpClient: Stripe.createFetchHttpClient(),
+        timeout: 10000, // Timeout em ms (10 segundos)
       });
+
+      // Tentar conectar ao Stripe diretamente, sem verificar conexão com a internet
+      logStep("Tentando conectar diretamente ao Stripe");
       
-      logStep("Produtos recebidos do Stripe", { count: products.data.length });
-
-      // Mapear produtos para o formato esperado pela UI
-      const formattedProducts = products.data
-        .filter(product => product.metadata?.type === 'subscription' || product.metadata?.tier)
-        .map(product => {
-          // Obter o preço padrão do produto
-          const defaultPrice = product.default_price as Stripe.Price;
-          
-          // Determinar o tier com base nos metadados do produto
-          let tier = product.metadata?.tier || 'basic';
-          if (!['free', 'basic', 'premium'].includes(tier)) {
-            // Fallback baseado no preço
-            const amount = defaultPrice?.unit_amount || 0;
-            if (amount === 0) tier = 'free';
-            else if (amount < 2000) tier = 'basic';
-            else tier = 'premium';
-          }
-          
-          // Verificar se é o plano popular
-          const popular = product.metadata?.popular === 'true' || tier === 'basic';
-
-          return {
-            id: product.id,
-            priceId: defaultPrice?.id,
-            name: product.name,
-            description: product.description || `Plano ${tier.charAt(0).toUpperCase() + tier.slice(1)}`,
-            price: defaultPrice?.unit_amount || 0,
-            tier,
-            popular,
-            features: product.features?.map(f => f.name) || 
-                      product.metadata?.features?.split(',') || 
-                      []
-          };
+      try {
+        // Buscar produtos ativos
+        logStep("Enviando requisição para o Stripe.products.list");
+        const products = await stripe.products.list({
+          active: true,
+          limit: 10,
+          expand: ['data.default_price']
         });
-
-      logStep("Produtos formatados", { count: formattedProducts.length });
-      
-      if (formattedProducts.length > 0) {
-        // Garantir que pelo menos temos o plano gratuito
-        if (!formattedProducts.find(p => p.tier === 'free')) {
-          formattedProducts.unshift(defaultPlans[0]);
-          logStep("Adicionado plano gratuito aos produtos do Stripe");
-        }
         
-        // Ordenar por preço
-        formattedProducts.sort((a, b) => a.price - b.price);
+        logStep("Produtos recebidos do Stripe", { count: products.data.length });
 
-        const response = {
-          products: formattedProducts,
-          cached: false,
-          timestamp: new Date().toISOString()
-        };
+        // Mapear produtos para o formato esperado pela UI
+        const formattedProducts = products.data
+          .filter(product => product.metadata?.type === 'subscription' || product.metadata?.tier)
+          .map(product => {
+            // Obter o preço padrão do produto
+            const defaultPrice = product.default_price as Stripe.Price;
+            
+            // Determinar o tier com base nos metadados do produto
+            let tier = product.metadata?.tier || 'basic';
+            if (!['free', 'basic', 'premium'].includes(tier)) {
+              // Fallback baseado no preço
+              const amount = defaultPrice?.unit_amount || 0;
+              if (amount === 0) tier = 'free';
+              else if (amount < 2000) tier = 'basic';
+              else tier = 'premium';
+            }
+            
+            // Verificar se é o plano popular
+            const popular = product.metadata?.popular === 'true' || tier === 'basic';
 
-        logStep(`Requisição [${requestId}] concluída com sucesso`, { productCount: formattedProducts.length });
+            return {
+              id: product.id,
+              priceId: defaultPrice?.id,
+              name: product.name,
+              description: product.description || `Plano ${tier.charAt(0).toUpperCase() + tier.slice(1)}`,
+              price: defaultPrice?.unit_amount || 0,
+              tier,
+              popular,
+              features: product.features?.map(f => f.name) || 
+                        product.metadata?.features?.split(',') || 
+                        []
+            };
+          });
 
-        return new Response(
-          JSON.stringify(response),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        logStep("Produtos formatados", { count: formattedProducts.length });
+        
+        if (formattedProducts.length > 0) {
+          // Garantir que pelo menos temos o plano gratuito
+          if (!formattedProducts.find(p => p.tier === 'free')) {
+            formattedProducts.unshift(defaultPlans[0]);
+            logStep("Adicionado plano gratuito aos produtos do Stripe");
           }
-        );
-      } else {
-        logStep(`Requisição [${requestId}] - Nenhum produto encontrado, usando planos padrão`);
-        return new Response(
-          JSON.stringify({ 
-            products: defaultPlans,
+          
+          // Ordenar por preço
+          formattedProducts.sort((a, b) => a.price - b.price);
+
+          const response = {
+            products: formattedProducts,
             cached: false,
-            fallback: true,
             timestamp: new Date().toISOString()
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+          };
+
+          logStep(`Requisição [${requestId}] concluída com sucesso`, { productCount: formattedProducts.length });
+
+          return new Response(
+            JSON.stringify(response),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      } catch (stripeError) {
+        // Erro ao se comunicar com o Stripe
+        logStep(`Erro ao comunicar com Stripe API: ${stripeError.message}`);
+        throw stripeError; // Repassar erro para ser tratado no catch externo
       }
-    } catch (stripeError) {
-      // Erro específico na comunicação com o Stripe, usar planos padrão
-      logStep(`Requisição [${requestId}] - Erro ao comunicar com Stripe API`, { 
-        error: stripeError.message,
-        stack: stripeError.stack
+    } catch (error) {
+      // Usar planos padrão em caso de erro
+      logStep(`Requisição [${requestId}] - Usando planos padrão devido a erro`, { 
+        error: error instanceof Error ? error.message : String(error)
       });
+      
       return new Response(
         JSON.stringify({ 
           products: defaultPlans, 
-          warning: "Usando planos padrão devido a erro na comunicação com Stripe",
+          warning: "Usando planos padrão devido a problemas de conectividade ou erro na comunicação com Stripe",
           cached: false,
           fallback: true,
-          error: stripeError.message,
           timestamp: new Date().toISOString()
         }),
         {
-          status: 200,  // Retornar 200 mesmo com erro, mas com os planos padrão
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
+    // Se não retornou antes, retorna planos padrão
+    return new Response(
+      JSON.stringify({ 
+        products: defaultPlans,
+        cached: false,
+        fallback: true,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    logStep("Erro fatal", { message: errorMessage, stack: errorStack });
+    logStep("Erro fatal", { message: errorMessage });
     
     return new Response(
       JSON.stringify({ 
@@ -224,7 +228,7 @@ serve(async (req) => {
         timestamp: new Date().toISOString()
       }),
       {
-        status: 400,
+        status: 200, // Retornar 200 mesmo com erro para evitar problemas de CORS
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

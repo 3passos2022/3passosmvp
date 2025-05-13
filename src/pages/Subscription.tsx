@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import PlansComparison from '@/components/subscription/PlansComparison';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 
@@ -47,7 +47,11 @@ const Subscription: React.FC = () => {
           console.log("Status da assinatura atualizado com sucesso");
         } catch (error) {
           console.error("Erro ao verificar assinatura:", error);
-          toast.error("Não foi possível verificar o status da sua assinatura");
+          toast({
+            title: "Erro",
+            description: "Não foi possível verificar o status da sua assinatura",
+            variant: "destructive"
+          });
         } finally {
           clearTimeout(timeout);
           setInitializing(false);
@@ -70,12 +74,19 @@ const Subscription: React.FC = () => {
     }
     
     if (plan.tier === 'free') {
-      toast.info('Você já está no plano gratuito');
+      toast({
+        title: "Plano gratuito",
+        description: "Você já está no plano gratuito"
+      });
       return;
     }
     
     if (!plan.priceId) {
-      toast.error('Este plano não possui um ID de preço válido');
+      toast({
+        title: "Erro",
+        description: "Este plano não possui um ID de preço válido",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -106,7 +117,11 @@ const Subscription: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Erro ao iniciar checkout:', error);
-      toast.error('Erro ao processar pagamento: ' + (error.message || 'Tente novamente mais tarde'));
+      toast({
+        title: "Erro de pagamento",
+        description: 'Erro ao processar pagamento: ' + (error.message || 'Tente novamente mais tarde'),
+        variant: "destructive"
+      });
     }
   };
 
