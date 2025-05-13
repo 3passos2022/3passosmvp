@@ -8,7 +8,7 @@ const TOAST_REMOVE_DELAY = 5000;
 
 type ToastType = "default" | "destructive" | "success";
 
-type ToastProps = {
+export type ToastProps = {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -190,7 +190,7 @@ function useToast() {
 }
 
 export { useToast, toast };
-export type { ToastProps };
+export type { Toast };
 
 /**
  * Toast component that displays notifications

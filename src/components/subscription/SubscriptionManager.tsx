@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { SubscriptionStatus, SubscriptionData } from '@/lib/types/subscriptions';
+import { SubscriptionData } from '@/lib/types/subscriptions';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -49,7 +49,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       }
     }
     
-    // Check subscription status on mount
+    // Check subscription status on mount if we have a user
     if (user) {
       refreshSubscription().catch(error => {
         console.error("Error checking subscription:", error);

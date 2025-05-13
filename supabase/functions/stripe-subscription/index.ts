@@ -72,11 +72,19 @@ serve(async (req) => {
     // Find customer
     log("Looking up Stripe customer", { email: user.email });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    
+
+    // Check if record exists in subscribers table
+    const { data: existingSubscriber } = await supabase
+      .from("subscribers")
+      .select("*")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    // If no customer found in Stripe or if we need to update existing record
     if (customers.data.length === 0) {
       log("No customer found, marking as non-subscriber");
       
-      // Update subscribers table
+      // Create or update subscribers table
       await supabase.from("subscribers").upsert({
         email: user.email,
         user_id: user.id,
