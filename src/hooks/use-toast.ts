@@ -1,77 +1,72 @@
-import { toast as sonnerToast, type ExternalToast } from "sonner";
-import React from "react";
 
-// Define a custom toast type that includes title and description
-export interface ToastProps extends ExternalToast {
-  title?: React.ReactNode;
-  description?: React.ReactNode;
+import { toast as sonnerToast, type Toast as SonnerToast, type ToastOptions } from "sonner";
+
+export interface ToastProps extends ToastOptions {
+  title?: string;
+  description?: string;
 }
 
-// Our custom toast function that translates between our props and sonner props
-const customToast = (props: ToastProps) => {
-  // If props is a string or React element, pass it directly to sonner
-  if (typeof props === 'string' || React.isValidElement(props)) {
-    return sonnerToast(props);
-  }
-
-  // Otherwise, extract title, description, and other props
-  const { title, description, ...restProps } = props;
-  
-  // If we have both title and description
-  if (title && description) {
-    return sonnerToast((
-      <div>
-        {typeof title === 'string' ? <p className="font-medium">{title}</p> : title}
-        {typeof description === 'string' ? <p className="text-sm opacity-90">{description}</p> : description}
-      </div>
-    ), restProps);
-  }
-  
-  // If we just have title
-  if (title) {
-    return sonnerToast(title, restProps);
-  }
-  
-  // If we just have description
-  if (description) {
-    return sonnerToast(description, restProps);
-  }
-  
-  // Fallback to regular toast behavior
-  return sonnerToast("", restProps);
+export type Toast = ToastProps & {
+  id: string;
 };
 
-// Add all the methods from sonner toast to our custom toast
-type SonnerToastType = typeof sonnerToast;
-interface CustomToastType extends SonnerToastType {
-  (props: ToastProps): ReturnType<SonnerToastType>;
+// Simple toast function that avoids JSX syntax in TypeScript
+function createToast(props: ToastProps | string) {
+  if (typeof props === 'string') {
+    return sonnerToast(props);
+  }
+  
+  const { title, description, ...options } = props;
+  
+  // Use sonner's built-in title/description pattern instead of JSX
+  return sonnerToast(title || '', {
+    description,
+    ...options
+  });
 }
 
-// Create our enhanced toast function with all sonner methods
-const enhancedToast = customToast as unknown as CustomToastType;
-
-// Copy all the methods from sonnerToast to our enhancedToast
-Object.keys(sonnerToast).forEach((key) => {
-  const methodKey = key as keyof typeof sonnerToast;
-  if (typeof sonnerToast[methodKey] === 'function') {
-    (enhancedToast as any)[methodKey] = sonnerToast[methodKey];
-  }
+// Add required methods to our toast function
+const toast = Object.assign(createToast, {
+  success: (props: ToastProps | string) => {
+    if (typeof props === 'string') {
+      return sonnerToast.success(props);
+    }
+    const { title, description, ...options } = props;
+    return sonnerToast.success(title || '', { description, ...options });
+  },
+  error: (props: ToastProps | string) => {
+    if (typeof props === 'string') {
+      return sonnerToast.error(props);
+    }
+    const { title, description, ...options } = props;
+    return sonnerToast.error(title || '', { description, ...options });
+  },
+  info: (props: ToastProps | string) => {
+    if (typeof props === 'string') {
+      return sonnerToast.info(props);
+    }
+    const { title, description, ...options } = props;
+    return sonnerToast.info(title || '', { description, ...options });
+  },
+  warning: (props: ToastProps | string) => {
+    if (typeof props === 'string') {
+      return sonnerToast.warning(props);
+    }
+    const { title, description, ...options } = props;
+    return sonnerToast.warning(title || '', { description, ...options });
+  },
+  // Copy other methods from sonnerToast
+  promise: sonnerToast.promise,
+  loading: sonnerToast.loading,
+  dismiss: sonnerToast.dismiss,
+  custom: sonnerToast.custom,
+  message: sonnerToast.message,
 });
 
-// Create a custom hook to use the toast
 export const useToast = () => {
   return {
-    toast: enhancedToast
+    toast
   };
 };
 
-// Export our toast instance for direct use
-export const toast = enhancedToast;
-
-// Export a type for toast data for components that use the toaster
-export type Toast = ToastProps & {
-  id: string;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  action?: React.ReactNode;
-};
+export { toast };
