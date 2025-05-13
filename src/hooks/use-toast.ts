@@ -1,76 +1,67 @@
 
-import { toast as sonnerToast } from 'sonner';
+import { toast as sonnerToast } from "sonner";
 
-// Define the ToastProps type based on sonner's interface
-export interface ToastProps {
-  title?: string;
-  description?: string | React.ReactNode;
-  variant?: "default" | "destructive";
+// Import ExternalToast from sonner directly
+import type { ExternalToast } from "sonner";
+
+// Define our custom Toast type that extends ExternalToast
+export interface Toast extends ExternalToast {
+  variant?: "default" | "destructive" | "success";
   duration?: number;
-  action?: React.ReactNode;
-  // Add any other properties that might be needed
+  description?: React.ReactNode;
 }
 
-// Define the Toast type
-export type Toast = {
-  id: string;
-  title?: string;
-  description?: string | React.ReactNode;
-  // Additional properties as needed
-};
+// Export ToastProps as our custom Toast interface
+export type ToastProps = Toast;
 
-// Create a wrapper function that normalizes our API with sonner
-export function toast(props: ToastProps): void;
-export function toast(title: string, props?: Omit<ToastProps, 'title'>): void;
-export function toast(titleOrProps: string | ToastProps, props?: Omit<ToastProps, 'title'>): void {
-  if (typeof titleOrProps === 'string') {
-    const title = titleOrProps;
-    const options = props || {};
-    if (options.variant === 'destructive') {
-      sonnerToast.error(title, options);
-    } else {
-      sonnerToast(title, options);
-    }
-    return;
-  }
-  
-  const { title, description, variant, ...options } = titleOrProps;
-  
-  // Handle variants
-  if (variant === "destructive") {
-    sonnerToast.error(title || '', {
-      description,
-      ...options
-    });
-    return;
-  }
-  
-  // Default toast
-  sonnerToast(title || '', {
-    description,
-    ...options
-  });
-}
-
-// Add success, error, and other methods
-toast.success = (title: string, props?: Omit<ToastProps, 'title'>) => {
-  sonnerToast.success(title, props);
-};
-
-toast.error = (title: string, props?: Omit<ToastProps, 'title'>) => {
-  sonnerToast.error(title, props);
-};
-
-toast.info = (title: string, props?: Omit<ToastProps, 'title'>) => {
-  sonnerToast.info(title, props);
-};
-
-toast.warning = (title: string, props?: Omit<ToastProps, 'title'>) => {
-  sonnerToast.warning(title, props);
-};
-
-export const useToast = () => {
+// Define a custom useToast hook that extends sonner's functionality
+export function useToast() {
   return {
-    toast
+    toast: ({ variant, description, ...props }: ToastProps) => {
+      // Map our variant to sonner's style
+      if (variant === "destructive") {
+        return sonnerToast.error(props.title, {
+          description,
+          ...props,
+        });
+      } else if (variant === "success") {
+        return sonnerToast.success(props.title, {
+          description,
+          ...props,
+        });
+      } else {
+        return sonnerToast(props.title, {
+          description,
+          ...props,
+        });
+      }
+    },
+    dismiss: sonnerToast.dismiss,
+    success: (title: string, props?: Omit<ToastProps, "title" | "variant">) => 
+      sonnerToast.success(title, props),
+    error: (title: string, props?: Omit<ToastProps, "title" | "variant">) => 
+      sonnerToast.error(title, props),
+    warning: (title: string, props?: Omit<ToastProps, "title" | "variant">) => 
+      sonnerToast(title, { ...props, style: { backgroundColor: "var(--warning)" } }),
+    info: (title: string, props?: Omit<ToastProps, "title" | "variant">) => 
+      sonnerToast.info(title, props),
   };
+}
+
+// Re-export toast for convenience
+export const toast = {
+  ...sonnerToast,
+  // Add our custom methods that handle variants
+  default: (title: string, props?: Omit<ToastProps, "title">) => 
+    sonnerToast(title, props),
+  success: (title: string, props?: Omit<ToastProps, "title">) => 
+    sonnerToast.success(title, props),
+  destructive: (title: string, props?: Omit<ToastProps, "title">) => 
+    sonnerToast.error(title, props),
+  error: (title: string, props?: Omit<ToastProps, "title">) => 
+    sonnerToast.error(title, props),
+  warning: (title: string, props?: Omit<ToastProps, "title">) => 
+    sonnerToast(title, { ...props, style: { backgroundColor: "var(--warning)" } }),
+  info: (title: string, props?: Omit<ToastProps, "title">) => 
+    sonnerToast.info(title, props),
 };

@@ -156,10 +156,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setSession(null);
       setUser(null);
       navigate('/login');
+      return Promise.resolve();
     } catch (error: any) {
       toast.error('Erro ao fazer logout', {
         description: error.message,
       });
+      return Promise.reject(error);
     }
   };
 
