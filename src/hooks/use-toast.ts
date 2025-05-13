@@ -1,4 +1,3 @@
-
 import { toast as sonnerToast, type ExternalToast } from "sonner";
 import React from "react";
 
@@ -16,16 +15,7 @@ const customToast = (props: ToastProps) => {
 
   const { title, description, ...restProps } = props;
   
-  // If we have both title and description, use them together
-  if (title && description) {
-    return sonnerToast(
-      <div>
-        {typeof title === 'string' ? <p className="font-medium">{title}</p> : title}
-        {typeof description === 'string' ? <p className="text-sm opacity-90">{description}</p> : description}
-      </div>,
-      restProps
-    );
-  }
+
   
   // If we just have title, use that
   if (title) {
