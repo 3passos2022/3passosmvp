@@ -61,13 +61,15 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const result = await signUp!(email, password, selectedRole);
-      
-      if (result.error) {
-        toast.error('Erro ao criar conta: ' + result.error.message);
-      } else {
-        toast.success('Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.');
-        setActiveTab('login');
+      if (signUp) {
+        const result = await signUp(email, password, selectedRole);
+        
+        if (result.error) {
+          toast.error('Erro ao criar conta: ' + result.error.message);
+        } else {
+          toast.success('Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.');
+          setActiveTab('login');
+        }
       }
     } catch (err: any) {
       toast.error('Falha ao criar conta: ' + (err.message || 'Erro desconhecido'));
@@ -216,7 +218,7 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div>
-                <RoleSelector selected={selectedRole} onSelect={setSelectedRole} />
+                <RoleSelector selectedRole={selectedRole} onSelectRole={setSelectedRole} />
               </div>
 
               <div>

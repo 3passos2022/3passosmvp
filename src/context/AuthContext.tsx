@@ -208,11 +208,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) throw error;
 
       // Update user profile in "profiles" table
-      if (updates.name) {
+      if (updates.name && user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .update({ name: updates.name })
-          .eq('id', user?.id);
+          .eq('id', user.id);
 
         if (profileError) {
           console.error("Erro ao atualizar perfil:", profileError);
