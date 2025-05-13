@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
+import { ExtendedUser } from '@/lib/types';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -54,7 +55,7 @@ const UserProfile: React.FC = () => {
         .join('')
         .toUpperCase();
     }
-    return user.email.substring(0, 2).toUpperCase();
+    return (user.email || '').substring(0, 2).toUpperCase();
   };
 
   return (
@@ -116,7 +117,7 @@ const UserProfile: React.FC = () => {
               
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Tipo de conta</p>
-                <p className="font-medium">{RoleUtils.getAccountTypeLabel(user)}</p>
+                <p className="font-medium">{RoleUtils.getAccountTypeLabel(user as any)}</p>
               </div>
             </div>
           )}

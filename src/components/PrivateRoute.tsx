@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/lib/types';
+import { UserRole, ExtendedUser } from '@/lib/types';
 import { toast } from 'sonner';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 
@@ -78,7 +78,20 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ requiredRole, children }) =
 
   // Verificar permissão de role usando a nova classe utilitária
   if (requiredRole) {
-    const hasRequiredRole = RoleUtils.hasRole(user, requiredRole);
+    // Ensure we're passing the user with the expected shape
+    const userProfile = {
+      id: user.id,
+      email: user.email || '',
+      role: user.role || UserRole.CLIENT,
+      name: user.name,
+      avatar_url: user.avatar_url,
+      created_at: user.created_at || new Date().toISOString(),
+      subscribed: user.subscribed,
+      subscription_tier: user.subscription_tier,
+      subscription_end: user.subscription_end
+    };
+    
+    const hasRequiredRole = RoleUtils.hasRole(userProfile, requiredRole);
     
     if (!hasRequiredRole) {
       toast.error('Você não tem permissão para acessar esta página.');

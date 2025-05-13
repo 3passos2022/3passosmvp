@@ -1,22 +1,29 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { createUserProfile, getUserProfile } from '@/integrations/supabase/database-functions';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
+import { ExtendedUser, UserRole } from '@/lib/types';
 
 interface AuthContextType {
-  user: User | null;
+  user: ExtendedUser | null;
   session: Session | null;
   loading: boolean;
   login: (email: string) => Promise<void>;
   logout: () => Promise<void>;
+  signOut: () => Promise<void>; // Alias for logout
   refreshUser: () => Promise<void>;
   updateUser: (updates: any) => Promise<void>;
+  updateProfile: (updates: any) => Promise<{ error: any | null }>;
   refreshSubscription: () => Promise<any>;
   subscription: SubscriptionStatus | null;
   subscriptionLoading: boolean;
+  makeAdmin?: (userId: string) => Promise<void>;
+  signIn?: (email: string) => Promise<void>; // Alias for login
+  signUp?: (email: string) => Promise<void>; // Alias for login
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +33,7 @@ interface AuthProviderProps {
 }
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
@@ -67,6 +74,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Provide aliases for consistency with component usage
+  const signIn = login;
+  const signUp = login;
+
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -82,6 +93,9 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Alias for logout
+  const signOut = logout;
+
   const refreshUser = async () => {
     try {
       setLoading(true);
@@ -93,16 +107,22 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
   
       if (data?.user) {
-        setUser(data.user);
+        // Create extended user
+        const extendedUser: ExtendedUser = data.user;
   
         // Buscar informações adicionais do perfil
         const profileData = await getUserProfile(data.user.id);
         
         // Atualizar o estado do usuário com as informações do perfil
-        setUser(prevUser => ({
-          ...prevUser,
-          ...profileData
-        }));
+        if (profileData) {
+          const updatedUser = {
+            ...extendedUser,
+            ...profileData
+          };
+          setUser(updatedUser);
+        } else {
+          setUser(extendedUser);
+        }
       }
     } catch (error: any) {
       console.error("Erro ao atualizar informações do usuário:", error);
@@ -155,6 +175,65 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Add updateProfile function with the expected return type
+  const updateProfile = async (updates: any) => {
+    try {
+      setLoading(true);
+      
+      // Handle profile updates
+      if (user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+          
+        if (profileError) {
+          console.error("Erro ao atualizar perfil:", profileError);
+          return { error: profileError };
+        }
+        
+        // Update local user state with the new profile info
+        setUser(prevUser => {
+          if (!prevUser) return null;
+          return { ...prevUser, ...updates };
+        });
+        
+        toast.success('Perfil atualizado com sucesso');
+        return { error: null };
+      }
+      
+      return { error: new Error('Usuário não encontrado') };
+    } catch (error: any) {
+      toast.error('Erro ao atualizar perfil: ' + error.message);
+      return { error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add makeAdmin function
+  const makeAdmin = async (userId: string) => {
+    try {
+      // Only allow admins to make other users admin
+      if (user?.role !== UserRole.ADMIN) {
+        toast.error('Você não tem permissão para executar esta ação');
+        return;
+      }
+      
+      const { error } = await supabase.rpc('update_user_role', { 
+        user_id: userId,
+        new_role: UserRole.ADMIN
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Usuário promovido a administrador com sucesso!');
+    } catch (error: any) {
+      console.error('Error making admin:', error);
+      toast.error('Erro ao promover a administrador. Tente novamente.');
+    }
+  };
+
   // Function to refresh subscription status
   const refreshSubscription = async () => {
     if (!session || !user) {
@@ -176,10 +255,23 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log("Subscription status response:", data);
       
-      setSubscription({
+      const subscriptionStatus = {
         subscribed: data.subscribed || false,
         subscription_tier: data.subscription_tier || 'free',
         subscription_end: data.subscription_end
+      };
+      
+      setSubscription(subscriptionStatus);
+      
+      // Update user's subscription info
+      setUser(prevUser => {
+        if (!prevUser) return null;
+        return { 
+          ...prevUser, 
+          subscribed: data.subscribed || false,
+          subscription_tier: data.subscription_tier || 'free',
+          subscription_end: data.subscription_end
+        };
       });
       
       return data;
@@ -207,11 +299,16 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     login,
     logout,
+    signOut, // Add alias
+    signIn, // Add alias
+    signUp, // Add alias
     refreshUser,
     updateUser,
+    updateProfile, // Add new method
     refreshSubscription,
     subscription,
     subscriptionLoading,
+    makeAdmin, // Add new method
   };
 
   return (

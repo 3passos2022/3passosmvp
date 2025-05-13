@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +43,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         console.warn("No plans received from API, using fallback plans");
         
         // Use fallback plans if none received from API
-        const fallbackPlans = [
+        const fallbackPlans: SubscriptionData[] = [
           {
             id: 'free',
             priceId: undefined,
@@ -94,11 +94,16 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
         return;
       }
       
-      console.log("Plans data:", data.products);
-      setPlans(data.products);
+      // Convert API response to properly typed SubscriptionData objects
+      const typedProducts: SubscriptionData[] = data.products.map((product: any) => ({
+        ...product,
+        tier: product.tier as 'free' | 'basic' | 'premium'
+      }));
+      
+      setPlans(typedProducts);
       
       // Notify parent component
-      if (onPlansLoaded) onPlansLoaded(data.products);
+      if (onPlansLoaded) onPlansLoaded(typedProducts);
       
     } catch (error) {
       console.error("Error loading plans:", error);
@@ -109,7 +114,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
       });
       
       // Use fallback plans on error
-      const fallbackPlans = [
+      const fallbackPlans: SubscriptionData[] = [
         {
           id: 'free',
           priceId: undefined,

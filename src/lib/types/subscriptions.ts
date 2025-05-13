@@ -13,5 +13,5 @@ export interface SubscriptionData {
   price: number;
   features: string[];
   popular?: boolean;
-  tier: 'free' | 'basic' | 'premium';
+  tier: 'free' | 'basic' | 'premium'; // This ensures tier is strictly typed
 }
