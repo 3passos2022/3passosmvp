@@ -194,20 +194,25 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           role: (data.user.user_metadata?.role as UserRole) || UserRole.CLIENT
         };
   
-        // Buscar informações adicionais do perfil
-        const profileData = await getUserProfile(data.user.id);
-        
-        // Atualizar o estado do usuário com as informações do perfil
-        if (profileData) {
-          const updatedUser: ExtendedUser = {
-            ...extendedUser,
-            ...(profileData as Record<string, any>),
-            // Ensure required fields
-            email: profileData.email || extendedUser.email,
-            role: profileData.role || extendedUser.role
-          };
-          setUser(updatedUser);
-        } else {
+        // Fetch additional profile information
+        try {
+          const profileData = await getUserProfile(data.user.id);
+          
+          // Update user state with profile information
+          if (profileData) {
+            const updatedUser: ExtendedUser = {
+              ...extendedUser,
+              ...(profileData as Record<string, any>),
+              // Ensure required fields
+              email: profileData.email || extendedUser.email,
+              role: profileData.role || extendedUser.role
+            };
+            setUser(updatedUser);
+          } else {
+            setUser(extendedUser);
+          }
+        } catch (profileError) {
+          console.error("Error fetching profile:", profileError);
           setUser(extendedUser);
         }
       }

@@ -7,6 +7,7 @@ export interface ToastProps {
   description?: string;
   variant?: "default" | "destructive";
   duration?: number;
+  // Add any other properties that are used in the project
 }
 
 // Define the Toast type
@@ -22,19 +23,20 @@ function createToast(props: ToastProps | string) {
   
   const { title, description, variant, duration, ...options } = props;
   
-  // Map our variant to sonner's type
-  let type: "success" | "error" | "info" | "warning" | undefined = undefined;
+  // Map our variant to sonner's properties
+  const toastOptions: any = {
+    description,
+    duration,
+    ...options
+  };
+  
+  // Set error type if variant is destructive
   if (variant === "destructive") {
-    type = "error";
+    return sonnerToast.error(title || '', toastOptions);
   }
   
   // Use sonner's built-in title/description pattern
-  return sonnerToast(title || '', {
-    description,
-    duration,
-    type,
-    ...options
-  });
+  return sonnerToast(title || '', toastOptions);
 }
 
 // Add required methods to our toast function
