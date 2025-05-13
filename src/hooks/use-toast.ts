@@ -1,4 +1,3 @@
-
 import { toast as sonnerToast, type ExternalToast } from "sonner";
 import React from "react";
 
@@ -10,29 +9,30 @@ export interface ToastProps extends ExternalToast {
 
 // Our custom toast function that translates between our props and sonner props
 const customToast = (props: ToastProps) => {
+  // If props is a string or React element, pass it directly to sonner
   if (typeof props === 'string' || React.isValidElement(props)) {
     return sonnerToast(props);
   }
 
+  // Otherwise, extract title, description, and other props
   const { title, description, ...restProps } = props;
   
-  // If we have both title and description, use them together
+  // If we have both title and description
   if (title && description) {
-    return sonnerToast(
+    return sonnerToast((
       <div>
         {typeof title === 'string' ? <p className="font-medium">{title}</p> : title}
         {typeof description === 'string' ? <p className="text-sm opacity-90">{description}</p> : description}
-      </div>,
-      restProps
-    );
+      </div>
+    ), restProps);
   }
   
-  // If we just have title, use that
+  // If we just have title
   if (title) {
     return sonnerToast(title, restProps);
   }
   
-  // If we just have description, use that
+  // If we just have description
   if (description) {
     return sonnerToast(description, restProps);
   }

@@ -17,7 +17,6 @@ import SubscriptionCancel from './pages/SubscriptionCancel';
 import { UserRole } from './lib/types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
-import { Toaster } from '@/components/ui/toaster';
 
 // Create a query client
 const queryClient = new QueryClient();
