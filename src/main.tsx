@@ -4,7 +4,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/components/ui/toaster';
 
 // Get the root element
 const rootElement = document.getElementById("root");
@@ -18,7 +18,7 @@ if (!rootElement) {
     document.addEventListener('DOMContentLoaded', () => {
       createRoot(rootElement).render(
         <React.StrictMode>
-          <Toaster position="top-right" richColors />
+          <Toaster />
           <App />
         </React.StrictMode>
       );
@@ -26,7 +26,7 @@ if (!rootElement) {
   } else {
     createRoot(rootElement).render(
       <React.StrictMode>
-        <Toaster position="top-right" richColors />
+        <Toaster />
         <App />
       </React.StrictMode>
     );
