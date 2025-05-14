@@ -28,8 +28,9 @@ const SubscriptionManager: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
 
   useEffect(() => {
-    const checkUserSubscription = async () => {
-      if (user) {
+    // Only load subscription data if user is logged in
+    if (user) {
+      const checkUserSubscription = async () => {
         try {
           await refreshSubscription();
           loadNotifications();
@@ -38,29 +39,14 @@ const SubscriptionManager: React.FC = () => {
         } catch (error) {
           console.error("Failed to check subscription:", error);
         }
-      }
-    };
-    
-    checkUserSubscription();
-    
-    // Poll for subscription status changes every 5 minutes while on this page
-    // This is much less aggressive than the previous 30-second interval
-    const interval = setInterval(async () => {
-      // Only refresh if it's been at least 5 minutes since the last refresh
-      const currentTime = Date.now();
-      if (user && (currentTime - lastRefreshTime >= 5 * 60 * 1000)) {
-        try {
-          console.log("Polling subscription status (5-min interval)");
-          await refreshSubscription();
-          setLastRefreshTime(currentTime);
-        } catch (error) {
-          console.error("Failed to check subscription in interval:", error);
-        }
-      }
-    }, 5 * 60 * 1000); // Check every 5 minutes instead of 30 seconds
-    
-    return () => clearInterval(interval);
-  }, [user, refreshSubscription, lastRefreshTime]);
+      };
+      
+      checkUserSubscription();
+      
+      // No automatic polling - rely on manual refresh and initial load only
+      // This prevents the excessive API calls we were seeing
+    }
+  }, [user, refreshSubscription]);
 
   const loadNotifications = async () => {
     if (!user) return;
@@ -112,20 +98,26 @@ const SubscriptionManager: React.FC = () => {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout');
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { tier: 'basic' } // Default to basic plan
+      });
       
       if (error) {
-        throw new Error(error.message);
+        console.error("Checkout error:", error);
+        throw new Error(error.message || "Erro ao iniciar checkout");
       }
       
       if (data?.url) {
+        console.log("Redirecting to checkout:", data.url);
         window.location.href = data.url;
+      } else {
+        throw new Error("URL de checkout não recebida");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating checkout:", error);
       toast({
         title: "Erro no checkout",
-        description: "Erro ao iniciar checkout: " + (error as Error).message,
+        description: "Erro ao iniciar checkout: " + error.message,
         variant: "destructive"
       });
     } finally {
@@ -162,12 +154,12 @@ const SubscriptionManager: React.FC = () => {
   };
 
   const handleRefresh = async () => {
-    // Prevent refreshing if it happened in the last 30 seconds
+    // Prevent refreshing if it happened in the last 5 seconds
     const currentTime = Date.now();
-    if (currentTime - lastRefreshTime < 30000) {
+    if (currentTime - lastRefreshTime < 5000) {
       toast({
         title: "Aguarde",
-        description: "Por favor aguarde pelo menos 30 segundos entre atualizações"
+        description: "Por favor aguarde alguns segundos entre atualizações"
       });
       return;
     }
