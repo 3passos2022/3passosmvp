@@ -1,16 +1,18 @@
 
 import * as React from "react";
-import { toast as sonnerToast, type Toast } from "sonner";
+import { toast as sonnerToast, ToastT } from "sonner";
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000;
 
-type ToasterToast = Toast & {
+type ToasterToastProps = {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
 };
+
+type ToasterToast = ToastT & ToasterToastProps;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -134,9 +136,9 @@ function dispatch(action: Action) {
   });
 }
 
-type Toast = Omit<ToasterToast, "id">;
+type ToastProps = Omit<ToasterToastProps, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ ...props }: ToastProps) {
   const id = genId();
 
   const update = (props: ToasterToast) =>

@@ -28,8 +28,6 @@ type SimpleProviderProfile = {
   name: string;
   phone: string;
   role: string;
-  city: string;
-  neighborhood: string;
   averageRating: number | null;
   latitude: number | null;
   longitude: number | null;
@@ -51,25 +49,20 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     } = quoteDetails;
 
     // Validate required data
-    if (!serviceId || !address || !address.city) {
+    if (!serviceId || !address) {
       console.error('Missing required data for provider matching');
       return null;
     }
 
     // Get providers that match the service first (without filtering by sub-services or specialties)
-    const { data: providers, error } = await supabase
+    const { data: profiles, error } = await supabase
       .from('profiles')
       .select(`
         id,
         name,
         phone, 
         role,
-        city,
-        neighborhood,
-        averageRating,
-        latitude,
-        longitude,
-        bio
+        averageRating
       `)
       .eq('role', 'provider');
 
@@ -78,13 +71,38 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       throw new Error(`Error fetching providers: ${error.message}`);
     }
 
-    if (!providers || providers.length === 0) {
+    if (!profiles || profiles.length === 0) {
       console.warn('No providers found');
       return [];
     }
 
+    // Get provider settings for location info
+    const { data: providerSettings, error: settingsError } = await supabase
+      .from('provider_settings')
+      .select(`
+        provider_id,
+        latitude,
+        longitude,
+        bio,
+        city,
+        neighborhood
+      `);
+
+    if (settingsError) {
+      console.error('Error fetching provider settings:', settingsError);
+      // Continue without settings - we'll just have less data
+    }
+
+    // Create a map of provider settings by provider_id for easier lookup
+    const settingsMap = new Map();
+    if (providerSettings) {
+      providerSettings.forEach((setting) => {
+        settingsMap.set(setting.provider_id, setting);
+      });
+    }
+
     // Filter providers manually based on service area since the join is causing issues
-    const filteredProviders = providers.filter(provider => 
+    const filteredProviders = profiles.filter(provider => 
       provider.role === 'provider' // Additional safety check
     );
 
@@ -93,17 +111,28 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       filteredProviders.map(async (provider: any) => {
         let distance: number | null = null;
         let isWithinRadius = false;
+        let city = '';
+        let neighborhood = '';
+        let bio = null;
 
-        // Check if we have coordinate data for both the provider and the address
-        if (provider.latitude && provider.longitude && 
-            address.latitude !== undefined && address.longitude !== undefined) {
-          distance = calculateDistance(
-            address.latitude, 
-            address.longitude, 
-            provider.latitude, 
-            provider.longitude
-          );
-          isWithinRadius = distance <= 10; // 10km radius
+        // Get provider settings if available
+        const settings = settingsMap.get(provider.id);
+        if (settings) {
+          bio = settings.bio;
+          city = settings.city || '';
+          neighborhood = settings.neighborhood || '';
+          
+          // Check if we have coordinate data for both the provider and the address
+          if (settings.latitude && settings.longitude && 
+              address.latitude !== undefined && address.longitude !== undefined) {
+            distance = calculateDistance(
+              address.latitude, 
+              address.longitude, 
+              settings.latitude, 
+              settings.longitude
+            );
+            isWithinRadius = distance <= 10; // 10km radius
+          }
         }
 
         const priceDetails = await calculateProviderPrice(provider.id, items || {});
@@ -115,10 +144,10 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           name: provider.name || '',
           phone: provider.phone || '',
           role: provider.role || 'provider',
-          city: provider.city || '',
-          neighborhood: provider.neighborhood || '',
+          city: city,
+          neighborhood: neighborhood,
           averageRating: provider.averageRating || 0,
-          bio: provider.bio || '',
+          bio: bio || '',
           relevanceScore: Math.random(), // Temporário
           specialties: [] // Empty array as we can't get this data currently
         };
@@ -177,7 +206,7 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     // Now, query for the full provider details
     const providerResult = await supabase
       .from('profiles')
-      .select('id, name, phone, role, city, neighborhood, averageRating, bio')
+      .select('id, name, phone, role, averageRating')
       .eq('id', providerId)
       .maybeSingle();
 
@@ -188,22 +217,31 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     }
 
     // Make sure we have data
-    const data = providerResult.data;
-    if (!data) {
+    const profileData = providerResult.data;
+    if (!profileData) {
       console.warn(`Provider details not found for ID: ${providerId}`);
       return null;
     }
 
+    // Get the provider settings for additional data
+    const settingsResult = await supabase
+      .from('provider_settings')
+      .select('bio, city, neighborhood')
+      .eq('provider_id', providerId)
+      .maybeSingle();
+    
+    const settingsData = settingsResult.data || { bio: '', city: '', neighborhood: '' };
+
     // Map the data to our expected structure with safe defaults
     const provider: SimpleProviderDetails = {
-      userId: data.id || '',
-      name: data.name || '',
-      phone: data.phone || '',
-      role: data.role || '',
-      city: data.city || '',
-      neighborhood: data.neighborhood || '',
-      averageRating: data.averageRating || 0,
-      bio: data.bio || ''
+      userId: profileData.id || '',
+      name: profileData.name || '',
+      phone: profileData.phone || '',
+      role: profileData.role || '',
+      city: settingsData.city || '',
+      neighborhood: settingsData.neighborhood || '',
+      averageRating: profileData.averageRating || 0,
+      bio: settingsData.bio || ''
     };
 
     // Fetch portfolio items
