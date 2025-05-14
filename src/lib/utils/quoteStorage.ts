@@ -1,4 +1,3 @@
-
 import { QuoteDetails, QuoteMeasurement } from "@/lib/types/providerMatch";
 
 /**
@@ -121,5 +120,38 @@ export const clearQuoteData = (): void => {
     console.log("Quote data cleared from storage");
   } catch (error) {
     console.error("Error clearing quote data:", error);
+  }
+};
+
+/**
+ * Retrieve provider IDs that have already received quotes in the current session
+ * This helps show "Quote Sent" status for providers even when the user hasn't logged in yet
+ */
+export const getQuoteSentProviders = (): string[] => {
+  try {
+    const sentProvidersString = sessionStorage.getItem('quoteSentProviders');
+    if (!sentProvidersString) return [];
+    
+    return JSON.parse(sentProvidersString);
+  } catch (error) {
+    console.error('Error retrieving sent providers:', error);
+    return [];
+  }
+};
+
+/**
+ * Mark a provider as having received a quote in the current session
+ */
+export const markQuoteSentToProvider = (providerId: string): void => {
+  try {
+    if (!providerId) return;
+    
+    const currentProviders = getQuoteSentProviders();
+    if (!currentProviders.includes(providerId)) {
+      currentProviders.push(providerId);
+      sessionStorage.setItem('quoteSentProviders', JSON.stringify(currentProviders));
+    }
+  } catch (error) {
+    console.error('Error marking quote as sent:', error);
   }
 };

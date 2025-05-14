@@ -74,7 +74,32 @@ const Login: React.FC = () => {
   
   useEffect(() => {
     if (user && session) {
-      navigate(from);
+      // Verificar se há um redirecionamento pós-login no sessionStorage
+      const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+      const selectedProviderId = sessionStorage.getItem('selectedProviderId');
+
+      if (redirectAfterLogin) {
+        // Limpar o redirecionamento da sessionStorage
+        sessionStorage.removeItem('redirectAfterLogin');
+        
+        // Verificar se há um ID de prestador selecionado
+        if (selectedProviderId) {
+          // Redirecionar com o estado do provedor
+          navigate(redirectAfterLogin, { 
+            state: { 
+              selectedProviderId,
+              fromLogin: true 
+            } 
+          });
+          // Não limpar o selectedProviderId aqui, deixar para o componente de destino
+        } else {
+          // Simples redirecionamento sem estado
+          navigate(redirectAfterLogin);
+        }
+      } else {
+        // Redirecionamento padrão
+        navigate(from);
+      }
     }
   }, [user, session, navigate, from]);
 
@@ -106,12 +131,7 @@ const Login: React.FC = () => {
       } else {
         toast.success("Login realizado com sucesso!");
         
-        // Atraso para garantir atualização do estado
-        setTimeout(() => {
-          if (!user || !session) {
-            navigate(from);
-          }
-        }, 500);
+        // Não é necessário redirecionar aqui, o useEffect cuidará disso
       }
     } catch (error) {
       toast.error("Erro inesperado ao fazer login");
@@ -145,7 +165,6 @@ const Login: React.FC = () => {
 
   // Redirecionar se já estiver logado
   if (!loading && user && session) {
-    navigate(from);
     return null;
   }
 

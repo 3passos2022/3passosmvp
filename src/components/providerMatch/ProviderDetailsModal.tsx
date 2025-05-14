@@ -52,16 +52,18 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
   useEffect(() => {
     // Check if this provider already has a quote sent
     const checkQuoteStatus = async () => {
-      if (quoteDetails?.id && provider?.provider?.userId) {
+      if (isLoggedIn && quoteDetails?.id && provider?.provider?.userId) {
         const sent = await checkQuoteSentToProvider(quoteDetails.id, provider.provider.userId);
         setQuoteSent(sent);
+      } else {
+        setQuoteSent(false); // Reset when modal opens with non-logged in user
       }
     };
     
     if (isOpen) {
       checkQuoteStatus();
     }
-  }, [quoteDetails?.id, provider?.provider?.userId, isOpen]);
+  }, [quoteDetails?.id, provider?.provider?.userId, isOpen, isLoggedIn]);
 
   const handleSendQuote = async () => {
     // Don't send if already sent

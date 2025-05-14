@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -101,6 +102,32 @@ const ProvidersFound: React.FC = () => {
     
     fetchQuoteDetails();
   }, [location, navigate, toast]);
+  
+  // Efeito para verificar se o usuário retornou do login com um ID de provedor selecionado
+  useEffect(() => {
+    // Verificar o estado da location para ver se veio do login
+    const fromLogin = location.state?.fromLogin;
+    const providerIdFromState = location.state?.selectedProviderId;
+    
+    // Verificar se há um ID de provedor na sessionStorage se não veio do login
+    const storedProviderId = sessionStorage.getItem('selectedProviderId');
+    
+    // Priorizar o ID que vem do estado (login) se existir
+    const providerId = providerIdFromState || storedProviderId;
+    
+    if (providerId && (fromLogin || user)) {
+      console.log('Provider ID found after login or in storage:', providerId);
+      setSelectedProviderId(providerId);
+      
+      // Limpar o selectedProviderId do sessionStorage
+      sessionStorage.removeItem('selectedProviderId');
+      
+      // Limpar o estado da location para evitar reaberturas indesejadas
+      if (location.state && 'selectedProviderId' in location.state) {
+        navigate(location.pathname, { replace: true });
+      }
+    }
+  }, [location, user, navigate]);
   
   useEffect(() => {
     const fetchProviders = async () => {
