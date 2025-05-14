@@ -6,6 +6,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "86400", // Extend preflight cache to 24 hours
 };
 
 // Helper para logging
@@ -15,17 +17,23 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests properly
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    logStep("Received OPTIONS request, sending CORS headers");
+    return new Response(null, { 
+      status: 204, 
+      headers: corsHeaders 
+    });
   }
 
   try {
     logStep("Função iniciada");
 
-    // Inicializa o cliente Supabase
+    // Inicializa o cliente Supabase com a chave de serviço para operações administrativas
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
     );
 
     // Verifica a autenticação
@@ -43,38 +51,32 @@ serve(async (req) => {
     const user = userData.user;
     logStep("Usuário autenticado", { id: user.id, email: user.email });
 
-    // Obtém referência ao cliente no Stripe
-    const { data: subscriberData } = await supabaseClient
-      .from("subscribers")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!subscriberData || !subscriberData.stripe_customer_id) {
-      throw new Error("Nenhuma assinatura encontrada para este usuário");
-    }
-
-    const customerId = subscriberData.stripe_customer_id;
-    logStep("ID do cliente Stripe recuperado", { customerId });
-
     // Inicializa o Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Cria sessão do portal do cliente
-    const { url } = await req.json();
-    const returnUrl = url || new URL(req.url).origin;
+    // Verifica se o cliente já existe no Stripe
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     
-    const session = await stripe.billingPortal.sessions.create({
+    if (customers.data.length === 0) {
+      throw new Error("Nenhum cliente Stripe encontrado para este usuário");
+    }
+    
+    const customerId = customers.data[0].id;
+    logStep("Cliente Stripe encontrado", { customerId });
+    
+    // Criar a sessão do portal do cliente
+    const origin = req.headers.get("origin") || "https://3passos.lovable.dev";
+    const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: returnUrl,
+      return_url: `${origin}/subscription`,
     });
-
-    logStep("Sessão do portal criada", { url: session.url });
-
+    
+    logStep("Sessão do portal do cliente criada", { sessionId: portalSession.id });
+    
     return new Response(
-      JSON.stringify({ url: session.url }),
+      JSON.stringify({ url: portalSession.url }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -14,14 +14,33 @@ import { SubscriptionData } from '@/lib/types/subscriptions';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 
 const Subscription: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading, refreshSubscription } = useAuth();
   const navigate = useNavigate();
   const [checkoutLoading, setCheckoutLoading] = useState<boolean>(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState<boolean>(true);
   
+  // Load subscription data only once when the page loads
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    
+    const loadInitialData = async () => {
+      if (!authLoading && user) {
+        try {
+          await refreshSubscription();
+        } catch (error) {
+          console.error("Failed to load subscription data:", error);
+        } finally {
+          setPageLoading(false);
+        }
+      } else if (!authLoading) {
+        // If not loading and no user, we can show the page
+        setPageLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, [authLoading, user, refreshSubscription]);
   
   const handleSelectPlan = async (plan: SubscriptionData) => {
     if (!user) {
@@ -56,6 +75,7 @@ const Subscription: React.FC = () => {
       
       if (data?.url) {
         console.log('URL de checkout recebida, redirecionando...');
+        // Use window.location.href for a full page navigation to the checkout URL
         window.location.href = data.url;
       } else {
         console.error('URL de checkout não recebida na resposta:', data);
@@ -70,7 +90,7 @@ const Subscription: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (authLoading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />

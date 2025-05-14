@@ -16,13 +16,19 @@ const logStep = (step: string, details?: any) => {
 // Configure CORS headers (not typically needed for webhooks, but included for completeness)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400", // 24 hours
 };
 
 serve(async (req) => {
   // Handle OPTIONS request for CORS
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    logStep("Recebida requisição OPTIONS");
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -54,7 +60,10 @@ serve(async (req) => {
       logStep(`Evento verificado: ${event.type}`);
     } catch (err: any) {
       logStep(`Erro na verificação da assinatura: ${err.message}`);
-      return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+      return new Response(`Webhook Error: ${err.message}`, { 
+        status: 400,
+        headers: corsHeaders
+      });
     }
 
     // Handle the event based on the type
