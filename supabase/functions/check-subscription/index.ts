@@ -62,6 +62,7 @@ serve(async (req) => {
         stripe_customer_id: null,
         subscribed: false,
         subscription_tier: "free",
+        subscription_status: "free",
         subscription_end: null,
         updated_at: new Date().toISOString(),
       }, { onConflict: "email" });
@@ -70,7 +71,12 @@ serve(async (req) => {
         JSON.stringify({ 
           subscribed: false,
           subscription_tier: "free",
-          subscription_end: null
+          subscription_status: "free",
+          subscription_end: null,
+          trial_end: null,
+          is_trial_used: false,
+          last_invoice_url: null,
+          next_invoice_amount: null
         }),
         {
           status: 200,
@@ -89,51 +95,119 @@ serve(async (req) => {
       limit: 1,
     });
     
-    const hasActiveSub = subscriptions.data.length > 0;
+    // Também verifica assinaturas em período de teste (que não são retornadas como 'active')
+    const trialSubscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "trialing",
+      limit: 1,
+    });
+    
+    // Combina as assinaturas ativas e em período de teste
+    const allSubscriptions = [...subscriptions.data, ...trialSubscriptions.data];
+    const hasActiveSub = allSubscriptions.length > 0;
+    
     let subscriptionTier = "free";
     let subscriptionEnd = null;
+    let subscriptionStatus = "free";
+    let trialEnd = null;
+    let isTrialUsed = false;
+    let stripeSubscriptionId = null;
+    let lastInvoiceUrl = null;
+    let nextInvoiceAmount = null;
 
     if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
+      const subscription = allSubscriptions[0];
+      stripeSubscriptionId = subscription.id;
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      logStep("Assinatura ativa encontrada", { subscriptionId: subscription.id, endDate: subscriptionEnd });
+      subscriptionStatus = subscription.status;
+      
+      // Verifica se está em período de teste
+      if (subscription.trial_end) {
+        trialEnd = new Date(subscription.trial_end * 1000).toISOString();
+        isTrialUsed = true;
+      }
+      
+      logStep("Assinatura ativa encontrada", { 
+        subscriptionId: subscription.id, 
+        status: subscription.status,
+        endDate: subscriptionEnd,
+        trialEnd
+      });
       
       // Determina o tier da assinatura com base no preço
       const priceId = subscription.items.data[0].price.id;
       const price = await stripe.prices.retrieve(priceId);
       const amount = price.unit_amount || 0;
       
-      if (amount >= 2000) {
+      if (amount >= 7000) {
         subscriptionTier = "premium";
-      } else if (amount >= 1000) {
+      } else if (amount >= 3000) {
         subscriptionTier = "basic";
       } else {
         subscriptionTier = "free";
       }
       
-      logStep("Tier de assinatura determinado", { priceId, amount, subscriptionTier });
+      // Verifica informações da última fatura, se disponível
+      if (subscription.latest_invoice) {
+        try {
+          const invoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
+          if (invoice) {
+            lastInvoiceUrl = invoice.hosted_invoice_url;
+            nextInvoiceAmount = invoice.amount_due;
+          }
+        } catch (error) {
+          logStep("Erro ao buscar fatura", { error });
+        }
+      }
+      
+      logStep("Tier de assinatura determinado", { 
+        priceId, 
+        amount, 
+        subscriptionTier,
+        subscriptionStatus
+      });
     } else {
       logStep("Nenhuma assinatura ativa encontrada");
     }
 
     // Atualiza o registro no banco de dados
-    await supabaseClient.from("subscribers").upsert({
+    const { error: upsertError } = await supabaseClient.from("subscribers").upsert({
       email: user.email,
       user_id: user.id,
       stripe_customer_id: customerId,
+      stripe_subscription_id: stripeSubscriptionId,
       subscribed: hasActiveSub,
       subscription_tier: hasActiveSub ? subscriptionTier : "free",
+      subscription_status: hasActiveSub ? subscriptionStatus : "free",
       subscription_end: subscriptionEnd,
+      trial_end: trialEnd,
+      is_trial_used: isTrialUsed,
+      last_invoice_url: lastInvoiceUrl,
+      next_invoice_amount: nextInvoiceAmount,
       updated_at: new Date().toISOString(),
     }, { onConflict: "email" });
 
-    logStep("Banco de dados atualizado com informações de assinatura", { subscribed: hasActiveSub, subscriptionTier });
+    if (upsertError) {
+      throw new Error(`Erro ao atualizar dados de assinatura: ${upsertError.message}`);
+    }
+
+    logStep("Banco de dados atualizado com informações de assinatura", { 
+      subscribed: hasActiveSub, 
+      subscriptionTier,
+      subscriptionStatus
+    });
     
     return new Response(
       JSON.stringify({
         subscribed: hasActiveSub,
         subscription_tier: hasActiveSub ? subscriptionTier : "free",
-        subscription_end: subscriptionEnd
+        subscription_status: hasActiveSub ? subscriptionStatus : "free",
+        subscription_end: subscriptionEnd,
+        trial_end: trialEnd,
+        is_trial_used: isTrialUsed,
+        stripe_subscription_id: stripeSubscriptionId,
+        last_invoice_url: lastInvoiceUrl,
+        next_invoice_amount: nextInvoiceAmount
       }),
       {
         status: 200,

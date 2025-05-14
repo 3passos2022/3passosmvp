@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, X } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Check } from 'lucide-react';
+import { SubscriptionData } from '@/lib/types/subscriptions';
 import { cn } from '@/lib/utils';
 import SubscriptionCard from './SubscriptionCard';
-import { SubscriptionData } from '@/lib/types/subscriptions';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 interface PlansComparisonProps {
   showTitle?: boolean;
@@ -30,12 +30,13 @@ const SUBSCRIPTION_PLANS: SubscriptionData[] = [
     id: 'basic',
     name: 'Básico',
     description: 'Para prestadores em crescimento',
-    price: 1499,
+    price: 3990,
     features: [
       'Limite de 15 imagens no portfólio',
       'Limite de 3 serviços cadastrados',
       'Visualização de todos os prestadores',
-      'Prioridade nos resultados de busca'
+      'Prioridade nos resultados de busca',
+      'Suporte por email'
     ],
     popular: true,
     tier: 'basic'
@@ -44,13 +45,14 @@ const SUBSCRIPTION_PLANS: SubscriptionData[] = [
     id: 'premium',
     name: 'Premium',
     description: 'Para prestadores profissionais',
-    price: 2499,
+    price: 7990,
     features: [
       'Imagens ilimitadas no portfólio',
       'Serviços ilimitados',
       'Visualização de todos os prestadores',
       'Destaque especial nos resultados de busca',
-      'Suporte prioritário'
+      'Suporte prioritário',
+      'Dashboard de análises avançadas'
     ],
     tier: 'premium'
   }
@@ -83,6 +85,11 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
           <p className="mt-2 text-muted-foreground">
             Selecione o plano ideal para suas necessidades
           </p>
+          {user?.role === 'provider' && (
+            <div className="mt-4 inline-block bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm">
+              Prestadores ganham 30 dias grátis no plano Básico! 🎁
+            </div>
+          )}
         </div>
       )}
       
@@ -93,8 +100,13 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
             plan={plan}
             currentTier={currentTier}
             onSelect={handleSelect}
+            showTrialBadge={user?.role === 'provider' && plan.tier === 'basic'}
           />
         ))}
+      </div>
+
+      <div className="text-center text-sm text-gray-500 mt-8">
+        <p>Todas as assinaturas são renovadas automaticamente. Cancele a qualquer momento.</p>
       </div>
     </div>
   );

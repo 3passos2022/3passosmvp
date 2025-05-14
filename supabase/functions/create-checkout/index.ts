@@ -67,13 +67,27 @@ serve(async (req) => {
     
     switch (tier) {
       case "premium":
-        amount = 2499; // R$24,99/mês
+        amount = 7990; // R$79,90/mês
         break;
       case "basic":
       default:
-        amount = 1499; // R$14,99/mês
+        amount = 3990; // R$39,90/mês
         tier = "basic";
         break;
+    }
+
+    // Verifica se o usuário pode iniciar um período de teste (apenas para providers no plano basic)
+    let trial_period_days: number | null = null;
+    const { data: canStartTrial, error: trialError } = await supabaseClient.rpc("can_start_trial", {
+      p_user_id: user.id,
+      p_tier: tier
+    });
+    
+    if (trialError) {
+      logStep("Erro ao verificar elegibilidade para teste", { error: trialError.message });
+    } else if (canStartTrial && tier === "basic") {
+      trial_period_days = 30; // 30 dias de teste gratuito para prestadores no plano básico
+      logStep("Usuário elegível para período de teste", { trial_period_days });
     }
 
     // Cria a sessão de checkout
@@ -81,7 +95,12 @@ serve(async (req) => {
     const success_url = returnUrl || `${origin}/subscription/success?tier=${tier}`;
     const cancel_url = `${origin}/subscription/cancel`;
 
-    logStep("Criando sessão de checkout", { tier, amount, customerId });
+    logStep("Criando sessão de checkout", { 
+      tier, 
+      amount, 
+      customerId, 
+      trial_period_days 
+    });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -103,6 +122,7 @@ serve(async (req) => {
       mode: "subscription",
       success_url,
       cancel_url,
+      subscription_data: trial_period_days ? { trial_period_days } : undefined,
       metadata: {
         user_id: user.id,
         tier: tier,

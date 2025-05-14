@@ -3,22 +3,36 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ExternalLink, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2, ExternalLink, RefreshCw, Calendar, Receipt } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface UserNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
 
 const SubscriptionManager: React.FC = () => {
   const { user, subscription, refreshSubscription, subscriptionLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [portalLoading, setPortalLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const checkUserSubscription = async () => {
       if (user) {
         try {
           await refreshSubscription();
+          loadNotifications();
         } catch (error) {
           console.error("Failed to check subscription:", error);
         }
@@ -41,9 +55,51 @@ const SubscriptionManager: React.FC = () => {
     return () => clearInterval(interval);
   }, [user, refreshSubscription]);
 
+  const loadNotifications = async () => {
+    if (!user) return;
+    
+    setNotificationsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('type', 'subscription')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      await supabase
+        .from('user_notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+        
+      setNotifications(prevNotifications => 
+        prevNotifications.map(n => 
+          n.id === notificationId ? { ...n, read: true } : n
+        )
+      );
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
   const handleSubscribe = async () => {
     if (!user) {
-      toast.error("Você precisa estar logado para assinar");
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para assinar",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -60,7 +116,11 @@ const SubscriptionManager: React.FC = () => {
       }
     } catch (error) {
       console.error("Error creating checkout:", error);
-      toast.error("Erro ao iniciar checkout: " + (error as Error).message);
+      toast({
+        title: "Erro no checkout",
+        description: "Erro ao iniciar checkout: " + (error as Error).message,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -84,7 +144,11 @@ const SubscriptionManager: React.FC = () => {
       }
     } catch (error) {
       console.error("Error opening customer portal:", error);
-      toast.error("Erro ao abrir portal do cliente: " + (error as Error).message);
+      toast({
+        title: "Erro",
+        description: "Erro ao abrir portal do cliente: " + (error as Error).message,
+        variant: "destructive"
+      });
     } finally {
       setPortalLoading(false);
     }
@@ -94,12 +158,42 @@ const SubscriptionManager: React.FC = () => {
     setRefreshing(true);
     try {
       await refreshSubscription();
-      toast.success("Informações de assinatura atualizadas");
+      await loadNotifications();
+      toast({
+        title: "Atualizado",
+        description: "Informações de assinatura atualizadas"
+      });
     } catch (error) {
       console.error("Error refreshing subscription data:", error);
-      toast.error("Erro ao atualizar dados da assinatura");
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar dados da assinatura",
+        variant: "destructive"
+      });
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(amount / 100);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500">Ativo</Badge>;
+      case 'trialing':
+        return <Badge className="bg-blue-500">Período de Teste</Badge>;
+      case 'past_due':
+        return <Badge className="bg-yellow-500">Pendente</Badge>;
+      case 'canceled':
+        return <Badge className="bg-red-500">Cancelado</Badge>;
+      default:
+        return <Badge className="bg-gray-500">Gratuito</Badge>;
     }
   };
 
@@ -133,23 +227,120 @@ const SubscriptionManager: React.FC = () => {
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         ) : subscription?.subscribed ? (
-          <div>
-            <p className="text-sm text-gray-500 mb-2">Plano atual:</p>
-            <p className="font-medium">{subscription.subscription_tier === 'premium' ? 'Premium' : 'Básico'}</p>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Plano atual:</p>
+                <p className="font-medium">{subscription.subscription_tier === 'premium' ? 'Premium' : 'Básico'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500 mb-1">Status:</p>
+                {subscription.subscription_status && getStatusBadge(subscription.subscription_status)}
+              </div>
+            </div>
+            
+            {subscription.trial_end && (
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="flex">
+                  <Calendar className="h-5 w-5 text-blue-500 mr-2" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Período de teste ativo</p>
+                    <p className="text-xs text-blue-600">
+                      Seu período de teste termina em {new Date(subscription.trial_end).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {subscription.subscription_end && (
-              <>
-                <p className="text-sm text-gray-500 mt-4 mb-2">Próxima cobrança:</p>
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Próxima cobrança:</p>
+                  <p className="font-medium">
+                    {new Date(subscription.subscription_end).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {subscription.last_invoice_url && (
+              <div className="flex items-center">
+                <Receipt className="h-4 w-4 mr-2 text-gray-500" />
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Último pagamento:</p>
+                  <a 
+                    href={subscription.last_invoice_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline flex items-center"
+                  >
+                    Ver fatura <ExternalLink className="h-3 w-3 ml-1" />
+                  </a>
+                </div>
+              </div>
+            )}
+            
+            {subscription.next_invoice_amount && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-500 mb-1">Próxima cobrança:</p>
                 <p className="font-medium">
-                  {new Date(subscription.subscription_end).toLocaleDateString('pt-BR')}
+                  {formatCurrency(subscription.next_invoice_amount)}
                 </p>
-              </>
+              </div>
+            )}
+            
+            {subscription.subscription_status === 'past_due' && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertDescription>
+                  Detectamos um problema com seu pagamento. Por favor, atualize seus dados de pagamento 
+                  para evitar a suspensão do serviço.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         ) : (
-          <p className="text-sm">
-            Assine agora para acessar recursos premium e impulsionar seu negócio.
-          </p>
+          <div className="space-y-4">
+            <p className="text-sm">
+              Assine agora para acessar recursos premium e impulsionar seu negócio.
+            </p>
+            
+            {user?.role === 'provider' && (
+              <Alert className="bg-blue-50 border-blue-200">
+                <div className="flex items-start">
+                  <div className="rounded-full bg-blue-100 p-1 mr-2">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <AlertDescription className="text-blue-800 text-sm">
+                    <span className="font-semibold">Prestadores ganham 30 dias grátis!</span> Experimente o plano básico sem compromisso.
+                  </AlertDescription>
+                </div>
+              </Alert>
+            )}
+          </div>
+        )}
+        
+        {notifications.length > 0 && !subscriptionLoading && (
+          <div className="mt-6 space-y-3">
+            <p className="text-sm font-medium">Atualizações recentes</p>
+            {notifications.map(notification => (
+              <div 
+                key={notification.id}
+                className={`p-3 rounded-md text-sm ${notification.read ? 'bg-gray-50' : 'bg-blue-50'}`}
+                onClick={() => !notification.read && markNotificationAsRead(notification.id)}
+              >
+                <p className="font-medium">{notification.title}</p>
+                <p className="text-gray-600 text-xs">{notification.message}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(notification.created_at).toLocaleDateString('pt-BR', { 
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
@@ -183,6 +374,8 @@ const SubscriptionManager: React.FC = () => {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Carregando...
               </>
+            ) : user?.role === 'provider' ? (
+              "Assinar com 30 dias grátis"
             ) : (
               "Assinar Agora"
             )}

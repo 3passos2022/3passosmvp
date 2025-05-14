@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Check, Calendar } from 'lucide-react';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import { cn } from '@/lib/utils';
 
@@ -10,13 +10,15 @@ interface SubscriptionCardProps {
   currentTier?: 'free' | 'basic' | 'premium';
   onSelect: (plan: SubscriptionData) => void;
   disabled?: boolean;
+  showTrialBadge?: boolean;
 }
 
 const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   plan,
   currentTier,
   onSelect,
-  disabled = false
+  disabled = false,
+  showTrialBadge = false
 }) => {
   const isCurrentPlan = currentTier === plan.tier;
   
@@ -33,6 +35,13 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       {plan.popular && (
         <div className="absolute -top-3 left-0 right-0 mx-auto w-fit rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">
           Popular
+        </div>
+      )}
+
+      {showTrialBadge && (
+        <div className="absolute -top-3 right-4 rounded-full bg-blue-500 px-3 py-1 text-xs text-white flex items-center">
+          <Calendar className="w-3 h-3 mr-1" />
+          30 Dias Grátis
         </div>
       )}
       
@@ -61,7 +70,9 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         onClick={() => onSelect(plan)}
         variant={plan.popular ? "default" : "outline"}
       >
-        {isCurrentPlan ? 'Seu Plano Atual' : 'Escolher Plano'}
+        {isCurrentPlan ? 'Seu Plano Atual' : (
+          showTrialBadge ? 'Experimente Grátis' : 'Escolher Plano'
+        )}
       </Button>
     </div>
   );

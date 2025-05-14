@@ -763,10 +763,16 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          is_trial_used: boolean | null
+          last_invoice_url: string | null
+          next_invoice_amount: number | null
           stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           subscribed: boolean
           subscription_end: string | null
+          subscription_status: string | null
           subscription_tier: string | null
+          trial_end: string | null
           updated_at: string
           user_id: string | null
         }
@@ -774,10 +780,16 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          is_trial_used?: boolean | null
+          last_invoice_url?: string | null
+          next_invoice_amount?: number | null
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           subscribed?: boolean
           subscription_end?: string | null
+          subscription_status?: string | null
           subscription_tier?: string | null
+          trial_end?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -785,10 +797,16 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          is_trial_used?: boolean | null
+          last_invoice_url?: string | null
+          next_invoice_amount?: number | null
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           subscribed?: boolean
           subscription_end?: string | null
+          subscription_status?: string | null
           subscription_tier?: string | null
+          trial_end?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -867,6 +885,36 @@ export type Database = {
           },
         ]
       }
+      user_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -889,6 +937,19 @@ export type Database = {
           p_height?: number
         }
         Returns: string
+      }
+      add_user_notification: {
+        Args: {
+          p_user_id: string
+          p_type: string
+          p_title: string
+          p_message: string
+        }
+        Returns: string
+      }
+      can_start_trial: {
+        Args: { p_user_id: string; p_tier: string }
+        Returns: boolean
       }
       create_user_profile: {
         Args: { user_id: string; user_name: string; user_role: string }
