@@ -83,7 +83,28 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       query = query.contains('specialties', [{ id: specialtyId }]);
     }
 
-    const { data: providers, error } = await query;
+    // Use a type annotation for the response to avoid deep type instantiation
+    type ProfilesResponse = {
+      data: Array<{
+        userId: string;
+        name: string;
+        email: string;
+        phone: string;
+        role: string;
+        city: string;
+        neighborhood: string;
+        averageRating: number;
+        latitude: number;
+        longitude: number;
+        bio: string;
+        services: Array<{ id: string; name: string }>;
+        sub_services: Array<{ id: string; name: string; service_id: string }>;
+        specialties: Array<{ id: string; name: string; sub_service_id: string }>;
+      }> | null;
+      error: any;
+    };
+    
+    const { data: providers, error } = await query as unknown as ProfilesResponse;
 
     if (error) {
       console.error('Error fetching providers:', error);
@@ -150,7 +171,23 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 
 export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
-    // Use explicit type annotation to avoid deep type instantiation
+    // Define explicit return type for the query to avoid deep type instantiation
+    type ProviderQueryResult = {
+      data: {
+        userId: string;
+        name: string;
+        email: string;
+        phone: string;
+        role: string;
+        city: string;
+        neighborhood: string;
+        averageRating: number;
+        bio: string;
+      } | null;
+      error: any;
+    };
+
+    // Execute the query with type casting
     const { data: provider, error } = await supabase
       .from('profiles')
       .select(`
@@ -165,18 +202,28 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
         bio
       `)
       .eq('userId', providerId)
-      .single();
+      .single() as unknown as ProviderQueryResult;
 
     if (error) {
       console.error('Error fetching provider details:', error);
       return null;
     }
 
+    // Define type for portfolio items query
+    type PortfolioQueryResult = {
+      data: Array<{
+        id: string;
+        image_url: string;
+        description: string;
+      }> | null;
+      error: any;
+    };
+
     // Fetch portfolio items with explicit type annotation
     const { data: portfolioItems, error: portfolioError } = await supabase
-      .from('provider_portfolio') // Updated to use the correct table name
+      .from('provider_portfolio')
       .select('*')
-      .eq('provider_id', providerId);
+      .eq('provider_id', providerId) as unknown as PortfolioQueryResult;
 
     if (portfolioError) {
       console.error('Error fetching portfolio items:', portfolioError);
@@ -202,13 +249,21 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
       if (items.hasOwnProperty(itemId)) {
         const quantity = items[itemId];
 
+        // Define explicit return type for price query
+        type PriceQueryResult = {
+          data: {
+            price_per_unit: number;
+          } | null;
+          error: any;
+        };
+
         // Use explicit type annotation to avoid deep type instantiation
         const { data: priceData, error: priceError } = await supabase
-          .from('provider_item_prices') // Updated to use the correct table name
-          .select('price_per_unit') // Updated to use the correct column name
+          .from('provider_item_prices')
+          .select('price_per_unit')
           .eq('provider_id', providerId)
           .eq('item_id', itemId)
-          .single();
+          .single() as unknown as PriceQueryResult;
 
         if (priceError) {
           console.error(`Error fetching price for item ${itemId}:`, priceError);
@@ -216,7 +271,7 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
         }
 
         if (priceData) {
-          const itemPrice = priceData.price_per_unit || 0; // Updated to use the correct property name
+          const itemPrice = priceData.price_per_unit || 0;
           const itemTotal = itemPrice * quantity;
           total += itemTotal;
           details[itemId] = {
