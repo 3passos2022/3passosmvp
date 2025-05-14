@@ -193,20 +193,23 @@ interface SimplePortfolioItem {
 
 export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
-    // Query for provider details - fix the column selection syntax
+    // First, check if the provider exists with a simple query
+    const { data: providerExists, error: checkError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', providerId)
+      .maybeSingle();
+    
+    if (checkError || !providerExists) {
+      console.error('Error checking if provider exists:', checkError);
+      console.warn(`Provider not found with ID: ${providerId}`);
+      return null;
+    }
+    
+    // Now, query for the full provider details with proper column selection
     const { data, error } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        name,
-        email,
-        phone,
-        role,
-        city,
-        neighborhood,
-        averageRating,
-        bio
-      `)
+      .select('id, name, email, phone, role, city, neighborhood, averageRating, bio')
       .eq('id', providerId)
       .maybeSingle();
 
@@ -217,13 +220,13 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     }
 
     if (!data) {
-      console.warn(`Provider not found with ID: ${providerId}`);
+      console.warn(`Provider details not found for ID: ${providerId}`);
       return null;
     }
 
-    // Map the data to our expected structure
+    // Map the data to our expected structure with safe defaults
     const provider: SimpleProviderDetails = {
-      userId: data.id,
+      userId: data.id || '',
       name: data.name || '',
       email: data.email || '',
       phone: data.phone || '',
