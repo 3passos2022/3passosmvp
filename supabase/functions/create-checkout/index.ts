@@ -72,14 +72,17 @@ serve(async (req) => {
     let priceId: string;
     let amount: number;
     
-    switch (tier) {
+    // Fix: Use let instead of const for variable that will be modified
+    let selectedTier = tier;
+    
+    switch (selectedTier) {
       case "premium":
         amount = 7990; // R$79,90/mês
         break;
       case "basic":
       default:
         amount = 3990; // R$39,90/mês
-        tier = "basic";
+        selectedTier = "basic";
         break;
     }
 
@@ -87,23 +90,23 @@ serve(async (req) => {
     let trial_period_days: number | null = null;
     const { data: canStartTrial, error: trialError } = await supabaseClient.rpc("can_start_trial", {
       p_user_id: user.id,
-      p_tier: tier
+      p_tier: selectedTier
     });
     
     if (trialError) {
       logStep("Erro ao verificar elegibilidade para teste", { error: trialError.message });
-    } else if (canStartTrial && tier === "basic") {
+    } else if (canStartTrial && selectedTier === "basic") {
       trial_period_days = 30; // 30 dias de teste gratuito para prestadores no plano básico
       logStep("Usuário elegível para período de teste", { trial_period_days });
     }
 
     // Cria a sessão de checkout
     const origin = new URL(req.url).origin;
-    const success_url = returnUrl || `${origin}/subscription/success?tier=${tier}`;
+    const success_url = returnUrl || `${origin}/subscription/success?tier=${selectedTier}`;
     const cancel_url = `${origin}/subscription/cancel`;
 
     logStep("Criando sessão de checkout", { 
-      tier, 
+      tier: selectedTier, 
       amount, 
       customerId, 
       trial_period_days 
@@ -117,8 +120,8 @@ serve(async (req) => {
           price_data: {
             currency: "brl",
             product_data: {
-              name: `Plano ${tier.charAt(0).toUpperCase() + tier.slice(1)}`,
-              description: tier === "premium" ? "Acesso completo a todas as funcionalidades" : "Acesso a funcionalidades avançadas",
+              name: `Plano ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)}`,
+              description: selectedTier === "premium" ? "Acesso completo a todas as funcionalidades" : "Acesso a funcionalidades avançadas",
             },
             unit_amount: amount,
             recurring: { interval: "month" },
@@ -132,7 +135,7 @@ serve(async (req) => {
       subscription_data: trial_period_days ? { trial_period_days } : undefined,
       metadata: {
         user_id: user.id,
-        tier: tier,
+        tier: selectedTier,
       },
     });
 
