@@ -1,429 +1,318 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { createUserProfile, getUserProfile } from '@/integrations/supabase/database-functions';
-import { toast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { SubscriptionStatus } from '@/lib/types/subscriptions';
-import { ExtendedUser, UserRole } from '@/lib/types';
 
-interface AuthContextType {
-  user: ExtendedUser | null;
-  session: Session | null;
-  loading: boolean;
-  login: (email: string, password?: string) => Promise<{ error: any | null }>;
-  logout: () => Promise<void>;
-  signOut: () => Promise<void>; // Alias for logout
-  refreshUser: () => Promise<void>;
-  updateUser: (updates: any) => Promise<void>;
-  updateProfile: (updates: any) => Promise<{ error: any | null }>;
-  refreshSubscription: () => Promise<any>;
-  subscription: SubscriptionStatus | null;
-  subscriptionLoading: boolean;
-  makeAdmin?: (userId: string) => Promise<void>;
-  signIn?: (email: string, password?: string) => Promise<{ error: any | null }>;
-  signUp?: (email: string, password: string, role: UserRole) => Promise<{ error: any | null }>;
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Session, User } from '@supabase/supabase-js';
+import { UserRole, UserProfile } from '@/lib/types';
+import { SubscriptionStatus } from '@/lib/types/subscriptions';
+import { toast } from 'sonner';
+import ProfileService, { hasRole } from '@/services/ProfileService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<ExtendedUser | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
-  const [subscriptionLoading, setSubscriptionLoading] = useState<boolean>(true);
-  const navigate = useNavigate();
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
+  // Function to check user role
+  const checkUserRole = (role: UserRole | string) => {
+    return hasRole(user, role);
+  };
+
+  // Buscar perfil do usuário de forma simplificada
+  const fetchUserProfile = async (sessionUser: User) => {
+    try {
+      const profileData = await ProfileService.getUserProfile(
+        sessionUser.id,
+        sessionUser.email || undefined
+      );
+      
+      if (profileData) {
+        setUser(profileData);
+        return;
+      }
+      
+      // Criar um perfil padrão se não encontrado
+      const newProfile = await ProfileService.createDefaultProfile(
+        sessionUser.id,
+        sessionUser.email || '',
+        UserRole.CLIENT
+      );
+      
+      if (newProfile) {
+        setUser(newProfile);
+      } else {
+        // Perfil mínimo para navegação
+        setUser({
+          id: sessionUser.id,
+          email: sessionUser.email || '',
+          role: UserRole.CLIENT,
+          created_at: new Date().toISOString(),
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
+        } as UserProfile);
+      }
+    } catch (error) {
+      // Perfil mínimo em caso de erro
+      setUser({
+        id: sessionUser.id,
+        email: sessionUser.email || '',
+        role: UserRole.CLIENT,
+        created_at: new Date().toISOString(),
+        subscribed: false,
+        subscription_tier: 'free',
+        subscription_end: null
+      } as UserProfile);
+    }
+  };
+
+  // Configuração do listener de autenticação
   useEffect(() => {
-    const loadSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      setSession(session);
-      if (session?.user) {
-        // Cast to ExtendedUser with required fields
-        const extendedUser: ExtendedUser = {
-          ...session.user,
-          email: session.user.email || '',
-          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT
-        };
-        setUser(extendedUser);
-      } else {
+    // Função para lidar com mudanças de estado de autenticação
+    const handleAuthChange = async (event: string, newSession: Session | null) => {
+      setSession(newSession);
+      
+      if (!newSession) {
         setUser(null);
+        setSubscription(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+      
+      // Usar setTimeout para evitar recursão
+      setTimeout(async () => {
+        if (newSession.user) {
+          await fetchUserProfile(newSession.user);
+        }
+        setLoading(false);
+      }, 0);
     };
+    
+    // Configurar o listener de autenticação
+    const { data: authListener } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    loadSession();
-
-    supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (session?.user) {
-        // Cast to ExtendedUser with required fields
-        const extendedUser: ExtendedUser = {
-          ...session.user,
-          email: session.user.email || '',
-          role: (session.user.user_metadata?.role as UserRole) || UserRole.CLIENT
-        };
-        setUser(extendedUser);
-      } else {
-        setUser(null);
+    // Verificar a sessão atual
+    const checkCurrentSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          setLoading(false);
+          return;
+        }
+        
+        setSession(data.session);
+        
+        if (data.session?.user) {
+          await fetchUserProfile(data.session.user);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        setLoading(false);
       }
-    });
+    };
+    
+    checkCurrentSession();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async (email: string, password?: string) => {
+  // Função de registro simplificada
+  async function signUp(email: string, password: string, role: UserRole) {
     try {
-      let result;
-      if (password) {
-        result = await supabase.auth.signInWithPassword({ email, password });
-      } else {
-        result = await supabase.auth.signInWithOtp({ email });
-      }
-      
-      if (result.error) {
-        toast({
-          title: 'Erro ao fazer login',
-          description: result.error.message,
-          variant: "destructive"
-        });
-        return { error: result.error };
-      }
-      
-      toast({
-        title: 'Login realizado com sucesso!',
-        variant: "default"
-      });
-      
-      // Atraso para garantir atualização do estado
-      setTimeout(() => {
-        if (!user || !session) {
-          navigate('/');
-        }
-      }, 500);
-      
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: 'Erro inesperado ao fazer login',
-        variant: "destructive"
-      });
-      return { error };
-    }
-  };
-
-  // Provide aliases for consistency with component usage
-  const signIn = login;
-
-  const signUp = async (email: string, password: string, role: UserRole) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
+      const { data, error } = await supabase.auth.signUp({
+        email,
         password,
         options: {
-          data: {
-            role: role
-          }
-        }
+          data: { role },
+        },
       });
-      
+
       if (error) {
-        toast({
-          title: 'Erro ao criar conta',
-          description: error.message,
-          variant: "destructive"
-        });
-        return { error };
+        return { error, data: null };
       }
       
-      // Create user profile
-      if (data.user) {
-        try {
-          await createUserProfile(data.user.id, data.user.email || '', role);
-        } catch (profileError) {
-          console.error("Error creating profile:", profileError);
-        }
-      }
-      
-      toast({
-        title: 'Conta criada com sucesso!',
-        description: 'Verifique seu e-mail para confirmar seu cadastro.',
-        variant: "default"
-      });
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao criar conta',
-        variant: "destructive"
-      });
-      return { error };
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setSession(null);
-      setUser(null);
-      navigate('/login');
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao fazer logout',
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Alias for logout
-  const signOut = logout;
-
-  const refreshUser = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.getUser();
-  
-      if (error) {
-        console.error("Erro ao obter usuário:", error);
-        throw error;
-      }
-  
       if (data?.user) {
-        // Create extended user
-        const extendedUser: ExtendedUser = {
-          ...data.user,
-          email: data.user.email || '',
-          role: (data.user.user_metadata?.role as UserRole) || UserRole.CLIENT
-        };
-  
-        // Buscar informações adicionais do perfil
-        const profileData = await getUserProfile(data.user.id);
-        
-        // Atualizar o estado do usuário com as informações do perfil
-        if (profileData) {
-          const updatedUser: ExtendedUser = {
-            ...extendedUser,
-            ...(profileData as Record<string, any>),
-            // Ensure required fields
-            email: profileData.email || extendedUser.email,
-            role: profileData.role || extendedUser.role
-          };
-          setUser(updatedUser);
-        } else {
-          setUser(extendedUser);
-        }
+        // Criar perfil após registro bem-sucedido
+        setTimeout(async () => {
+          await ProfileService.createDefaultProfile(data.user.id, email, role);
+        }, 500);
       }
       
-      return { success: true };
-    } catch (error: any) {
-      console.error("Erro ao atualizar informações do usuário:", error);
-      toast({
-        title: "Falha ao carregar informações do usuário",
-        variant: "destructive"
-      });
-      throw error;
-    } finally {
-      setLoading(false);
+      return { data, error: null };
+    } catch (error) {
+      return { error: error as Error, data: null };
     }
-  };
+  }
 
-  const updateUser = async (updates: any) => {
+  // Função de login simplificada
+  async function signIn(email: string, password: string) {
     try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.updateUser(updates);
-      if (error) throw error;
-
-      // Update user profile in "profiles" table
-      if (updates.name && user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ name: updates.name })
-          .eq('id', user.id);
-
-        if (profileError) {
-          console.error("Erro ao atualizar perfil:", profileError);
-          toast({
-            title: "Falha ao atualizar informações do perfil",
-            variant: "destructive"
-          });
-        }
-      }
-
-      const result = await refreshUser();
-      if (result && result.success) {
-        toast({
-          title: 'Perfil atualizado!',
-          variant: "default"
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao atualizar perfil',
-        description: error.message,
-        variant: "destructive"
+      return await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      return { error: error as Error, data: null };
     }
-  };
+  }
 
-  // Add updateProfile function with the expected return type
-  const updateProfile = async (updates: any) => {
+  // Função de logout simplificada
+  async function signOut() {
+    ProfileService.clearCache();
+    await supabase.auth.signOut();
+  }
+
+  // Funções para redefinição de senha
+  async function forgotPassword(email: string) {
     try {
-      setLoading(true);
+      return await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+    } catch (error) {
+      return { error: error as Error, data: null };
+    }
+  }
+
+  async function resetPassword(newPassword: string) {
+    try {
+      return await supabase.auth.updateUser({
+        password: newPassword,
+      });
+    } catch (error) {
+      return { error: error as Error, data: null };
+    }
+  }
+
+  // Gerenciamento de perfil simplificado
+  async function updateProfile(data: Partial<UserProfile>) {
+    if (!user) return { error: new Error('No user logged in'), data: null };
+
+    try {
+      const result = await ProfileService.updateProfile(user.id, data);
       
-      // Handle profile updates
-      if (user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id);
-          
-        if (profileError) {
-          console.error("Erro ao atualizar perfil:", profileError);
-          return { error: profileError };
-        }
-        
-        // Update local user state with the new profile info
-        setUser(prevUser => {
-          if (!prevUser) return null;
-          return { ...prevUser, ...updates };
-        });
-        
-        toast({
-          title: 'Perfil atualizado com sucesso',
-          variant: "default"
-        });
-        return { error: null };
+      if (!result.error) {
+        setUser((prev) => (prev ? { ...prev, ...data } : null));
       }
       
-      return { error: new Error('Usuário não encontrado') };
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao atualizar perfil',
-        description: error.message,
-        variant: "destructive"
-      });
-      return { error };
-    } finally {
-      setLoading(false);
+      return result;
+    } catch (error) {
+      return { error: error as Error, data: null };
     }
-  };
+  }
 
-  // Add makeAdmin function
-  const makeAdmin = async (userId: string) => {
+  // Atualizar dados do usuário
+  async function refreshUser() {
+    if (!session?.user?.id) {
+      return;
+    }
+    
     try {
-      // Only allow admins to make other users admin
-      if (user?.role !== UserRole.ADMIN) {
-        toast({
-          title: 'Você não tem permissão para executar esta ação',
-          variant: "destructive"
+      const refreshedProfile = await ProfileService.getUserProfile(
+        session.user.id,
+        session.user.email || undefined,
+        true
+      );
+      
+      if (refreshedProfile) {
+        setUser(refreshedProfile);
+      } else {
+        const newProfile = await ProfileService.createDefaultProfile(
+          session.user.id,
+          session.user.email || '',
+          UserRole.CLIENT
+        );
+        
+        if (newProfile) {
+          setUser(newProfile);
+        }
+      }
+    } catch (error) {
+      toast.error('Falha ao atualizar dados do usuário');
+    }
+  }
+
+  // Funções administrativas
+  async function makeAdmin(userId: string) {
+    if (!user) {
+      return { error: new Error('No user logged in'), data: null };
+    }
+    
+    return await ProfileService.makeAdmin(user.id, userId);
+  }
+
+  // Gerenciamento de assinatura
+  async function checkSubscription() {
+    if (!session) return;
+
+    try {
+      setSubscriptionLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      
+      if (error) {
+        setSubscription({
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
         });
         return;
       }
       
-      const { error } = await supabase.rpc('update_user_role', { 
-        user_id: userId,
-        new_role: UserRole.ADMIN
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: 'Usuário promovido a administrador com sucesso!',
-        variant: "default"
-      });
-    } catch (error: any) {
-      console.error('Error making admin:', error);
-      toast({
-        title: 'Erro ao promover a administrador',
-        description: 'Tente novamente.',
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Function to refresh subscription status
-  const refreshSubscription = async () => {
-    if (!session || !user) {
-      setSubscription({ subscribed: false, subscription_tier: 'free' });
-      setSubscriptionLoading(false);
-      return { subscribed: false, subscription_tier: 'free' };
-    }
-
-    setSubscriptionLoading(true);
-    try {
-      console.log("Checking subscription status for user:", user.id);
-      
-      const { data, error } = await supabase.functions.invoke('stripe-subscription');
-      
-      if (error) {
-        console.error("Error checking subscription:", error);
-        throw new Error(error.message);
-      }
-      
-      console.log("Subscription status response:", data);
-      
-      const subscriptionStatus = {
-        subscribed: data.subscribed || false,
-        subscription_tier: data.subscription_tier || 'free',
-        subscription_end: data.subscription_end
-      };
-      
-      setSubscription(subscriptionStatus);
-      
-      // Update user's subscription info
-      if (user) {
-        setUser(prevUser => {
-          if (!prevUser) return null;
-          return { 
-            ...prevUser, 
-            subscribed: data.subscribed || false,
-            subscription_tier: data.subscription_tier || 'free',
-            subscription_end: data.subscription_end
-          };
+      if (data) {
+        setSubscription({
+          subscribed: data.subscribed,
+          subscription_tier: (data.subscription_tier || 'free') as 'free' | 'basic' | 'premium',
+          subscription_end: data.subscription_end
+        });
+      } else {
+        setSubscription({
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null
         });
       }
-      
-      return data;
     } catch (error) {
-      console.error("Error refreshing subscription:", error);
-      setSubscription({ subscribed: false, subscription_tier: 'free' });
-      throw error;
+      setSubscription({
+        subscribed: false,
+        subscription_tier: 'free',
+        subscription_end: null
+      });
     } finally {
       setSubscriptionLoading(false);
     }
-  };
+  }
 
-  // When authentication state changes, refresh subscription
-  useEffect(() => {
-    if (session && user) {
-      refreshSubscription().catch(err => {
-        console.error("Failed to refresh subscription on auth state change:", err);
-      });
+  async function refreshSubscription() {
+    if (!user) {
+      return;
     }
-  }, [session, user]);
+    await checkSubscription();
+  }
 
+  // Context value
   const value: AuthContextType = {
     user,
     session,
     loading,
-    login,
-    logout,
-    signOut, // Add alias
-    signIn, // Add alias
-    signUp, // Add alias
+    signUp,
+    signIn,
+    signOut,
+    forgotPassword,
+    resetPassword,
+    updateProfile,
     refreshUser,
-    updateUser,
-    updateProfile, // Add new method
-    refreshSubscription,
+    makeAdmin,
     subscription,
+    refreshSubscription,
     subscriptionLoading,
-    makeAdmin, // Add new method
+    hasRole: checkUserRole
   };
 
   return (
@@ -433,12 +322,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-const useAuth = () => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
-
-export { AuthProvider, useAuth };
