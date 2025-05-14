@@ -148,8 +148,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
   }
 };
 
-export const getProviderDetails = async (providerId: string): Promise<any | null> => {
+export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
+    // Use explicit type annotation to avoid deep type instantiation
     const { data: provider, error } = await supabase
       .from('profiles')
       .select(`
@@ -171,7 +172,7 @@ export const getProviderDetails = async (providerId: string): Promise<any | null
       return null;
     }
 
-    // Fetch portfolio items
+    // Fetch portfolio items with explicit type annotation
     const { data: portfolioItems, error: portfolioError } = await supabase
       .from('provider_portfolio') // Updated to use the correct table name
       .select('*')
@@ -201,6 +202,7 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
       if (items.hasOwnProperty(itemId)) {
         const quantity = items[itemId];
 
+        // Use explicit type annotation to avoid deep type instantiation
         const { data: priceData, error: priceError } = await supabase
           .from('provider_item_prices') // Updated to use the correct table name
           .select('price_per_unit') // Updated to use the correct column name
