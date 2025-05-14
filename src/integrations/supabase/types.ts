@@ -483,11 +483,11 @@ export type Database = {
           service_end_date: string | null
           service_id: string
           service_time_preference: string | null
-          specialty_id: string
+          specialty_id: string | null
           state: string
           status: string
           street: string
-          sub_service_id: string
+          sub_service_id: string | null
           zip_code: string
         }
         Insert: {
@@ -507,11 +507,11 @@ export type Database = {
           service_end_date?: string | null
           service_id: string
           service_time_preference?: string | null
-          specialty_id: string
+          specialty_id?: string | null
           state: string
           status?: string
           street: string
-          sub_service_id: string
+          sub_service_id?: string | null
           zip_code: string
         }
         Update: {
@@ -531,11 +531,11 @@ export type Database = {
           service_end_date?: string | null
           service_id?: string
           service_time_preference?: string | null
-          specialty_id?: string
+          specialty_id?: string | null
           state?: string
           status?: string
           street?: string
-          sub_service_id?: string
+          sub_service_id?: string | null
           zip_code?: string
         }
         Relationships: [

@@ -26,7 +26,6 @@ const deg2rad = (deg: number): number => {
 type SimpleProviderProfile = {
   userId: string;
   name: string;
-  email: string;
   phone: string;
   role: string;
   city: string;
@@ -63,7 +62,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       .select(`
         id,
         name,
-        email,
         phone, 
         role,
         city,
@@ -115,7 +113,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         const providerProfile: ProviderProfile = {
           userId: provider.id,
           name: provider.name || '',
-          email: provider.email || '',
           phone: provider.phone || '',
           role: provider.role || 'provider',
           city: provider.city || '',
@@ -147,7 +144,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
 interface SimpleProviderDetails {
   userId: string;
   name: string;
-  email: string;
   phone: string;
   role: string;
   city: string;
@@ -181,7 +177,7 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     // Now, query for the full provider details
     const providerResult = await supabase
       .from('profiles')
-      .select('id, name, email, phone, role, city, neighborhood, averageRating, bio')
+      .select('id, name, phone, role, city, neighborhood, averageRating, bio')
       .eq('id', providerId)
       .maybeSingle();
 
@@ -202,7 +198,6 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     const provider: SimpleProviderDetails = {
       userId: data.id || '',
       name: data.name || '',
-      email: data.email || '',
       phone: data.phone || '',
       role: data.role || '',
       city: data.city || '',
