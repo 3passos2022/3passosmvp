@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty, PriceDetail } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -614,8 +615,9 @@ export const sendQuoteToProvider = async (
           p_state: quoteDetails.address.state,
           p_zip_code: quoteDetails.address.zipCode,
           p_is_anonymous: !quoteDetails.clientId,
-          p_service_date: quoteDetails.serviceDate ? new Date(quoteDetails.serviceDate) : null,
-          p_service_end_date: quoteDetails.serviceEndDate ? new Date(quoteDetails.serviceEndDate) : null,
+          // Convert Date objects to ISO strings for database compatibility
+          p_service_date: quoteDetails.serviceDate ? quoteDetails.serviceDate.toISOString() : null,
+          p_service_end_date: quoteDetails.serviceEndDate ? quoteDetails.serviceEndDate.toISOString() : null,
           p_service_time_preference: quoteDetails.serviceTimePreference || null
         }
       );
