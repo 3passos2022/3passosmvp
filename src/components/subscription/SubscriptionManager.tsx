@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ const SubscriptionManager: React.FC = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState<boolean>(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
 
   useEffect(() => {
     const checkUserSubscription = async () => {
@@ -33,6 +33,8 @@ const SubscriptionManager: React.FC = () => {
         try {
           await refreshSubscription();
           loadNotifications();
+          // Update last refresh time
+          setLastRefreshTime(Date.now());
         } catch (error) {
           console.error("Failed to check subscription:", error);
         }
@@ -41,19 +43,24 @@ const SubscriptionManager: React.FC = () => {
     
     checkUserSubscription();
     
-    // Poll for subscription status changes every 30 seconds while on this page
+    // Poll for subscription status changes every 5 minutes while on this page
+    // This is much less aggressive than the previous 30-second interval
     const interval = setInterval(async () => {
-      if (user) {
+      // Only refresh if it's been at least 5 minutes since the last refresh
+      const currentTime = Date.now();
+      if (user && (currentTime - lastRefreshTime >= 5 * 60 * 1000)) {
         try {
+          console.log("Polling subscription status (5-min interval)");
           await refreshSubscription();
+          setLastRefreshTime(currentTime);
         } catch (error) {
           console.error("Failed to check subscription in interval:", error);
         }
       }
-    }, 30000);
+    }, 5 * 60 * 1000); // Check every 5 minutes instead of 30 seconds
     
     return () => clearInterval(interval);
-  }, [user, refreshSubscription]);
+  }, [user, refreshSubscription, lastRefreshTime]);
 
   const loadNotifications = async () => {
     if (!user) return;
@@ -155,6 +162,16 @@ const SubscriptionManager: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    // Prevent refreshing if it happened in the last 30 seconds
+    const currentTime = Date.now();
+    if (currentTime - lastRefreshTime < 30000) {
+      toast({
+        title: "Aguarde",
+        description: "Por favor aguarde pelo menos 30 segundos entre atualizações"
+      });
+      return;
+    }
+
     setRefreshing(true);
     try {
       await refreshSubscription();
@@ -163,6 +180,7 @@ const SubscriptionManager: React.FC = () => {
         title: "Atualizado",
         description: "Informações de assinatura atualizadas"
       });
+      setLastRefreshTime(currentTime);
     } catch (error) {
       console.error("Error refreshing subscription data:", error);
       toast({

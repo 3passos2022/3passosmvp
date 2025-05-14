@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -11,10 +11,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { SubscriptionData } from '@/lib/types/subscriptions';
+import LoadingSpinner from '@/components/ui/loading-spinner';
 
 const Subscription: React.FC = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [checkoutLoading, setCheckoutLoading] = useState<boolean>(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -31,26 +34,49 @@ const Subscription: React.FC = () => {
       return;
     }
     
+    // Prevent multiple clicks
+    if (checkoutLoading) {
+      return;
+    }
+    
+    setCheckoutLoading(true);
+    setSelectedPlan(plan.id);
+    
     try {
+      console.log(`Iniciando checkout para o plano: ${plan.tier}`);
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { tier: plan.tier }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na resposta da função:', error);
+        throw error;
+      }
       
       if (data?.url) {
+        console.log('URL de checkout recebida, redirecionando...');
         window.location.href = data.url;
       } else {
+        console.error('URL de checkout não recebida na resposta:', data);
         throw new Error('Não foi possível obter o link de checkout');
       }
     } catch (error: any) {
       console.error('Erro ao iniciar checkout:', error);
-      toast.error('Erro ao processar pagamento: ' + (error.message || 'Tente novamente mais tarde'));
+      toast.error('Erro ao processar pagamento: ' + (error.message || 'Tente novamente mais tarde. Se o erro persistir, entre em contato com o suporte.'));
+    } finally {
+      setCheckoutLoading(false);
+      setSelectedPlan(null);
     }
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+        <span className="ml-2">Carregando...</span>
+      </div>
+    );
   }
 
   return (
@@ -73,7 +99,10 @@ const Subscription: React.FC = () => {
               </div>
             )}
             
-            <PlansComparison onSelectPlan={handleSelectPlan} />
+            <PlansComparison 
+              onSelectPlan={handleSelectPlan} 
+              disabledPlans={checkoutLoading ? [selectedPlan || ''] : []}
+            />
           </motion.div>
         </div>
       </main>

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, Calendar } from 'lucide-react';
+import { Check, Calendar, Loader2 } from 'lucide-react';
 import { SubscriptionData } from '@/lib/types/subscriptions';
 import { cn } from '@/lib/utils';
 
@@ -70,7 +70,12 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         onClick={() => onSelect(plan)}
         variant={plan.popular ? "default" : "outline"}
       >
-        {isCurrentPlan ? 'Seu Plano Atual' : (
+        {disabled ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Processando...
+          </>
+        ) : isCurrentPlan ? 'Seu Plano Atual' : (
           showTrialBadge ? 'Experimente Grátis' : 'Escolher Plano'
         )}
       </Button>

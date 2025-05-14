@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 interface PlansComparisonProps {
   showTitle?: boolean;
   onSelectPlan?: (plan: SubscriptionData) => void;
+  disabledPlans?: string[];
 }
 
 const SUBSCRIPTION_PLANS: SubscriptionData[] = [
@@ -60,7 +61,8 @@ const SUBSCRIPTION_PLANS: SubscriptionData[] = [
 
 const PlansComparison: React.FC<PlansComparisonProps> = ({ 
   showTitle = true,
-  onSelectPlan 
+  onSelectPlan,
+  disabledPlans = [] 
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -100,6 +102,7 @@ const PlansComparison: React.FC<PlansComparisonProps> = ({
             plan={plan}
             currentTier={currentTier}
             onSelect={handleSelect}
+            disabled={disabledPlans.includes(plan.id)}
             showTrialBadge={user?.role === 'provider' && plan.tier === 'basic'}
           />
         ))}
