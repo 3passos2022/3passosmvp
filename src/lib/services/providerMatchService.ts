@@ -21,6 +21,24 @@ const deg2rad = (deg: number): number => {
   return deg * (Math.PI / 180)
 }
 
+// Define simple provider profile type to avoid deep nesting
+type SimpleProviderProfile = {
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  city: string;
+  neighborhood: string;
+  averageRating: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  bio: string | null;
+  services: Array<{ id: string; name: string }>;
+  sub_services: Array<{ id: string; name: string; service_id: string }>;
+  specialties: Array<{ id: string; name: string; sub_service_id: string }>;
+}
+
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[] | null> => {
   try {
     // Extract data from quoteDetails
@@ -83,28 +101,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       query = query.contains('specialties', [{ id: specialtyId }]);
     }
 
-    // Use a type annotation for the response to avoid deep type instantiation
-    type ProfilesResponse = {
-      data: Array<{
-        userId: string;
-        name: string;
-        email: string;
-        phone: string;
-        role: string;
-        city: string;
-        neighborhood: string;
-        averageRating: number;
-        latitude: number;
-        longitude: number;
-        bio: string;
-        services: Array<{ id: string; name: string }>;
-        sub_services: Array<{ id: string; name: string; service_id: string }>;
-        specialties: Array<{ id: string; name: string; sub_service_id: string }>;
-      }> | null;
-      error: any;
-    };
-    
-    const { data: providers, error } = await query as unknown as ProfilesResponse;
+    // Execute the query without complex type casting
+    const { data: providers, error } = await query;
 
     if (error) {
       console.error('Error fetching providers:', error);
@@ -116,9 +114,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return [];
     }
 
+    // Cast the data to our simple type
+    const typedProviders = providers as unknown as SimpleProviderProfile[];
+
     // Calculate distance and total price for each provider
     const providersWithDistance: ProviderMatch[] = await Promise.all(
-      providers.map(async (provider: any) => {
+      typedProviders.map(async (provider) => {
         let distance: number | null = null;
         let isWithinRadius = false;
 
@@ -147,9 +148,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           city: provider.city,
           neighborhood: provider.neighborhood,
           averageRating: provider.averageRating || 0,
-          bio: provider.bio,
+          bio: provider.bio || '',
           relevanceScore: Math.random(), // Temporário
-          specialties: provider.specialties || [] // Add empty array as fallback
+          specialties: provider.specialties?.map(s => ({
+            id: s.id,
+            name: s.name
+          })) || []
         };
 
         return {
@@ -169,26 +173,29 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
   }
 };
 
+// Simple types for provider details
+interface SimpleProviderDetails {
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  city: string;
+  neighborhood: string;
+  averageRating: number;
+  bio: string;
+}
+
+interface SimplePortfolioItem {
+  id: string;
+  image_url: string;
+  description: string | null;
+}
+
 export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
-    // Define explicit return type for the query to avoid deep type instantiation
-    type ProviderQueryResult = {
-      data: {
-        userId: string;
-        name: string;
-        email: string;
-        phone: string;
-        role: string;
-        city: string;
-        neighborhood: string;
-        averageRating: number;
-        bio: string;
-      } | null;
-      error: any;
-    };
-
-    // Execute the query with type casting
-    const { data: provider, error } = await supabase
+    // Use a simpler approach without complex type casting
+    const providerResult = await supabase
       .from('profiles')
       .select(`
         userId,
@@ -202,42 +209,45 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
         bio
       `)
       .eq('userId', providerId)
-      .single() as unknown as ProviderQueryResult;
+      .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching provider details:', error);
+    if (providerResult.error) {
+      console.error('Error fetching provider details:', providerResult.error);
       return null;
     }
 
-    // Define type for portfolio items query
-    type PortfolioQueryResult = {
-      data: Array<{
-        id: string;
-        image_url: string;
-        description: string;
-      }> | null;
-      error: any;
-    };
+    const provider = providerResult.data as SimpleProviderDetails | null;
 
-    // Fetch portfolio items with explicit type annotation
-    const { data: portfolioItems, error: portfolioError } = await supabase
+    // Fetch portfolio items
+    const portfolioResult = await supabase
       .from('provider_portfolio')
-      .select('*')
-      .eq('provider_id', providerId) as unknown as PortfolioQueryResult;
+      .select('id, image_url, description')
+      .eq('provider_id', providerId);
 
-    if (portfolioError) {
-      console.error('Error fetching portfolio items:', portfolioError);
+    if (portfolioResult.error) {
+      console.error('Error fetching portfolio items:', portfolioResult.error);
     }
+
+    const portfolioItems = portfolioResult.data as SimplePortfolioItem[] || [];
 
     return {
       provider: provider,
-      portfolioItems: portfolioItems || []
+      portfolioItems: portfolioItems.map(item => ({
+        id: item.id,
+        imageUrl: item.image_url,
+        description: item.description || undefined
+      }))
     };
   } catch (error) {
     console.error('Error in getProviderDetails:', error);
     return null;
   }
 };
+
+// Simple type for price data
+interface SimplePriceData {
+  price_per_unit: number;
+}
 
 export const calculateProviderPrice = async (providerId: string, items: { [itemId: string]: number }): Promise<{ total: number, details: any }> => {
   let total = 0;
@@ -249,26 +259,20 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
       if (items.hasOwnProperty(itemId)) {
         const quantity = items[itemId];
 
-        // Define explicit return type for price query
-        type PriceQueryResult = {
-          data: {
-            price_per_unit: number;
-          } | null;
-          error: any;
-        };
-
-        // Use explicit type annotation to avoid deep type instantiation
-        const { data: priceData, error: priceError } = await supabase
+        // Use a simpler approach for price queries
+        const priceResult = await supabase
           .from('provider_item_prices')
           .select('price_per_unit')
           .eq('provider_id', providerId)
           .eq('item_id', itemId)
-          .single() as unknown as PriceQueryResult;
+          .maybeSingle();
 
-        if (priceError) {
-          console.error(`Error fetching price for item ${itemId}:`, priceError);
-          continue; // Skip to the next item if there's an error
+        if (priceResult.error) {
+          console.error(`Error fetching price for item ${itemId}:`, priceResult.error);
+          continue;
         }
+
+        const priceData = priceResult.data as SimplePriceData | null;
 
         if (priceData) {
           const itemPrice = priceData.price_per_unit || 0;
@@ -335,19 +339,19 @@ export const checkQuoteSentToProvider = async (quoteId: string, providerId: stri
   
   // For logged in users, check database
   try {
-    const { data, error } = await supabase
+    const result = await supabase
       .from('quote_providers')
       .select('id')
       .eq('quote_id', quoteId)
       .eq('provider_id', providerId)
-      .single();
+      .maybeSingle();
       
-    if (error) {
-      console.error('Error checking quote status:', error);
+    if (result.error) {
+      console.error('Error checking quote status:', result.error);
       return false;
     }
     
-    return !!data;
+    return !!result.data;
   } catch (error) {
     console.error('Exception checking quote status:', error);
     return false;
