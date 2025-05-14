@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, QuoteDetails, ProviderProfile } from '@/lib/types/providerMatch';
 import { UserProfile } from '@/lib/types';
 import { getQuoteSentProviders, markQuoteSentToProvider } from '@/lib/utils/quoteStorage';
+import { toast } from '@/components/ui/use-toast';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
@@ -60,7 +61,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     let query = supabase
       .from('profiles')
       .select(`
-        userId,
+        id as userId,
         name,
         email,
         phone,
@@ -101,7 +102,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       query = query.contains('specialties', [{ id: specialtyId }]);
     }
 
-    // Execute the query without complex type casting
+    // Execute the query
     const { data: providers, error } = await query;
 
     if (error) {
@@ -114,12 +115,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return [];
     }
 
-    // Cast the data to our simple type
-    const typedProviders = providers as unknown as SimpleProviderProfile[];
-
     // Calculate distance and total price for each provider
     const providersWithDistance: ProviderMatch[] = await Promise.all(
-      typedProviders.map(async (provider) => {
+      providers.map(async (provider: any) => {
         let distance: number | null = null;
         let isWithinRadius = false;
 
@@ -150,7 +148,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           averageRating: provider.averageRating || 0,
           bio: provider.bio || '',
           relevanceScore: Math.random(), // Temporário
-          specialties: provider.specialties?.map(s => ({
+          specialties: provider.specialties?.map((s: any) => ({
             id: s.id,
             name: s.name
           })) || []
@@ -173,7 +171,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
   }
 };
 
-// Simple types for provider details
+// Define type for provider details
 interface SimpleProviderDetails {
   userId: string;
   name: string;
@@ -186,6 +184,7 @@ interface SimpleProviderDetails {
   bio: string;
 }
 
+// Define type for portfolio items
 interface SimplePortfolioItem {
   id: string;
   image_url: string;
@@ -194,11 +193,11 @@ interface SimplePortfolioItem {
 
 export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
-    // Use a simpler approach without complex type casting
+    // Query for provider details
     const providerResult = await supabase
       .from('profiles')
       .select(`
-        userId,
+        id as userId,
         name,
         email,
         phone,
@@ -208,15 +207,22 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
         averageRating,
         bio
       `)
-      .eq('userId', providerId)
+      .eq('id', providerId)
       .maybeSingle();
 
+    // Handle error or no provider found
     if (providerResult.error) {
       console.error('Error fetching provider details:', providerResult.error);
       return null;
     }
 
+    // Extract provider data with proper type safety
     const provider = providerResult.data as SimpleProviderDetails | null;
+    
+    if (!provider) {
+      console.warn(`Provider not found with ID: ${providerId}`);
+      return null;
+    }
 
     // Fetch portfolio items
     const portfolioResult = await supabase
@@ -228,7 +234,8 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
       console.error('Error fetching portfolio items:', portfolioResult.error);
     }
 
-    const portfolioItems = portfolioResult.data as SimplePortfolioItem[] || [];
+    // Extract portfolio items with type safety
+    const portfolioItems = (portfolioResult.data || []) as SimplePortfolioItem[];
 
     return {
       provider: provider,
