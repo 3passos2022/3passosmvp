@@ -1,103 +1,60 @@
 
-import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import './App.css';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Index from './pages/Index';
-import Services from './pages/Services';
-import NotFound from './pages/NotFound';
 import Login from './pages/Login';
-import RequestQuote from './pages/RequestQuote';
-import ProvidersFound from './pages/ProvidersFound';
+import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
+import Services from './pages/Services';
 import Admin from './pages/Admin';
-import PrivateRoute from './components/PrivateRoute';
 import Subscription from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import SubscriptionCancel from './pages/SubscriptionCancel';
-import { UserRole } from './lib/types';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import RequestQuote from './pages/RequestQuote';
+import ProvidersFound from './pages/ProvidersFound';
+import makeAndreAdmin from './pages/makeAndreAdmin';
 import { AuthProvider } from './context/AuthContext';
-import { Toaster } from 'sonner';
+import PrivateRoute from './components/PrivateRoute';
+import { Toaster } from "@/components/ui/toaster";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ServiceNavBarWrapper } from './components/ServiceNavBarWrapper';
+import { Toaster as SonnerToaster } from 'sonner';
 
-// Create a query client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <Toaster position="top-center" richColors />
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
         <Router>
+          <ServiceNavBarWrapper />
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/services" element={<Services />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/services/:serviceId" element={<Services />} />
             <Route path="/request-quote" element={<RequestQuote />} />
             <Route path="/prestadoresencontrados" element={<ProvidersFound />} />
-            
-            {/* Subscription Routes */}
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/subscription/success" element={<SubscriptionSuccess />} />
             <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
-            
-            {/* Protected Routes - Profile and nested routes */}
-            <Route path="/profile" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            <Route path="/profile/quotes" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            <Route path="/profile/requested" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            <Route path="/profile/subscription" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            <Route path="/profile/settings" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            <Route path="/profile/services" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            <Route path="/profile/portfolio" element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            } />
-            
-            {/* Admin Routes */}
-            <Route path="/admin/*" element={
-              <PrivateRoute requiredRole={UserRole.ADMIN}>
-                <Admin />
-              </PrivateRoute>
-            } />
-            
-            {/* Add an unauthorized route */}
-            <Route path="/unauthorized" element={<div className="min-h-screen flex items-center justify-center">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold mb-4">Acesso não autorizado</h1>
-                <p className="text-gray-600 mb-6">Você não tem permissão para acessar esta página.</p>
-                <a href="/" className="text-primary hover:underline">Voltar para a página inicial</a>
-              </div>
-            </div>} />
-            
-            <Route path="*" element={<NotFound />} />
+            <Route path="/profile/*" element={<PrivateRoute><Profile /></PrivateRoute>} />
+            <Route path="/admin/*" element={<Admin />} />
+            <Route path="/makementor" element={<makeAndreAdmin />} />
+            <Route path="/404" element={<NotFound />} />
+            <Route path="*" element={<Navigate to="/404" />} />
           </Routes>
+          <SonnerToaster position="top-right" richColors />
+          <Toaster />
         </Router>
-      </QueryClientProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

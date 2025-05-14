@@ -93,13 +93,16 @@ interface FormData {
   specialtyName?: string;
   description?: string;
   answers?: {[key: string]: string};
+  questions?: {[questionId: string]: { question: string, answer: string }};
   itemQuantities?: {[key: string]: number};
+  itemNames?: {[key: string]: string};
   measurements?: {
     id: string;
     roomName: string;
     width: number;
     length: number;
     height?: number;
+    measurementType?: 'square_meter' | 'linear_meter';
   }[];
   serviceDate?: Date;
   serviceEndDate?: Date;
@@ -586,6 +589,7 @@ const ServiceDetailsStep: React.FC<{
     width: number;
     length: number;
     height?: number;
+    measurementType?: 'square_meter' | 'linear_meter';
   }[]>(formData.measurements || []);
   const [loading, setLoading] = useState(true);
   const [hasSquareMeterItems, setHasSquareMeterItems] = useState(false);
@@ -718,7 +722,13 @@ const ServiceDetailsStep: React.FC<{
     const newId = `temp-${Date.now()}`;
     setMeasurements(prev => [
       ...prev,
-      { id: newId, roomName: '', width: 0, length: 0 }
+      { 
+        id: newId, 
+        roomName: '', 
+        width: 0, 
+        length: 0,
+        measurementType: 'square_meter' // Default to square meters
+      }
     ]);
   };
 
@@ -1006,12 +1016,30 @@ const ServiceDetailsStep: React.FC<{
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Nome do cmodo/área (opcional)</Label>
+                        <Label>Nome do cômodo/área (opcional)</Label>
                         <Input 
-                          value={measurement.roomName} 
+                          value={measurement.roomName || ''} 
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
                           placeholder="Ex: Sala, Quarto, Cozinha"
                         />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Tipo de medida</Label>
+                        <RadioGroup 
+                          value={measurement.measurementType || 'square_meter'} 
+                          onValueChange={(value) => updateMeasurement(index, 'measurementType', value)}
+                          className="flex space-x-4"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="square_meter" id={`square-${index}`} />
+                            <Label htmlFor={`square-${index}`}>Metros quadrados (m²)</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="linear_meter" id={`linear-${index}`} />
+                            <Label htmlFor={`linear-${index}`}>Metros lineares (m)</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1037,7 +1065,7 @@ const ServiceDetailsStep: React.FC<{
                           />
                         </div>
                         
-                        {hasSquareMeterItems && (
+                        {measurement.measurementType === 'square_meter' && hasSquareMeterItems && (
                           <div className="space-y-2">
                             <Label>Altura (m) (opcional)</Label>
                             <Input 
@@ -1052,9 +1080,15 @@ const ServiceDetailsStep: React.FC<{
                       </div>
                       
                       <div className="p-3 bg-gray-50 rounded-md">
-                        <p className="text-sm font-medium">
-                          Área total: {(measurement.width * measurement.length).toFixed(2)} m²
-                        </p>
+                        {measurement.measurementType === 'linear_meter' ? (
+                          <p className="text-sm font-medium">
+                            Perímetro total: {((measurement.width * 2) + (measurement.length * 2)).toFixed(2)} m
+                          </p>
+                        ) : (
+                          <p className="text-sm font-medium">
+                            Área total: {(measurement.width * measurement.length).toFixed(2)} m²
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1100,6 +1134,39 @@ const ReviewStep: React.FC<{
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Process questions and answers data to make it easier to display
+  const processQuestionAnswers = () => {
+    if (!formData.answers) return;
+    
+    const questionMap: {[questionId: string]: { question: string, answer: string }} = {};
+    
+    // Build the processed data structure
+    questions.forEach(question => {
+      const selectedOptionId = formData.answers?.[question.id];
+      if (!selectedOptionId) return;
+      
+      const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+      if (selectedOption) {
+        questionMap[question.id] = {
+          question: question.question,
+          answer: selectedOption.optionText
+        };
+      }
+    });
+    
+    return questionMap;
+  };
+  
+  // Process the question answers when the component mounts or when relevant data changes
+  useEffect(() => {
+    if (questions.length > 0 && formData.answers) {
+      const processedQuestions = processQuestionAnswers();
+      if (processedQuestions) {
+        updateFormData({ questions: processedQuestions });
+      }
+    }
+  }, [questions, formData.answers]);
   
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -1330,81 +1397,8 @@ const ReviewStep: React.FC<{
     <div className="space-y-6">
       <h3 className="text-lg font-medium">Revise os dados do seu orçamento</h3>
       
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dados do Serviço</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Nome</p>
-                <p className="font-medium">{formData.fullName}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Serviço</p>
-                <p className="font-medium">{formData.serviceName}</p>
-              </div>
-              
-              {formData.subServiceName && (
-                <div>
-                  <p className="text-sm text-gray-500">Tipo de Serviço</p>
-                  <p className="font-medium">{formData.subServiceName}</p>
-                </div>
-              )}
-              
-              {formData.specialtyName && (
-                <div>
-                  <p className="text-sm text-gray-500">Especialidade</p>
-                  <p className="font-medium">{formData.specialtyName}</p>
-                </div>
-              )}
-              
-              <div>
-                <p className="text-sm text-gray-500">Data</p>
-                <p className="font-medium">
-                  {formData.serviceDate ? format(formData.serviceDate, "dd/MM/yyyy") : '-'}
-                  {formData.serviceEndDate && formData.serviceEndDate !== formData.serviceDate && 
-                   ` até ${format(formData.serviceEndDate, "dd/MM/yyyy")}`}
-                </p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Horário preferencial</p>
-                <p className="font-medium">
-                  {formData.serviceTimePreference === 'morning' ? 'Manhã' :
-                   formData.serviceTimePreference === 'afternoon' ? 'Tarde' :
-                   formData.serviceTimePreference === 'evening' ? 'Noite' :
-                   formData.serviceTimePreference === 'business' ? 'Horário comercial' : '-'}
-                </p>
-              </div>
-            </div>
-            
-            {formData.description && (
-              <div className="pt-2">
-                <p className="text-sm text-gray-500 mb-1">Descrição</p>
-                <p className="text-sm border rounded-md p-3 bg-gray-50">{formData.description}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Endereço</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>
-              {formData.street}, {formData.number}
-              {formData.complement && ` - ${formData.complement}`}
-            </p>
-            <p>{formData.neighborhood}</p>
-            <p>{formData.city} - {formData.state}</p>
-            <p>CEP: {formData.zipCode}</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Use the QuoteDetailsSummary component to show all the quote details */}
+      <QuoteDetailsSummary formData={formData} />
       
       <div className="pt-4 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>

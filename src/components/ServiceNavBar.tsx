@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -68,9 +69,9 @@ const ServiceNavBar: React.FC = () => {
                   className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors"
                   onClick={e => {
                     e.stopPropagation();
-                    navigate(`/request-quote?serviceId=${service.id}`);
+                    navigate(`/services/${service.id}`);
                   }}
-                  aria-label={`Solicitar orçamento para ${service.name}`}
+                  aria-label={`Ver detalhes do serviço ${service.name}`}
                   style={{ zIndex: 42 }}
                 >
                   {service.icon_url ? (
