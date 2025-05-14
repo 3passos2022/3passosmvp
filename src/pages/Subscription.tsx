@@ -40,7 +40,7 @@ const Subscription: React.FC = () => {
     };
     
     loadInitialData();
-  }, [authLoading, user, refreshSubscription]);
+  }, [authLoading, user]);
   
   const handleSelectPlan = async (plan: SubscriptionData) => {
     if (!user) {

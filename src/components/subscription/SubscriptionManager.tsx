@@ -26,27 +26,23 @@ const SubscriptionManager: React.FC = () => {
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState<boolean>(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    // Only load subscription data if user is logged in
-    if (user) {
+    if (user && !hasLoaded) {
       const checkUserSubscription = async () => {
         try {
           await refreshSubscription();
           loadNotifications();
-          // Update last refresh time
           setLastRefreshTime(Date.now());
+          setHasLoaded(true);
         } catch (error) {
           console.error("Failed to check subscription:", error);
         }
       };
-      
       checkUserSubscription();
-      
-      // No automatic polling - rely on manual refresh and initial load only
-      // This prevents the excessive API calls we were seeing
     }
-  }, [user, refreshSubscription]);
+  }, []);
 
   const loadNotifications = async () => {
     if (!user) return;
