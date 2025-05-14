@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { ProviderMatch, QuoteDetails } from '@/lib/types/providerMatch';
+import { ProviderMatch, QuoteDetails, ProviderProfile } from '@/lib/types/providerMatch';
 import { UserProfile } from '@/lib/types';
 import { getQuoteSentProviders, markQuoteSentToProvider } from '@/lib/utils/quoteStorage';
 
@@ -100,31 +101,42 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         let distance: number | null = null;
         let isWithinRadius = false;
 
-        if (provider.latitude && provider.longitude && address.latitude && address.longitude) {
-          distance = calculateDistance(address.latitude, address.longitude, provider.latitude, provider.longitude);
+        // Check if we have coordinate data for both the provider and the address
+        if (provider.latitude && provider.longitude && 
+            address.latitude !== undefined && address.longitude !== undefined) {
+          distance = calculateDistance(
+            address.latitude, 
+            address.longitude, 
+            provider.latitude, 
+            provider.longitude
+          );
           isWithinRadius = distance <= 10; // 10km radius
         }
 
-        const priceDetails = await calculateProviderPrice(provider.userId, items);
+        const priceDetails = await calculateProviderPrice(provider.userId, items || {});
         const totalPrice = priceDetails.total;
 
+        // Create the provider profile object with required specialties array
+        const providerProfile: ProviderProfile = {
+          userId: provider.userId,
+          name: provider.name,
+          email: provider.email,
+          phone: provider.phone,
+          role: provider.role,
+          city: provider.city,
+          neighborhood: provider.neighborhood,
+          averageRating: provider.averageRating || 0,
+          bio: provider.bio,
+          relevanceScore: Math.random(), // Temporário
+          specialties: provider.specialties || [] // Add empty array as fallback
+        };
+
         return {
-          provider: {
-            userId: provider.userId,
-            name: provider.name,
-            email: provider.email,
-            phone: provider.phone,
-            role: provider.role,
-            city: provider.city,
-            neighborhood: provider.neighborhood,
-            averageRating: provider.averageRating || 0,
-            bio: provider.bio,
-            relevanceScore: Math.random() // Temporário
-          },
+          provider: providerProfile,
           distance: distance,
           isWithinRadius: isWithinRadius,
           totalPrice: totalPrice,
-          priceDetails: priceDetails
+          priceDetails: priceDetails.details
         };
       })
     );
@@ -161,7 +173,7 @@ export const getProviderDetails = async (providerId: string): Promise<any | null
 
     // Fetch portfolio items
     const { data: portfolioItems, error: portfolioError } = await supabase
-      .from('portfolio_items')
+      .from('provider_portfolio') // Updated to use the correct table name
       .select('*')
       .eq('provider_id', providerId);
 
@@ -190,8 +202,8 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
         const quantity = items[itemId];
 
         const { data: priceData, error: priceError } = await supabase
-          .from('provider_prices')
-          .select('price')
+          .from('provider_item_prices') // Updated to use the correct table name
+          .select('price_per_unit') // Updated to use the correct column name
           .eq('provider_id', providerId)
           .eq('item_id', itemId)
           .single();
@@ -202,7 +214,7 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
         }
 
         if (priceData) {
-          const itemPrice = priceData.price || 0;
+          const itemPrice = priceData.price_per_unit || 0; // Updated to use the correct property name
           const itemTotal = itemPrice * quantity;
           total += itemTotal;
           details[itemId] = {

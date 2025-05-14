@@ -1,4 +1,5 @@
 
+
 import { QuoteMeasurement } from '@/lib/types';
 
 export interface PriceDetail {
@@ -30,6 +31,8 @@ export interface ProviderProfile {
   relevanceScore?: number;
   hasAddress?: boolean;
   serviceRadiusKm?: number; // Added to track provider's service radius
+  email?: string; // Added email property
+  role?: string; // Added role property
 }
 
 export interface ProviderSpecialty {
@@ -70,6 +73,8 @@ export interface QuoteDetails {
     city: string;
     state: string;
     zipCode: string;
+    latitude?: number; // Added latitude
+    longitude?: number; // Added longitude
   };
   description?: string;
   clientId?: string | null;
