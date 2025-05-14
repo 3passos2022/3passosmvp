@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -609,6 +608,7 @@ const ServiceDetailsStep: React.FC<{
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [visitedSteps, setVisitedSteps] = useState<string[]>(['quiz']);
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
 
   useEffect(() => {
     async function loadServiceDetails() {
@@ -616,12 +616,20 @@ const ServiceDetailsStep: React.FC<{
       try {
         if (!formData.serviceId) return;
         
+        console.log("Loading service details for:", formData.serviceId, formData.subServiceId, formData.specialtyId);
+        
+        // Fetch questions for service, subservice, and specialty
         const serviceQuestions = formData.serviceId ? await getQuestions(formData.serviceId) : [];
         const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
         const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
         
-        setQuestionsData([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
+        const allQuestions = [...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions];
+        console.log("Fetched questions:", allQuestions.length, "service:", serviceQuestions.length, "subservice:", subServiceQuestions.length, "specialty:", specialtyQuestions.length);
         
+        setQuestionsData(allQuestions);
+        setQuestionsLoaded(true);
+        
+        // Fetch items for service, subservice, and specialty
         const serviceItems = formData.serviceId ? await getServiceItems(formData.serviceId) : [];
         const subServiceItems = formData.subServiceId ? await getServiceItems(undefined, formData.subServiceId) : [];
         const specialtyItems = formData.specialtyId ? await getServiceItems(undefined, undefined, formData.specialtyId) : [];
@@ -647,7 +655,7 @@ const ServiceDetailsStep: React.FC<{
         setHasLinearMeterItems(hasLinearItems);
         
         const neededSteps = [];
-        if (questionsData.length > 0) {
+        if (allQuestions.length > 0) {
           neededSteps.push('quiz');
         }
         
@@ -662,10 +670,21 @@ const ServiceDetailsStep: React.FC<{
           neededSteps.push('measurements');
         }
         
+        console.log("Required steps:", neededSteps);
         setRequiredSteps(neededSteps);
         
         if (neededSteps.length > 0) {
-          setDetailsSubStep(neededSteps[0] as 'quiz' | 'items' | 'measurements');
+          // Se não tiver perguntas, pular para o próximo passo disponível
+          if (neededSteps[0] === 'quiz' && allQuestions.length === 0) {
+            if (neededSteps.length > 1) {
+              setDetailsSubStep(neededSteps[1] as 'quiz' | 'items' | 'measurements');
+            } else {
+              // Se não houver mais etapas, voltar para o passo anterior
+              onNext();
+            }
+          } else {
+            setDetailsSubStep(neededSteps[0] as 'quiz' | 'items' | 'measurements');
+          }
         }
       } catch (error) {
         console.error('Error loading service details:', error);
@@ -676,7 +695,7 @@ const ServiceDetailsStep: React.FC<{
     }
     
     loadServiceDetails();
-  }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId]);
+  }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId, onNext]);
 
   useEffect(() => {
     if (!carouselApi) return;
@@ -800,7 +819,12 @@ const ServiceDetailsStep: React.FC<{
   };
 
   if (loading) {
-    return <div className="text-center py-8">Carregando detalhes do serviço...</div>;
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p>Carregando detalhes do serviço...</p>
+      </div>
+    );
   }
 
   if (requiredSteps.length === 0) {
@@ -928,7 +952,16 @@ const ServiceDetailsStep: React.FC<{
               </div>
             </>
           ) : (
-            <p>Não há perguntas disponíveis para este serviço.</p>
+            <div className="text-center py-8 bg-muted/10 rounded-lg border border-dashed">
+              {questionsLoaded ? (
+                <p className="text-muted-foreground">Não há perguntas disponíveis para este serviço.</p>
+              ) : (
+                <div>
+                  <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                  <p className="text-muted-foreground">Carregando perguntas...</p>
+                </div>
+              )}
+            </div>
           )}
           
           <div className="flex justify-between pt-6 border-t mt-6">
@@ -939,7 +972,7 @@ const ServiceDetailsStep: React.FC<{
               <Button 
                 type="button" 
                 onClick={nextDetailsSubStep}
-                disabled={!allQuestionsAnswered}
+                disabled={!allQuestionsAnswered && questionsData.length > 0}
               >
                 Próximo Sub-passo <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
@@ -1126,7 +1159,7 @@ const ServiceDetailsStep: React.FC<{
           <Button 
             type="submit" 
             className="ml-auto"
-            disabled={detailsSubStep === 'quiz' && !allQuestionsAnswered}
+            disabled={detailsSubStep === 'quiz' && !allQuestionsAnswered && questionsData.length > 0}
           >
             Próximo <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
