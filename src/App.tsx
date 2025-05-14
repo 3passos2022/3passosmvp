@@ -32,7 +32,6 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router>
-          <ServiceNavBar />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />

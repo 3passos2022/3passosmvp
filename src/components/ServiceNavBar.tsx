@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getAllServices } from '@/lib/api/services';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import './customStylingfiles-and/servicenavbar.css';
 
 interface Service {
   id: string;
@@ -15,7 +15,23 @@ const ServiceNavBar: React.FC = () => {
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredService, setHoveredService] = useState<string | null>(null);
+  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
+
+  const handleMouseLeave = (serviceId: string) => {
+    const id = setTimeout(() => {
+      setHoveredService(null);
+    }, 1000);
+    setTimeoutId(id);
+  };
+
+  const handleMouseEnter = (serviceId: string) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      setTimeoutId(null);
+    }
+    setHoveredService(serviceId);
+  };
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -52,17 +68,17 @@ const ServiceNavBar: React.FC = () => {
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.2 }}
-      className="w-full py-2 bg-white shadow-sm border-b z-[40] relative"
+      className="flex justify-center w-full py-2 bg-white shadow-sm border-b z-[40] relative overflow-visible"
+      
     >
-      <div className="container mx-auto">
-        <ScrollArea className="w-full">
-          <div className="flex items-center space-x-6 px-1 py-1 relative">
+        <ScrollArea id='service-navbar' className="overflow-visible">
+          <div className="flex items-center space-x-6 px-1 py-1 relative overflow-visible">
             {services.map((service) => (
               <div
                 key={service.id}
                 className="flex flex-col items-center text-center group min-w-[70px] relative z-[41]"
-                onMouseEnter={() => setHoveredService(service.id)}
-                onMouseLeave={() => setHoveredService(null)}
+                onMouseEnter={() => handleMouseEnter(service.id)}
+                onMouseLeave={() => handleMouseLeave(service.id)}
                 style={{ zIndex: 41 }}
               >
                 <button
@@ -81,7 +97,9 @@ const ServiceNavBar: React.FC = () => {
                       className="w-5 h-5 object-contain" 
                     />
                   ) : (
-                    <span className="text-primary font-semibold text-sm">
+                    <span className="text-primary font-semibold text-sm" 
+                    onMouseEnter={() => setHoveredService(service.id)}
+                    onMouseLeave={() => setTimeout(() => setHoveredService(null), 1000)}>
                       {service.name.charAt(0)}
                     </span>
                   )}
@@ -92,8 +110,10 @@ const ServiceNavBar: React.FC = () => {
                 {/* Submenu */}
                 {hoveredService === service.id && service.subServices && service.subServices.length > 0 && (
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 bg-white shadow-2xl rounded-xl p-2 z-[100] min-w-[220px] border border-gray-200 max-h-96 overflow-auto"
-                    style={{ top: 48, zIndex: 100 }}
+                    className="absolute -translate-x-1/2 bg-white shadow-2xl rounded-xl p-2 z-[100] min-w-[220px] border border-gray-200 overflow-y-auto"
+                    style={{ top: '100%', marginTop: '0.5rem', marginLeft: 'calc(250px + 130%)' }}
+                    onMouseEnter={() => handleMouseEnter(service.id)}
+                    onMouseLeave={() => handleMouseLeave(service.id)}
                   >
                     {service.subServices.map((sub) => (
                       <div key={sub.id} className="mb-1 last:mb-0">
@@ -125,7 +145,6 @@ const ServiceNavBar: React.FC = () => {
             ))}
           </div>
         </ScrollArea>
-      </div>
     </motion.div>
   );
 };

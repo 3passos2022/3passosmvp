@@ -21,6 +21,7 @@ import { UserRole } from '@/lib/types';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 import ServiceNavBar from './ServiceNavBar';
 import { Badge } from './ui/badge';
+import './customStylingfiles-and/servicenavbar.css';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -246,11 +247,9 @@ const Navbar: React.FC = () => {
           )}
         </AnimatePresence>
       </motion.nav>
+      <ServiceNavBar />
       
-      {/* ServiceNavBar with adjusted spacing to prevent overlapping */}
-      <div className={`pt-16 ${isOpen ? 'mt-[350px] md:mt-0' : ''}`}>
-        <ServiceNavBar />
-      </div>
+ 
     </>
   );
 };

@@ -1,0 +1,19 @@
+#service-navbar {
+    margin-top: 8%;
+    display: flex;
+    justify-content: space-around;
+    width: 95%;
+    height: fit-content;
+    overflow: visible !important;
+}
+
+#service-navbar > div {
+    overflow: visible !important;
+}
+
+@media (min-width: 768px) {
+    #service-navbar {
+        margin-top: 60px;
+        width: 70%;
+    }
+}
