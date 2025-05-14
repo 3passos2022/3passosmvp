@@ -61,7 +61,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
     let query = supabase
       .from('profiles')
       .select(`
-        id as userId,
+        id,
         name,
         email,
         phone,
@@ -133,12 +133,12 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           isWithinRadius = distance <= 10; // 10km radius
         }
 
-        const priceDetails = await calculateProviderPrice(provider.userId, items || {});
+        const priceDetails = await calculateProviderPrice(provider.id, items || {});
         const totalPrice = priceDetails.total;
 
         // Create the provider profile object with required specialties array
         const providerProfile: ProviderProfile = {
-          userId: provider.userId,
+          userId: provider.id,
           name: provider.name,
           email: provider.email,
           phone: provider.phone,
@@ -193,11 +193,11 @@ interface SimplePortfolioItem {
 
 export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
-    // Query for provider details
-    const providerResult = await supabase
+    // Query for provider details - fix the column selection syntax
+    const { data, error } = await supabase
       .from('profiles')
       .select(`
-        id as userId,
+        id,
         name,
         email,
         phone,
@@ -211,18 +211,28 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
       .maybeSingle();
 
     // Handle error or no provider found
-    if (providerResult.error) {
-      console.error('Error fetching provider details:', providerResult.error);
+    if (error) {
+      console.error('Error fetching provider details:', error);
       return null;
     }
 
-    // Extract provider data with proper type safety
-    const provider = providerResult.data as SimpleProviderDetails | null;
-    
-    if (!provider) {
+    if (!data) {
       console.warn(`Provider not found with ID: ${providerId}`);
       return null;
     }
+
+    // Map the data to our expected structure
+    const provider: SimpleProviderDetails = {
+      userId: data.id,
+      name: data.name || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      role: data.role || '',
+      city: data.city || '',
+      neighborhood: data.neighborhood || '',
+      averageRating: data.averageRating || 0,
+      bio: data.bio || ''
+    };
 
     // Fetch portfolio items
     const portfolioResult = await supabase
