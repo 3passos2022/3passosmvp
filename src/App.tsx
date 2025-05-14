@@ -11,7 +11,6 @@ import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import SubscriptionCancel from './pages/SubscriptionCancel';
 import RequestQuote from './pages/RequestQuote';
 import ProvidersFound from './pages/ProvidersFound';
-import makeAndreAdmin from './pages/makeAndreAdmin';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import { Toaster } from "@/components/ui/toaster";
@@ -46,7 +45,6 @@ function App() {
             <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
             <Route path="/profile/*" element={<PrivateRoute><Profile /></PrivateRoute>} />
             <Route path="/admin/*" element={<Admin />} />
-            <Route path="/makementor" element={<makeAndreAdmin />} />
             <Route path="/404" element={<NotFound />} />
             <Route path="*" element={<Navigate to="/404" />} />
           </Routes>
