@@ -1135,6 +1135,26 @@ const ReviewStep: React.FC<{
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [questionsData, setQuestionsData] = useState<ServiceQuestion[]>([]);
+  
+  // Fetch questions when component mounts
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        if (!formData.serviceId) return;
+        
+        const serviceQuestions = formData.serviceId ? await getQuestions(formData.serviceId) : [];
+        const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
+        const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
+        
+        setQuestionsData([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
+      } catch (error) {
+        console.error('Error fetching questions:', error);
+      }
+    };
+    
+    fetchQuestions();
+  }, [formData.serviceId, formData.subServiceId, formData.specialtyId]);
   
   // Process questions and answers data to make it easier to display
   const processQuestionAnswers = () => {
@@ -1164,14 +1184,13 @@ const ReviewStep: React.FC<{
     if (questionsData.length > 0 && formData.answers) {
       const processedQuestions = processQuestionAnswers();
       if (processedQuestions) {
-        const updatedFormData = {
-          ...formData,
-          questions: processedQuestions
-        };
-        setFormData(updatedFormData);
+        // Update the form data with processed questions
+        // We don't need to call setFormData here as we're in the ReviewStep
+        // and just showing the data, not modifying the parent state
+        formData.questions = processedQuestions;
       }
     }
-  }, [questionsData, formData.answers]);
+  }, [questionsData, formData, formData.answers]);
   
   const handleSubmit = async () => {
     setIsSubmitting(true);
