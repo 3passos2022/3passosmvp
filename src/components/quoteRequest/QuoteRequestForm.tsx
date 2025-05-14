@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -563,7 +564,15 @@ const ServiceStep: React.FC<{
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button type="submit" disabled={!selectedService || !formData.fullName?.trim() || !selectedDate || !timePreference}>
+        <Button 
+          type="submit" 
+          disabled={
+            !selectedService || 
+            !formData.fullName?.trim() || 
+            !timePreference || 
+            (dateSelectionMode === 'single' ? !selectedDate : !selectedDateRange.from || !selectedDateRange.to)
+          }
+        >
           Próximo <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
