@@ -405,6 +405,7 @@ const ProvidersFound: React.FC = () => {
                         key={provider.provider.userId} 
                         provider={provider} 
                         onViewDetails={handleViewDetails} 
+                        quoteId={quoteDetails?.id}
                       />
                     ))}
                   </div>

@@ -1,18 +1,34 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProviderMatch, PriceDetail } from '@/lib/types/providerMatch';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Star, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Star, AlertTriangle, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { checkQuoteSentToProvider } from '@/lib/services/providerMatchService';
 
 interface ProviderCardProps {
   provider: ProviderMatch;
   onViewDetails: (providerId: string) => void;
+  quoteId?: string;
 }
 
-const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) => {
+const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails, quoteId }) => {
   const { provider: providerData, distance, totalPrice, isWithinRadius, priceDetails = [] } = provider;
+  const [quoteSent, setQuoteSent] = useState(false);
+  
+  useEffect(() => {
+    // Check if this provider already has a quote sent
+    const checkQuoteStatus = async () => {
+      if (quoteId) {
+        const sent = await checkQuoteSentToProvider(quoteId, providerData.userId);
+        setQuoteSent(sent);
+      }
+    };
+    
+    checkQuoteStatus();
+  }, [quoteId, providerData.userId]);
   
   // Helper function to display price breakdown with better debugging
   const renderPriceBreakdown = () => {
@@ -60,32 +76,41 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
   return (
     <Card className={`w-full overflow-hidden transition-all hover:shadow-md ${!isWithinRadius ? 'border-amber-300' : ''}`}>
       <CardHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-            {/* Avatar placeholder */}
-            <span className="text-2xl font-semibold text-gray-500">
-              {providerData.name?.charAt(0) || "P"}
-            </span>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold">{providerData.name}</h3>
-            {(providerData.city && providerData.neighborhood) && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                <span>
-                  {`${providerData.neighborhood}, ${providerData.city}`}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center mt-1">
-              <Star className={`h-4 w-4 ${providerData.averageRating > 0 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-              <span className="ml-1 text-sm">
-                {providerData.averageRating > 0 
-                  ? providerData.averageRating.toFixed(1) 
-                  : 'Novo'}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+              {/* Avatar placeholder */}
+              <span className="text-2xl font-semibold text-gray-500">
+                {providerData.name?.charAt(0) || "P"}
               </span>
             </div>
+            <div>
+              <h3 className="text-lg font-semibold">{providerData.name}</h3>
+              {(providerData.city && providerData.neighborhood) && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3" />
+                  <span>
+                    {`${providerData.neighborhood}, ${providerData.city}`}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center mt-1">
+                <Star className={`h-4 w-4 ${providerData.averageRating > 0 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                <span className="ml-1 text-sm">
+                  {providerData.averageRating > 0 
+                    ? providerData.averageRating.toFixed(1) 
+                    : 'Novo'}
+                </span>
+              </div>
+            </div>
           </div>
+          
+          {quoteSent && (
+            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 flex items-center gap-1">
+              <CheckCircle className="h-3 w-3" />
+              <span>Orçamento enviado</span>
+            </Badge>
+          )}
         </div>
       </CardHeader>
       
@@ -124,10 +149,11 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails }) 
       
       <CardFooter className="p-4 pt-0">
         <Button 
-          className="w-full" 
+          className="w-full"
           onClick={() => onViewDetails(providerData.userId)}
+          variant={quoteSent ? "outline" : "default"}
         >
-          Ver mais informações
+          {quoteSent ? "Ver detalhes" : "Ver mais informações"}
         </Button>
       </CardFooter>
     </Card>

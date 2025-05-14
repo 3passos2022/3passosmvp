@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, ProviderDetails, QuoteDetails, ProviderProfile, ProviderSpecialty, PriceDetail } from '@/lib/types/providerMatch';
 import { calculateDistance, geocodeAddress } from './googleMapsService';
@@ -587,9 +586,99 @@ export const sendQuoteToProvider = async (
   providerId: string
 ): Promise<{ success: boolean; message: string; quoteId?: string; requiresLogin?: boolean }> => {
   try {
-    // If no quote ID is provided, we need to create it
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.log('User not authenticated, redirecting to login');
+      return { success: false, message: 'Login required', requiresLogin: true };
+    }
+    
+    // If no quote ID is provided, we need to create a new quote
     if (!quoteDetails.id) {
-      return { success: false, message: 'Quote ID not provided', requiresLogin: false };
+      console.log('Creating new quote in database from quote details');
+      
+      // Create the quote in the database first
+      const { data: quoteData, error: quoteError } = await supabase.rpc(
+        'submit_quote',
+        {
+          p_service_id: quoteDetails.serviceId,
+          p_sub_service_id: quoteDetails.subServiceId || null,
+          p_specialty_id: quoteDetails.specialtyId || null,
+          p_description: quoteDetails.description || '',
+          p_street: quoteDetails.address.street,
+          p_number: quoteDetails.address.number,
+          p_complement: quoteDetails.address.complement || null,
+          p_neighborhood: quoteDetails.address.neighborhood,
+          p_city: quoteDetails.address.city,
+          p_state: quoteDetails.address.state,
+          p_zip_code: quoteDetails.address.zipCode,
+          p_is_anonymous: !quoteDetails.clientId,
+          p_service_date: quoteDetails.serviceDate ? new Date(quoteDetails.serviceDate) : null,
+          p_service_end_date: quoteDetails.serviceEndDate ? new Date(quoteDetails.serviceEndDate) : null,
+          p_service_time_preference: quoteDetails.serviceTimePreference || null
+        }
+      );
+      
+      if (quoteError) {
+        console.error('Error creating quote:', quoteError);
+        return { success: false, message: 'Error creating quote' };
+      }
+      
+      // Set the newly created quote ID
+      quoteDetails.id = quoteData;
+      
+      console.log('Created new quote with ID:', quoteDetails.id);
+      
+      // Now add any measurements if they exist
+      if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
+        console.log('Adding measurements to quote:', quoteDetails.measurements.length);
+        
+        for (const measurement of quoteDetails.measurements) {
+          const { error: measurementError } = await supabase.rpc(
+            'add_quote_measurement',
+            {
+              p_quote_id: quoteDetails.id,
+              p_room_name: measurement.roomName || 'Room',
+              p_width: measurement.width,
+              p_length: measurement.length,
+              p_height: measurement.height || null
+            }
+          );
+          
+          if (measurementError) {
+            console.error('Error adding measurement:', measurementError);
+            // Continue with other measurements
+          }
+        }
+      }
+      
+      // Add any items if they exist
+      if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
+        console.log('Adding items to quote:', Object.keys(quoteDetails.items).length);
+        
+        for (const [itemId, quantity] of Object.entries(quoteDetails.items)) {
+          const { error: itemError } = await supabase.rpc(
+            'add_quote_item',
+            {
+              p_quote_id: quoteDetails.id,
+              p_item_id: itemId,
+              p_quantity: quantity
+            }
+          );
+          
+          if (itemError) {
+            console.error('Error adding item:', itemError);
+            // Continue with other items
+          }
+        }
+      }
+    }
+    
+    // At this point, we should have a valid quote ID
+    if (!quoteDetails.id) {
+      console.error('Quote ID still not available after creation attempt');
+      return { success: false, message: 'Could not create or retrieve quote ID' };
     }
 
     // Associate the quote with the provider
@@ -614,5 +703,29 @@ export const sendQuoteToProvider = async (
   } catch (error) {
     console.error('Error sending quote:', error);
     return { success: false, message: 'Error processing quote' };
+  }
+};
+
+// Function to check if a quote has been sent to a provider
+export const checkQuoteSentToProvider = async (quoteId: string | undefined, providerId: string): Promise<boolean> => {
+  if (!quoteId) return false;
+  
+  try {
+    const { data, error } = await supabase
+      .from('quote_providers')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .eq('provider_id', providerId)
+      .single();
+      
+    if (error) {
+      console.error('Error checking if quote was sent to provider:', error);
+      return false;
+    }
+    
+    return !!data;
+  } catch (error) {
+    console.error('Error checking if quote was sent to provider:', error);
+    return false;
   }
 };

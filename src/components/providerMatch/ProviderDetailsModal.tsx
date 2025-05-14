@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,10 +19,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/utils';
-import { Star, MapPin, Send, Phone, FileText } from 'lucide-react';
+import { Star, MapPin, Send, Phone, FileText, CheckCircle } from 'lucide-react';
 import { ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
 import { useToast } from '@/hooks/use-toast';
-import { sendQuoteToProvider } from '@/lib/services/providerMatchService';
+import { sendQuoteToProvider, checkQuoteSentToProvider } from '@/lib/services/providerMatchService';
 import { useNavigate } from 'react-router-dom';
 import QuoteDetailsSummary from '../quoteRequest/QuoteDetailsSummary';
 
@@ -44,10 +45,28 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [showQuoteDetails, setShowQuoteDetails] = useState(false);
+  const [quoteSent, setQuoteSent] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // Check if this provider already has a quote sent
+    const checkQuoteStatus = async () => {
+      if (quoteDetails?.id && provider?.provider?.userId) {
+        const sent = await checkQuoteSentToProvider(quoteDetails.id, provider.provider.userId);
+        setQuoteSent(sent);
+      }
+    };
+    
+    if (isOpen) {
+      checkQuoteStatus();
+    }
+  }, [quoteDetails?.id, provider?.provider?.userId, isOpen]);
+
   const handleSendQuote = async () => {
+    // Don't send if already sent
+    if (quoteSent) return;
+    
     setIsSending(true);
     try {
       const result = await sendQuoteToProvider(quoteDetails, provider.provider.userId);
@@ -65,11 +84,11 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       }
       
       if (result.success) {
+        setQuoteSent(true);
         toast({
           title: "Orçamento enviado",
           description: "Seu orçamento foi enviado com sucesso para o prestador",
         });
-        onClose();
       } else {
         toast({
           title: "Erro",
@@ -299,23 +318,34 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
             >
               Fechar
             </Button>
-            <Button
-              onClick={handleSendQuote}
-              disabled={isSending}
-              className="w-full sm:w-auto"
-            >
-              {isSending ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> 
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Enviar orçamento
-                </>
-              )}
-            </Button>
+            {quoteSent ? (
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto bg-green-50 text-green-600 border-green-200 hover:bg-green-100 hover:text-green-700"
+                disabled
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Orçamento enviado
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSendQuote}
+                disabled={isSending}
+                className="w-full sm:w-auto"
+              >
+                {isSending ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> 
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Enviar orçamento
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
