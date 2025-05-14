@@ -578,7 +578,7 @@ const ServiceDetailsStep: React.FC<{
   updateFormData: (data: Partial<FormData>) => void;
 }> = ({ onNext, onBack, formData, updateFormData }) => {
   const [detailsSubStep, setDetailsSubStep] = useState<'quiz' | 'items' | 'measurements'>('quiz');
-  const [questions, setQuestions] = useState<ServiceQuestion[]>([]);
+  const [questionsData, setQuestionsData] = useState<ServiceQuestion[]>([]);
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [answers, setAnswers] = useState<{[key: string]: string}>(formData.answers || {});
   const [itemQuantities, setItemQuantities] = useState<{[key: string]: number}>(formData.itemQuantities || {});
@@ -611,7 +611,7 @@ const ServiceDetailsStep: React.FC<{
         const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
         const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
         
-        setQuestions([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
+        setQuestionsData([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
         
         const serviceItems = formData.serviceId ? await getServiceItems(formData.serviceId) : [];
         const subServiceItems = formData.subServiceId ? await getServiceItems(undefined, formData.subServiceId) : [];
@@ -638,7 +638,7 @@ const ServiceDetailsStep: React.FC<{
         setHasLinearMeterItems(hasLinearItems);
         
         const neededSteps = [];
-        if (serviceQuestions.length > 0 || subServiceQuestions.length > 0 || specialtyQuestions.length > 0) {
+        if (questionsData.length > 0) {
           neededSteps.push('quiz');
         }
         
@@ -686,17 +686,17 @@ const ServiceDetailsStep: React.FC<{
 
   useEffect(() => {
     const checkQuestionsAnswered = () => {
-      if (questions.length === 0) {
+      if (questionsData.length === 0) {
         setAllQuestionsAnswered(true);
         return;
       }
       
-      const answeredQuestions = questions.filter(q => answers[q.id]);
-      setAllQuestionsAnswered(answeredQuestions.length === questions.length);
+      const answeredQuestions = questionsData.filter(q => answers[q.id]);
+      setAllQuestionsAnswered(answeredQuestions.length === questionsData.length);
     };
     
     checkQuestionsAnswered();
-  }, [answers, questions]);
+  }, [answers, questionsData]);
 
   const goToSubStep = (step: 'quiz' | 'items' | 'measurements') => {
     setDetailsSubStep(step);
@@ -761,7 +761,7 @@ const ServiceDetailsStep: React.FC<{
   };
 
   const nextQuestion = () => {
-    if (carouselApi && currentQuestionIndex < questions.length - 1) {
+    if (carouselApi && currentQuestionIndex < questionsData.length - 1) {
       carouselApi.scrollNext();
     }
   };
@@ -775,7 +775,7 @@ const ServiceDetailsStep: React.FC<{
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (detailsSubStep === 'quiz' && questions.length > 0 && !allQuestionsAnswered) {
+    if (detailsSubStep === 'quiz' && questionsData.length > 0 && !allQuestionsAnswered) {
       toast.error('Por favor, responda todas as perguntas');
       return;
     }
@@ -854,15 +854,15 @@ const ServiceDetailsStep: React.FC<{
         <div className="space-y-4">
           <h3 className="text-lg font-medium mb-4">Responda as perguntas abaixo</h3>
           
-          {questions.length > 0 ? (
+          {questionsData.length > 0 ? (
             <>
               <div className="flex justify-between items-center mb-2">
                 <p className="text-sm text-muted-foreground">
-                  Pergunta {currentQuestionIndex + 1} de {questions.length}
+                  Pergunta {currentQuestionIndex + 1} de {questionsData.length}
                 </p>
               </div>
               <Progress 
-                value={((currentQuestionIndex + 1) / questions.length) * 100}
+                value={((currentQuestionIndex + 1) / questionsData.length) * 100}
                 className="h-1 mb-4"
               />
               
@@ -875,7 +875,7 @@ const ServiceDetailsStep: React.FC<{
                 }}
               >
                 <CarouselContent>
-                  {questions.map((question) => (
+                  {questionsData.map((question) => (
                     <CarouselItem key={question.id} className="w-full">
                       <Card>
                         <CardHeader>
@@ -912,7 +912,7 @@ const ServiceDetailsStep: React.FC<{
                 <Button 
                   type="button"
                   onClick={nextQuestion}
-                  disabled={currentQuestionIndex === questions.length - 1}
+                  disabled={currentQuestionIndex === questionsData.length - 1}
                 >
                   Próxima Pergunta <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -1143,7 +1143,7 @@ const ReviewStep: React.FC<{
     const questionMap: {[questionId: string]: { question: string, answer: string }} = {};
     
     // Build the processed data structure
-    questions.forEach(question => {
+    questionsData.forEach(question => {
       const selectedOptionId = formData.answers?.[question.id];
       if (!selectedOptionId) return;
       
@@ -1161,13 +1161,17 @@ const ReviewStep: React.FC<{
   
   // Process the question answers when the component mounts or when relevant data changes
   useEffect(() => {
-    if (questions.length > 0 && formData.answers) {
+    if (questionsData.length > 0 && formData.answers) {
       const processedQuestions = processQuestionAnswers();
       if (processedQuestions) {
-        updateFormData({ questions: processedQuestions });
+        const updatedFormData = {
+          ...formData,
+          questions: processedQuestions
+        };
+        setFormData(updatedFormData);
       }
     }
-  }, [questions, formData.answers]);
+  }, [questionsData, formData.answers]);
   
   const handleSubmit = async () => {
     setIsSubmitting(true);
