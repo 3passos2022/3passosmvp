@@ -65,4 +65,5 @@ export interface QuoteMeasurement {
   length: number;
   height?: number;
   area?: number;
+  measurementType?: 'square_meter' | 'linear_meter';
 }

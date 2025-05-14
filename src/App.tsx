@@ -16,7 +16,7 @@ import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ServiceNavBarWrapper } from './components/ServiceNavBarWrapper';
+import ServiceNavBarWrapper from './components/ServiceNavBarWrapper'; // Fixed the import
 import { Toaster as SonnerToaster } from 'sonner';
 
 const queryClient = new QueryClient({

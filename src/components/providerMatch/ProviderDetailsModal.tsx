@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -111,7 +110,11 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       itemQuantities: quoteDetails.items,
       itemNames: quoteDetails._itemNames,
       measurements: quoteDetails.measurements?.map(m => ({
-        ...m,
+        id: m.id || `temp-${Math.random().toString(36).substring(2, 9)}`,
+        roomName: m.roomName || 'Ambiente',
+        width: m.width,
+        length: m.length,
+        height: m.height,
         measurementType: m.measurementType || 'square_meter'
       })),
       serviceDate: quoteDetails.serviceDate,

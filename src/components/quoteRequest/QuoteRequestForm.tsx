@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Progress } from "@/components/ui/progress";
+import QuoteDetailsSummary from './QuoteDetailsSummary';
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Rua é obrigatória'),
