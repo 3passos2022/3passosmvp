@@ -47,7 +47,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails, qu
         </CardTitle>
         <CardDescription>
           {city && neighborhood ? `${neighborhood}, ${city}` : 'Localização não informada'}
-          {distance !== null && `, ${distance.toFixed(2)} km`}
+          {distance !== null && distance !== undefined && `, ${distance.toFixed(2)} km`}
         </CardDescription>
       </CardHeader>
       <CardContent>
