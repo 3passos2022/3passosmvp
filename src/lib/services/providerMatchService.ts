@@ -316,7 +316,16 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
 
 export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId: string): Promise<any> => {
   try {
-    const { id: quoteId } = quoteDetails;
+    // Ensure we have a valid quote ID
+    const quoteId = quoteDetails.id;
+    
+    if (!quoteId) {
+      console.error('Missing quote ID when sending quote to provider');
+      return {
+        success: false,
+        message: "Erro: ID do orçamento não encontrado."
+      };
+    }
 
     // Check if we've already sent a quote to this provider
     const existingQuote = await supabase

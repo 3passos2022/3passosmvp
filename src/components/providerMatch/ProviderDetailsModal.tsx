@@ -44,7 +44,12 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
     setIsSending(true);
     
     try {
-      console.log('Sending quote with client ID:', quoteDetails.clientId);
+      // Log the quote details to verify the ID is present
+      console.log('Sending quote details:', quoteDetails);
+      
+      if (!quoteDetails.id) {
+        throw new Error('Quote ID is missing. Cannot send quote to provider.');
+      }
       
       const result = await sendQuoteToProvider(quoteDetails, provider.provider.userId);
       

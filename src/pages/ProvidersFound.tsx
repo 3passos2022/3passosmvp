@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -64,7 +63,17 @@ const ProvidersFound: React.FC = () => {
         // First try to get quote details from location state
         if (location.state?.quoteDetails) {
           console.log('Quote details found in router state:', location.state.quoteDetails);
-          setQuoteDetails(location.state.quoteDetails);
+          // Ensure we have a valid ID for this quote or generate one
+          if (!location.state.quoteDetails.id) {
+            const quoteWithId = {
+              ...location.state.quoteDetails,
+              id: crypto.randomUUID() // Generate a unique ID if none exists
+            };
+            setQuoteDetails(quoteWithId);
+            console.log('Generated ID for quote:', quoteWithId.id);
+          } else {
+            setQuoteDetails(location.state.quoteDetails);
+          }
           return;
         }
         
@@ -72,7 +81,17 @@ const ProvidersFound: React.FC = () => {
         const storedQuote = retrieveQuoteData();
         if (storedQuote) {
           console.log('Quote details found in sessionStorage:', storedQuote);
-          setQuoteDetails(storedQuote);
+          // Ensure we have a valid ID for this quote or generate one
+          if (!storedQuote.id) {
+            const quoteWithId = {
+              ...storedQuote,
+              id: crypto.randomUUID() // Generate a unique ID if none exists
+            };
+            setQuoteDetails(quoteWithId);
+            console.log('Generated ID for quote:', quoteWithId.id);
+          } else {
+            setQuoteDetails(storedQuote);
+          }
           return;
         }
         
