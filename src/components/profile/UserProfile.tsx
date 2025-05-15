@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
+import ProfileImageEditor from './ProfileImageEditor';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -15,6 +16,7 @@ const UserProfile: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [loading, setLoading] = useState(false);
+  const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
   
   const handleUpdate = async () => {
     setLoading(true);
@@ -42,6 +44,23 @@ const UserProfile: React.FC = () => {
     setPhone(user?.phone || '');
     setIsEditing(false);
   };
+  
+  const handleSaveImage = async (imageData: string) => {
+    setLoading(true);
+    try {
+      const { error } = await updateProfile({
+        avatar_url: imageData
+      });
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      toast.error('Erro ao atualizar foto de perfil');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -65,10 +84,17 @@ const UserProfile: React.FC = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={user.avatar_url} alt={user.name || 'Avatar'} />
-            <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
-          </Avatar>
+          <div className="relative group cursor-pointer" onClick={() => setIsImageEditorOpen(true)}>
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={user.avatar_url} alt={user.name || 'Avatar'} />
+              <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
+            </Avatar>
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-full flex items-center justify-center transition-all duration-200">
+              <span className="text-white opacity-0 group-hover:opacity-100 text-xs font-medium">
+                Editar
+              </span>
+            </div>
+          </div>
           <div>
             <CardTitle>{user.name || 'Usuário'}</CardTitle>
             <CardDescription>{user.email}</CardDescription>
@@ -136,6 +162,13 @@ const UserProfile: React.FC = () => {
           )}
         </CardFooter>
       </Card>
+      
+      <ProfileImageEditor
+        open={isImageEditorOpen}
+        onClose={() => setIsImageEditorOpen(false)}
+        onSave={handleSaveImage}
+        initialImage={user.avatar_url}
+      />
     </div>
   );
 };

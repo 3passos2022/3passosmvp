@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/types';
 import { toast } from 'sonner';
