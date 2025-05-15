@@ -322,11 +322,30 @@ export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId
       return { requiresLogin: true };
     }
 
+    // Check if we've already sent a quote to this provider
+    const existingQuote = await supabase
+      .from('quote_providers')
+      .select('id')
+      .eq('quote_id', quoteId)
+      .eq('provider_id', providerId)
+      .maybeSingle();
+      
+    if (existingQuote.data) {
+      return {
+        success: false,
+        message: "Orçamento já enviado para este prestador."
+      };
+    }
+
+    // Insert the new quote_providers record with the client_id field
     const { data, error } = await supabase
       .from('quote_providers')
-      .insert([
-        { quote_id: quoteId, provider_id: providerId, client_id: clientId }
-      ])
+      .insert([{
+        quote_id: quoteId,
+        provider_id: providerId,
+        client_id: clientId,
+        status: 'pending'
+      }])
       .select('id');
 
     if (error) {
@@ -344,6 +363,8 @@ export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId
         message: "Orçamento enviado com sucesso"
       };
     }
+    
+    return { success: false, message: "Falha ao enviar orçamento." };
   } catch (error: any) {
     console.error('Error in sendQuoteToProvider:', error);
     return { success: false, message: error.message };
