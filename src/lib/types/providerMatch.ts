@@ -1,5 +1,3 @@
-
-
 import { QuoteMeasurement } from '@/lib/types';
 
 export interface PriceDetail {
@@ -33,6 +31,7 @@ export interface ProviderProfile {
   serviceRadiusKm?: number; // Added to track provider's service radius
   email?: string; // Added email property
   role?: string; // Added role property
+  avatar_url?: string; // Added avatar_url property
 }
 
 export interface ProviderSpecialty {

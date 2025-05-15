@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Star, MapPin } from 'lucide-react';
@@ -16,7 +17,7 @@ interface ProviderCardProps {
 }
 
 const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails, quoteId }) => {
-  const { userId, name, averageRating, city, neighborhood } = provider.provider;
+  const { userId, name, averageRating, city, neighborhood, avatar_url } = provider.provider;
   const { totalPrice, distance, isWithinRadius } = provider;
 
   return (
@@ -31,6 +32,9 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onViewDetails, qu
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+            {avatar_url ? (
+              <AvatarImage src={avatar_url} alt={name || 'Provider'} />
+            ) : null}
             <AvatarFallback>{name?.charAt(0) || 'P'}</AvatarFallback>
           </Avatar>
           {name}

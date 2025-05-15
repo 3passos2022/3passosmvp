@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, QuoteDetails, ProviderProfile } from '@/lib/types/providerMatch';
 import { UserProfile } from '@/lib/types';
@@ -66,7 +65,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
         id,
         name,
         phone, 
-        role
+        role,
+        avatar_url
       `)
       .eq('role', 'provider');
 
@@ -156,7 +156,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           averageRating: averageRating,
           bio: bio || '',
           relevanceScore: Math.random(), // Temporário
-          specialties: [] // Empty array as we can't get this data currently
+          specialties: [], // Empty array as we can't get this data currently
+          avatar_url: provider.avatar_url || undefined
         };
 
         return {
@@ -194,7 +195,7 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     // Now, query for the basic provider details
     const providerResult = await supabase
       .from('profiles')
-      .select('id, name, phone, role')
+      .select('id, name, phone, role, avatar_url')
       .eq('id', providerId)
       .maybeSingle();
 
@@ -232,7 +233,8 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
       city: settingsData.city || '',
       neighborhood: settingsData.neighborhood || '',
       averageRating: averageRating,
-      bio: settingsData.bio || ''
+      bio: settingsData.bio || '',
+      avatar_url: profileData.avatar_url || undefined
     };
 
     // Fetch portfolio items
