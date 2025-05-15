@@ -22,19 +22,24 @@ const deg2rad = (deg: number): number => {
   return deg * (Math.PI / 180)
 }
 
-// Define simple provider profile type to avoid deep nesting
-type SimpleProviderProfile = {
-  userId: string;
-  name: string;
-  phone: string;
-  role: string;
-  averageRating: number | null;
-  latitude: number | null;
-  longitude: number | null;
-  bio: string | null;
-  services: Array<{ id: string; name: string }>;
-  sub_services: Array<{ id: string; name: string; service_id: string }>;
-  specialties: Array<{ id: string; name: string; sub_service_id: string }>;
+/**
+ * Gets the average rating for a provider
+ */
+const getProviderAverageRating = async (providerId: string): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_provider_average_rating', { p_provider_id: providerId });
+
+    if (error) {
+      console.error('Error fetching provider average rating:', error);
+      return 0;
+    }
+
+    return data || 0;
+  } catch (error) {
+    console.error('Error in getProviderAverageRating:', error);
+    return 0;
+  }
 }
 
 export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise<ProviderMatch[] | null> => {
@@ -54,15 +59,14 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       return null;
     }
 
-    // Get providers that match the service first (without filtering by sub-services or specialties)
-    const { data: profiles, error } = await supabase
+    // Get providers that match the service first
+    const { data: providers, error } = await supabase
       .from('profiles')
       .select(`
         id,
         name,
         phone, 
-        role,
-        averageRating
+        role
       `)
       .eq('role', 'provider');
 
@@ -71,7 +75,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       throw new Error(`Error fetching providers: ${error.message}`);
     }
 
-    if (!profiles || profiles.length === 0) {
+    if (!providers || providers.length === 0) {
       console.warn('No providers found');
       return [];
     }
@@ -101,8 +105,8 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
       });
     }
 
-    // Filter providers manually based on service area since the join is causing issues
-    const filteredProviders = profiles.filter(provider => 
+    // Filter providers based on role
+    const filteredProviders = providers.filter(provider => 
       provider.role === 'provider' // Additional safety check
     );
 
@@ -135,6 +139,9 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           }
         }
 
+        // Get average rating for this provider
+        const averageRating = await getProviderAverageRating(provider.id);
+
         const priceDetails = await calculateProviderPrice(provider.id, items || {});
         const totalPrice = priceDetails.total;
 
@@ -146,7 +153,7 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
           role: provider.role || 'provider',
           city: city,
           neighborhood: neighborhood,
-          averageRating: provider.averageRating || 0,
+          averageRating: averageRating,
           bio: bio || '',
           relevanceScore: Math.random(), // Temporário
           specialties: [] // Empty array as we can't get this data currently
@@ -169,25 +176,6 @@ export const findMatchingProviders = async (quoteDetails: QuoteDetails): Promise
   }
 };
 
-// Define type for provider details
-interface SimpleProviderDetails {
-  userId: string;
-  name: string;
-  phone: string;
-  role: string;
-  city: string;
-  neighborhood: string;
-  averageRating: number;
-  bio: string;
-}
-
-// Define type for portfolio items
-interface SimplePortfolioItem {
-  id: string;
-  image_url: string;
-  description: string | null;
-}
-
 export const getProviderDetails = async (providerId: string): Promise<any> => {
   try {
     // First, check if the provider exists with a simple query
@@ -203,10 +191,10 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
       return null;
     }
     
-    // Now, query for the full provider details
+    // Now, query for the basic provider details
     const providerResult = await supabase
       .from('profiles')
-      .select('id, name, phone, role, averageRating')
+      .select('id, name, phone, role')
       .eq('id', providerId)
       .maybeSingle();
 
@@ -223,6 +211,9 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
       return null;
     }
 
+    // Get the provider's average rating
+    const averageRating = await getProviderAverageRating(providerId);
+
     // Get the provider settings for additional data
     const settingsResult = await supabase
       .from('provider_settings')
@@ -233,14 +224,14 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     const settingsData = settingsResult.data || { bio: '', city: '', neighborhood: '' };
 
     // Map the data to our expected structure with safe defaults
-    const provider: SimpleProviderDetails = {
+    const provider = {
       userId: profileData.id || '',
       name: profileData.name || '',
       phone: profileData.phone || '',
       role: profileData.role || '',
       city: settingsData.city || '',
       neighborhood: settingsData.neighborhood || '',
-      averageRating: profileData.averageRating || 0,
+      averageRating: averageRating,
       bio: settingsData.bio || ''
     };
 
@@ -255,15 +246,15 @@ export const getProviderDetails = async (providerId: string): Promise<any> => {
     }
 
     // Extract portfolio items with type safety
-    const portfolioItems = (portfolioResult.data || []) as SimplePortfolioItem[];
+    const portfolioItems = (portfolioResult.data || []).map(item => ({
+      id: item.id,
+      imageUrl: item.image_url,
+      description: item.description || undefined
+    }));
 
     return {
       provider: provider,
-      portfolioItems: portfolioItems.map(item => ({
-        id: item.id,
-        imageUrl: item.image_url,
-        description: item.description || undefined
-      }))
+      portfolioItems: portfolioItems
     };
   } catch (error) {
     console.error('Error in getProviderDetails:', error);
