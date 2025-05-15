@@ -316,11 +316,7 @@ export const calculateProviderPrice = async (providerId: string, items: { [itemI
 
 export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId: string): Promise<any> => {
   try {
-    const { id: quoteId, clientId } = quoteDetails;
-
-    if (!clientId) {
-      return { requiresLogin: true };
-    }
+    const { id: quoteId } = quoteDetails;
 
     // Check if we've already sent a quote to this provider
     const existingQuote = await supabase
@@ -337,13 +333,12 @@ export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId
       };
     }
 
-    // Insert the new quote_providers record with the client_id field
+    // Insert the new quote_providers record without the client_id field
     const { data, error } = await supabase
       .from('quote_providers')
       .insert([{
         quote_id: quoteId,
         provider_id: providerId,
-        client_id: clientId,
         status: 'pending'
       }])
       .select('id');
