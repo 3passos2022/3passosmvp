@@ -11,6 +11,7 @@ import { formatCurrency } from '@/lib/utils';
 import { ProviderDetails, QuoteDetails, PriceDetail } from '@/lib/types/providerMatch';
 import { sendQuoteToProvider } from '@/lib/services/providerMatchService';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProviderDetailsModalProps {
   provider: ProviderDetails;
@@ -35,6 +36,106 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
   const { name, averageRating, city, neighborhood, bio, avatar_url } = provider.provider;
   const { portfolioItems, distance, totalPrice, isWithinRadius, priceDetails } = provider;
 
+  // Check if the quote exists in the database and create it if necessary
+  const ensureQuoteExists = async (quoteDetails: QuoteDetails): Promise<string> => {
+    try {
+      // If we already have a valid database ID (UUID format), check if it exists
+      if (quoteDetails.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(quoteDetails.id)) {
+        // Check if the quote exists in the database
+        const { data: existingQuote, error: checkError } = await supabase
+          .from('quotes')
+          .select('id')
+          .eq('id', quoteDetails.id)
+          .maybeSingle();
+        
+        if (checkError) {
+          console.error('Error checking if quote exists:', checkError);
+          throw new Error('Error verifying quote existence.');
+        }
+        
+        if (existingQuote) {
+          console.log('Quote already exists in the database:', existingQuote.id);
+          return existingQuote.id;
+        }
+      }
+      
+      // Quote doesn't exist, create it using RPC function or direct insert
+      console.log('Quote not found in database, creating new quote...');
+      
+      const { serviceId, subServiceId, specialtyId, description, address, clientId } = quoteDetails;
+      
+      // Use submit_quote RPC to create a new quote
+      const { data: newQuoteId, error: submitError } = await supabase.rpc('submit_quote', {
+        p_service_id: serviceId,
+        p_sub_service_id: subServiceId || null,
+        p_specialty_id: specialtyId || null,
+        p_description: description || '',
+        p_street: address.street,
+        p_number: address.number,
+        p_complement: address.complement || null,
+        p_neighborhood: address.neighborhood,
+        p_city: address.city,
+        p_state: address.state,
+        p_zip_code: address.zipCode,
+        p_is_anonymous: !isLoggedIn,
+        p_service_date: quoteDetails.serviceDate ? new Date(quoteDetails.serviceDate).toISOString() : null,
+        p_service_end_date: quoteDetails.serviceEndDate ? new Date(quoteDetails.serviceEndDate).toISOString() : null,
+        p_service_time_preference: quoteDetails.serviceTimePreference || null
+      });
+      
+      if (submitError) {
+        console.error('Error creating quote:', submitError);
+        throw new Error('Error creating quote in database.');
+      }
+      
+      if (!newQuoteId) {
+        throw new Error('Failed to create quote in database.');
+      }
+      
+      console.log('Created new quote with ID:', newQuoteId);
+      
+      // If we have measurements, add them to the quote
+      if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
+        for (const measurement of quoteDetails.measurements) {
+          const { data: measurementId, error: measurementError } = await supabase.rpc('add_quote_measurement', {
+            p_quote_id: newQuoteId,
+            p_room_name: measurement.roomName || 'Room',
+            p_width: measurement.width,
+            p_length: measurement.length,
+            p_height: measurement.height || null
+          });
+          
+          if (measurementError) {
+            console.error('Error adding measurement to quote:', measurementError);
+            // Continue with next measurement
+          }
+        }
+      }
+      
+      // If we have items, add them to the quote
+      if (quoteDetails.items) {
+        for (const [itemId, quantity] of Object.entries(quoteDetails.items)) {
+          const { data: itemData, error: itemError } = await supabase.rpc('add_quote_item', {
+            p_quote_id: newQuoteId,
+            p_item_id: itemId,
+            p_quantity: quantity
+          });
+          
+          if (itemError) {
+            console.error('Error adding item to quote:', itemError);
+            // Continue with next item
+          }
+        }
+      }
+      
+      // Return the new quote ID
+      return newQuoteId;
+    } catch (error) {
+      console.error('Error in ensureQuoteExists:', error);
+      throw new Error('Failed to process quote in database.');
+    }
+  };
+
   const handleSendQuote = async () => {
     if (!isLoggedIn) {
       onLoginRequired();
@@ -44,14 +145,26 @@ const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
     setIsSending(true);
     
     try {
-      // Log the quote details to verify the ID is present
-      console.log('Sending quote details:', quoteDetails);
-      
-      if (!quoteDetails.id) {
-        throw new Error('Quote ID is missing. Cannot send quote to provider.');
+      // Ensure the quote exists in the database and get valid quote ID
+      let databaseQuoteId;
+      try {
+        databaseQuoteId = await ensureQuoteExists(quoteDetails);
+        console.log('Using quote ID for provider:', databaseQuoteId);
+      } catch (error) {
+        console.error('Failed to ensure quote exists:', error);
+        toast.error("Erro ao processar o orçamento. Tente novamente.");
+        setIsSending(false);
+        return;
       }
       
-      const result = await sendQuoteToProvider(quoteDetails, provider.provider.userId);
+      // Update the quote details with the database ID
+      const updatedQuoteDetails = {
+        ...quoteDetails,
+        id: databaseQuoteId
+      };
+      
+      // Now send the quote to the provider with the valid database ID
+      const result = await sendQuoteToProvider(updatedQuoteDetails, provider.provider.userId);
       
       if (result.requiresLogin) {
         onLoginRequired();

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ProviderMatch, QuoteDetails, ProviderProfile } from '@/lib/types/providerMatch';
 import { UserProfile } from '@/lib/types';
@@ -327,6 +328,9 @@ export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId
       };
     }
 
+    // Log for debugging
+    console.log('Sending quote to provider with ID:', quoteId);
+
     // Check if we've already sent a quote to this provider
     const existingQuote = await supabase
       .from('quote_providers')
@@ -336,13 +340,14 @@ export const sendQuoteToProvider = async (quoteDetails: QuoteDetails, providerId
       .maybeSingle();
       
     if (existingQuote.data) {
+      console.log('Quote already sent to provider:', providerId);
       return {
         success: false,
         message: "Orçamento já enviado para este prestador."
       };
     }
 
-    // Insert the new quote_providers record without the client_id field
+    // Insert the new quote_providers record
     const { data, error } = await supabase
       .from('quote_providers')
       .insert([{
