@@ -654,7 +654,7 @@ const ServiceDetailsStep: React.FC<{
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
         
         setHasSquareMeterItems(hasSquareItems);
-        setHasLinearMeterItems(hasLinearItems);
+        setHasLinearMeterItems(hasLinearMeterItems);
         
         const neededSteps = [];
         if (allQuestions.length > 0) {
@@ -1453,12 +1453,8 @@ const ReviewStep: React.FC<{
   };
   
   const handleRedirect = () => {
-    // Redirect based on user login status
-    if (user) {
-      navigate('/profile/quotes');
-    } else {
-      navigate('/prestadoresencontrados');
-    }
+    // Always redirect to providers found page regardless of login status
+    navigate('/prestadoresencontrados');
   };
   
   return (
