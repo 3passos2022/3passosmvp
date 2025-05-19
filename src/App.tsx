@@ -9,13 +9,14 @@ import Admin from './pages/Admin';
 import Subscription from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import SubscriptionCancel from './pages/SubscriptionCancel';
+import ThankYou from './pages/ThankYou';
 import RequestQuote from './pages/RequestQuote';
 import ProvidersFound from './pages/ProvidersFound';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import ServiceNavBar from './components/ServiceNavBar'; // Changed to ServiceNavBar
+import ServiceNavBar from './components/ServiceNavBar';
 import { Toaster as SonnerToaster } from 'sonner';
 
 const queryClient = new QueryClient({
@@ -42,6 +43,7 @@ function App() {
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/subscription/success" element={<SubscriptionSuccess />} />
             <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
+            <Route path="/obrigado" element={<ThankYou />} />
             <Route path="/profile/*" element={<PrivateRoute><Profile /></PrivateRoute>} />
             <Route path="/admin/*" element={<Admin />} />
             <Route path="/404" element={<NotFound />} />

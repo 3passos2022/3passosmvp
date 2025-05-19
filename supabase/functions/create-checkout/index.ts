@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -102,7 +101,7 @@ serve(async (req) => {
 
     // Cria a sessão de checkout
     const origin = new URL(req.url).origin;
-    const success_url = returnUrl || `${origin}/subscription/success?tier=${selectedTier}`;
+    const success_url = returnUrl || `${origin}/obrigado?tier=${selectedTier}`;
     const cancel_url = `${origin}/subscription/cancel`;
 
     logStep("Criando sessão de checkout", { 
