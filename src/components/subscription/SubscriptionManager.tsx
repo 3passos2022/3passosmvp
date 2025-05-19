@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import PlansComparison from './PlansComparison';
 
 interface UserNotification {
   id: string;
@@ -202,6 +203,31 @@ const SubscriptionManager: React.FC = () => {
         return <Badge className="bg-gray-500">Gratuito</Badge>;
     }
   };
+
+  // If no subscription is active, render the PlansComparison component
+  if (!subscriptionLoading && subscription && !subscription.subscribed) {
+    return (
+      <div className="space-y-8">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Gerencie sua Assinatura</CardTitle>
+            <CardDescription>
+              Selecione um dos nossos planos para acessar recursos exclusivos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert className="mb-4">
+              <AlertDescription>
+                Você não possui uma assinatura ativa. Escolha um dos planos abaixo para desbloquear recursos premium.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+        
+        <PlansComparison />
+      </div>
+    );
+  }
 
   return (
     <Card>
