@@ -11,6 +11,8 @@ interface Service {
   icon_url?: string;
 }
 
+/*pushing*/
+
 const ServiceNavBar: React.FC = () => {
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
