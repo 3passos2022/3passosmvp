@@ -16,6 +16,7 @@ import UserProfile from '@/components/profile/UserProfile';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import { User, CreditCard, FileText, Settings, Briefcase } from 'lucide-react';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
+import './../components/customStylingfiles-and/profiletabs.css';
 
 const Profile: React.FC = () => {
   const { user, loading, session, refreshUser } = useAuth();
@@ -135,8 +136,8 @@ const Profile: React.FC = () => {
                 </div>
               </div>
               
-              <Tabs value={activeTab} onValueChange={handleTabChange}>
-                <TabsList className="mb-6 flex flex-wrap">
+              <Tabs value={activeTab} onValueChange={handleTabChange} >
+                <TabsList className="mb-6 flex flex-wrap" id="profile-tabs">
                   {/* Tabs comuns a todos os tipos de usuário */}
                   <TabsTrigger value="profile" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
