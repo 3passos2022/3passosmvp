@@ -72,7 +72,7 @@ const ServiceNavBar: React.FC = () => {
       
     >
         <ScrollArea id='service-navbar' className="overflow-visible">
-          <div className="flex items-center space-x-6 px-1 py-1 relative overflow-visible">
+          <div className="flex items-center space-x-6 px-1 py-5 relative overflow-visible">
             {services.map((service) => (
               <div
                 key={service.id}
