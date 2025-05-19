@@ -32,6 +32,20 @@
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
-    <script src="//tag.goadopt.io/injector.js?website_code=e38bd646-ca31-4448-a2e7-55a491992ce0" class="adopt-injector"></script>
+    <script>
+      // Add a small wrapper to handle potential cross-origin issues with third-party scripts
+      document.addEventListener('DOMContentLoaded', function() {
+        try {
+          // Safely create script element for the Adopt script
+          const adoptScript = document.createElement('script');
+          adoptScript.src = "//tag.goadopt.io/injector.js?website_code=e38bd646-ca31-4448-a2e7-55a491992ce0";
+          adoptScript.className = "adopt-injector";
+          adoptScript.async = true;
+          document.body.appendChild(adoptScript);
+        } catch (e) {
+          console.warn('Failed to load third-party script:', e);
+        }
+      });
+    </script>
   </body>
 </html>
