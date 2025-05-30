@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, Star, Phone, Mail, Send, User, Portfolio, Calculator } from 'lucide-react';
+import { MapPin, Star, Phone, Mail, Send, User, Image, Calculator } from 'lucide-react';
 import { ProviderDetails } from '@/lib/types/providerMatch';
 import { QuoteDetails } from '@/lib/types/providerMatch';
 
@@ -82,7 +82,7 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                 Preço & Detalhes
               </TabsTrigger>
               <TabsTrigger value="portfolio" className="flex items-center gap-2">
-                <Portfolio className="h-4 w-4" />
+                <Image className="h-4 w-4" />
                 Portfolio
               </TabsTrigger>
               <TabsTrigger value="provider" className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
-                      <Portfolio className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <Image className="h-12 w-12 mx-auto mb-3 opacity-50" />
                       <p>Este prestador ainda não adicionou trabalhos ao portfolio.</p>
                     </div>
                   )}

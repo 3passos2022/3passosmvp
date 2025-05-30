@@ -41,6 +41,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
           id,
           name,
           phone,
+          email,
           role
         ),
         provider_settings(
