@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,50 @@ const AddressStep: React.FC<AddressStepProps> = ({ onNext, onBack, formData, upd
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  // Automatically geocode when address fields change
+  useEffect(() => {
+    const geocodeTimeout = setTimeout(async () => {
+      if (address.street && address.number && address.neighborhood && address.city && address.state) {
+        await performGeocode();
+      }
+    }, 1000); // Wait 1 second after user stops typing
+
+    return () => clearTimeout(geocodeTimeout);
+  }, [address.street, address.number, address.neighborhood, address.city, address.state]);
+
+  // Perform geocoding
+  const performGeocode = async () => {
+    if (!address.street || !address.number || !address.neighborhood || !address.city || !address.state) {
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const fullAddress = `${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}, ${address.state}`;
+      console.log('AddressStep: Tentando geocodificar endereço:', fullAddress);
+      
+      const coordinates = await geocodeAddress(fullAddress);
+      
+      if (coordinates) {
+        console.log('AddressStep: Coordenadas obtidas:', coordinates);
+        setAddress(prev => ({
+          ...prev,
+          latitude: coordinates.lat,
+          longitude: coordinates.lng
+        }));
+        toast.success('Endereço localizado com sucesso!');
+      } else {
+        console.warn('AddressStep: Não foi possível obter coordenadas');
+        toast.warning('Não foi possível localizar o endereço exato. Verifique se os dados estão corretos.');
+      }
+    } catch (error) {
+      console.error('AddressStep: Erro na geocodificação:', error);
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
 
   // Handle ZIP code lookup
   const handleCepSearch = async () => {
@@ -54,6 +98,7 @@ const AddressStep: React.FC<AddressStepProps> = ({ onNext, onBack, formData, upd
 
     setIsLoading(true);
     try {
+      console.log('AddressStep: Buscando endereço para CEP:', address.zipCode);
       const cepData = await fetchAddressByCep(address.zipCode);
       
       // Check if ViaCEP returned an error
@@ -64,15 +109,24 @@ const AddressStep: React.FC<AddressStepProps> = ({ onNext, onBack, formData, upd
       }
 
       // Update the address with the data from ViaCEP
-      setAddress(prev => ({
-        ...prev,
-        street: cepData.logradouro || prev.street,
-        neighborhood: cepData.bairro || prev.neighborhood,
-        city: cepData.localidade || prev.city,
-        state: cepData.uf || prev.state,
-      }));
+      const updatedAddress = {
+        ...address,
+        street: cepData.logradouro || address.street,
+        neighborhood: cepData.bairro || address.neighborhood,
+        city: cepData.localidade || address.city,
+        state: cepData.uf || address.state,
+      };
+      
+      setAddress(updatedAddress);
+      
+      // Auto-geocode after CEP lookup
+      if (updatedAddress.street && address.number) {
+        setTimeout(() => performGeocode(), 500);
+      }
+      
+      toast.success('CEP encontrado com sucesso!');
     } catch (error) {
-      console.error('Error fetching address:', error);
+      console.error('AddressStep: Erro ao buscar CEP:', error);
       toast.error('Erro ao buscar o endereço. Tente novamente.');
     } finally {
       setIsLoading(false);
@@ -92,28 +146,34 @@ const AddressStep: React.FC<AddressStepProps> = ({ onNext, onBack, formData, upd
     setIsLoading(true);
 
     try {
-      // Construct full address string for geocoding
-      const fullAddress = `${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}, ${address.state}`;
-      
-      // Get coordinates from Google Maps API
-      const coordinates = await geocodeAddress(fullAddress);
-      
-      if (coordinates) {
-        // Update address with coordinates
-        const updatedAddress = {
-          ...address,
-          latitude: coordinates.lat,
-          longitude: coordinates.lng
-        };
+      let finalAddress = { ...address };
 
-        // Update form data and proceed to next step
-        updateFormData(updatedAddress);
-        onNext();
-      } else {
-        toast.error('Não foi possível obter coordenadas para este endereço. Por favor, verifique se o endereço está correto.');
+      // If we don't have coordinates yet, try to geocode now
+      if (!address.latitude || !address.longitude) {
+        console.log('AddressStep: Coordenadas não encontradas, tentando geocodificar antes de prosseguir');
+        const fullAddress = `${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}, ${address.state}`;
+        
+        const coordinates = await geocodeAddress(fullAddress);
+        
+        if (coordinates) {
+          finalAddress = {
+            ...address,
+            latitude: coordinates.lat,
+            longitude: coordinates.lng
+          };
+          console.log('AddressStep: Coordenadas obtidas durante submissão:', coordinates);
+        } else {
+          console.warn('AddressStep: Não foi possível obter coordenadas, mas prosseguindo');
+          toast.warning('Não foi possível obter a localização exata. Alguns prestadores podem não aparecer nos resultados.');
+        }
       }
+
+      // Update form data and proceed to next step
+      console.log('AddressStep: Dados finais do endereço:', finalAddress);
+      updateFormData(finalAddress);
+      onNext();
     } catch (error) {
-      console.error('Error geocoding address:', error);
+      console.error('AddressStep: Erro ao processar endereço:', error);
       toast.error('Ocorreu um erro ao processar o endereço. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
@@ -233,6 +293,21 @@ const AddressStep: React.FC<AddressStepProps> = ({ onNext, onBack, formData, upd
               />
             </div>
           </div>
+
+          {/* Status da geocodificação */}
+          {isGeocoding && (
+            <div className="flex items-center gap-2 text-sm text-blue-600">
+              <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+              Localizando endereço...
+            </div>
+          )}
+
+          {address.latitude && address.longitude && (
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <div className="h-2 w-2 bg-green-600 rounded-full"></div>
+              Endereço localizado com sucesso
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between mt-8">
@@ -246,7 +321,7 @@ const AddressStep: React.FC<AddressStepProps> = ({ onNext, onBack, formData, upd
           </Button>
           <Button 
             type="submit" 
-            disabled={isLoading}
+            disabled={isLoading || isGeocoding}
           >
             {isLoading ? 'Processando...' : 'Continuar'}
           </Button>

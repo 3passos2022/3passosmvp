@@ -9,7 +9,7 @@ import { ProviderMatch, ProviderDetails, QuoteDetails } from '@/lib/types/provid
 import { findMatchingProviders, getProviderDetails } from '@/lib/services/providerMatchService';
 import { useGoogleMaps } from '@/lib/services/googleMapsService';
 import ProviderCard from '@/components/providerMatch/ProviderCard';
-import ProviderDetailsModal from '@/components/providerMatch/ProviderDetailsModal';
+import { ProviderDetailsModal } from '@/components/providerMatch/ProviderDetailsModal';
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
 import { toast as sonnerToast } from 'sonner';
 import { ENV } from '@/env';
@@ -327,10 +327,10 @@ const ProvidersFound: React.FC = () => {
   
   useEffect(() => {
     const fetchProviderDetails = async () => {
-      if (!selectedProviderId) return;
+      if (!selectedProviderId || !quoteDetails) return;
       
       try {
-        const details = await getProviderDetails(selectedProviderId);
+        const details = await getProviderDetails(selectedProviderId, quoteDetails);
         if (details) {
           const originalProvider = providers.find(p => p.provider.userId === selectedProviderId);
           if (originalProvider) {
@@ -356,7 +356,7 @@ const ProvidersFound: React.FC = () => {
     };
     
     fetchProviderDetails();
-  }, [selectedProviderId, providers, toast]);
+  }, [selectedProviderId, providers, quoteDetails, toast]);
   
   const renderNoProvidersMessage = () => {
     if (errorMessage) {
@@ -479,8 +479,7 @@ const ProvidersFound: React.FC = () => {
                     ...quoteDetails,
                     clientId: user?.id || undefined
                   }}
-                  onLoginRequired={handleLoginRedirect}
-                  isLoggedIn={!!user}
+                  onSendQuote={handleLoginRedirect}
                 />
               )}
             </>

@@ -1,327 +1,301 @@
 
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Star, MapPin, Send, AlertCircle } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import { ProviderDetails, QuoteDetails, PriceDetail } from '@/lib/types/providerMatch';
-import { sendQuoteToProvider } from '@/lib/services/providerMatchService';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MapPin, Star, Phone, Mail, Send, User, Image, Calculator } from 'lucide-react';
+import { ProviderDetails } from '@/lib/types/providerMatch';
+import { QuoteDetails } from '@/lib/types/providerMatch';
 
 interface ProviderDetailsModalProps {
-  provider: ProviderDetails;
   isOpen: boolean;
   onClose: () => void;
+  provider: ProviderDetails | null;
   quoteDetails: QuoteDetails;
-  onLoginRequired: () => void;
-  isLoggedIn: boolean;
+  onSendQuote: (providerId: string) => void;
 }
 
-const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
-  provider,
+export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
   isOpen,
   onClose,
+  provider,
   quoteDetails,
-  onLoginRequired,
-  isLoggedIn
+  onSendQuote
 }) => {
-  const [isSending, setIsSending] = useState(false);
-  const [quoteSent, setQuoteSent] = useState(false);
-  
-  const { name, averageRating, city, neighborhood, bio, avatar_url } = provider.provider;
-  const { portfolioItems, distance, totalPrice, isWithinRadius, priceDetails } = provider;
+  const [activeTab, setActiveTab] = useState('price');
 
-  // Check if the quote exists in the database and create it if necessary
-  const ensureQuoteExists = async (quoteDetails: QuoteDetails): Promise<string> => {
-    try {
-      // If we already have a valid database ID (UUID format), check if it exists
-      if (quoteDetails.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(quoteDetails.id)) {
-        // Check if the quote exists in the database
-        const { data: existingQuote, error: checkError } = await supabase
-          .from('quotes')
-          .select('id')
-          .eq('id', quoteDetails.id)
-          .maybeSingle();
-        
-        if (checkError) {
-          console.error('Error checking if quote exists:', checkError);
-          throw new Error('Error verifying quote existence.');
-        }
-        
-        if (existingQuote) {
-          console.log('Quote already exists in the database:', existingQuote.id);
-          return existingQuote.id;
-        }
-      }
-      
-      // Quote doesn't exist, create it using RPC function or direct insert
-      console.log('Quote not found in database, creating new quote...');
-      
-      const { serviceId, subServiceId, specialtyId, description, address, clientId } = quoteDetails;
-      
-      // Use submit_quote RPC to create a new quote
-      const { data: newQuoteId, error: submitError } = await supabase.rpc('submit_quote', {
-        p_service_id: serviceId,
-        p_sub_service_id: subServiceId || null,
-        p_specialty_id: specialtyId || null,
-        p_description: description || '',
-        p_street: address.street,
-        p_number: address.number,
-        p_complement: address.complement || null,
-        p_neighborhood: address.neighborhood,
-        p_city: address.city,
-        p_state: address.state,
-        p_zip_code: address.zipCode,
-        p_is_anonymous: !isLoggedIn,
-        p_service_date: quoteDetails.serviceDate ? new Date(quoteDetails.serviceDate).toISOString() : null,
-        p_service_end_date: quoteDetails.serviceEndDate ? new Date(quoteDetails.serviceEndDate).toISOString() : null,
-        p_service_time_preference: quoteDetails.serviceTimePreference || null
-      });
-      
-      if (submitError) {
-        console.error('Error creating quote:', submitError);
-        throw new Error('Error creating quote in database.');
-      }
-      
-      if (!newQuoteId) {
-        throw new Error('Failed to create quote in database.');
-      }
-      
-      console.log('Created new quote with ID:', newQuoteId);
-      
-      // If we have measurements, add them to the quote
-      if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
-        for (const measurement of quoteDetails.measurements) {
-          const { data: measurementId, error: measurementError } = await supabase.rpc('add_quote_measurement', {
-            p_quote_id: newQuoteId,
-            p_room_name: measurement.roomName || 'Room',
-            p_width: measurement.width,
-            p_length: measurement.length,
-            p_height: measurement.height || null
-          });
-          
-          if (measurementError) {
-            console.error('Error adding measurement to quote:', measurementError);
-            // Continue with next measurement
-          }
-        }
-      }
-      
-      // If we have items, add them to the quote
-      if (quoteDetails.items) {
-        for (const [itemId, quantity] of Object.entries(quoteDetails.items)) {
-          const { data: itemData, error: itemError } = await supabase.rpc('add_quote_item', {
-            p_quote_id: newQuoteId,
-            p_item_id: itemId,
-            p_quantity: quantity
-          });
-          
-          if (itemError) {
-            console.error('Error adding item to quote:', itemError);
-            // Continue with next item
-          }
-        }
-      }
-      
-      // Return the new quote ID
-      return newQuoteId;
-    } catch (error) {
-      console.error('Error in ensureQuoteExists:', error);
-      throw new Error('Failed to process quote in database.');
-    }
+  if (!provider) return null;
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
   };
 
-  const handleSendQuote = async () => {
-    if (!isLoggedIn) {
-      onLoginRequired();
-      return;
-    }
-
-    setIsSending(true);
-    
-    try {
-      // Ensure the quote exists in the database and get valid quote ID
-      let databaseQuoteId;
-      try {
-        databaseQuoteId = await ensureQuoteExists(quoteDetails);
-        console.log('Using quote ID for provider:', databaseQuoteId);
-      } catch (error) {
-        console.error('Failed to ensure quote exists:', error);
-        toast.error("Erro ao processar o orçamento. Tente novamente.");
-        setIsSending(false);
-        return;
-      }
-      
-      // Update the quote details with the database ID
-      const updatedQuoteDetails = {
-        ...quoteDetails,
-        id: databaseQuoteId
-      };
-      
-      // Now send the quote to the provider with the valid database ID
-      const result = await sendQuoteToProvider(updatedQuoteDetails, provider.provider.userId);
-      
-      if (result.requiresLogin) {
-        onLoginRequired();
-        return;
-      }
-      
-      if (result.success) {
-        toast.success(result.message || "Orçamento enviado com sucesso!");
-        setQuoteSent(true);
-      } else {
-        toast.error(result.message || "Erro ao enviar orçamento. Tente novamente.");
-      }
-    } catch (error) {
-      console.error('Error sending quote:', error);
-      toast.error("Ocorreu um erro. Verifique sua conexão e tente novamente.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  // Render price details if available
-  const renderPriceDetails = () => {
-    if (!priceDetails || Object.keys(priceDetails).length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="mt-4">
-        <h4 className="text-sm font-medium mb-2">Detalhes do preço:</h4>
-        <div className="space-y-1 text-sm">
-          {Object.entries(priceDetails).map(([itemId, detail]) => (
-            <div key={itemId} className="flex justify-between">
-              <span>{detail.itemName || `Item ${itemId}`}</span>
-              <span>{formatCurrency(detail.total)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const formatDistance = (distance: number | null) => {
+    if (distance === null) return 'Distância não calculada';
+    if (distance < 1) return `${(distance * 1000).toFixed(0)}m`;
+    return `${distance.toFixed(1)}km`;
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 bg-primary text-primary-foreground">
-              {avatar_url ? (
-                <AvatarImage src={avatar_url} alt={name || 'Provider'} />
-              ) : null}
-              <AvatarFallback>{name?.charAt(0) || 'P'}</AvatarFallback>
-            </Avatar>
-            <div>
-              <DialogTitle className="text-xl">{name}</DialogTitle>
-              <DialogDescription className="flex items-center gap-2 mt-1">
-                {city && neighborhood && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    {neighborhood}, {city}
-                  </span>
-                )}
-                {distance !== null && distance !== undefined && (
-                  <span>• {distance.toFixed(2)} km</span>
-                )}
-                {averageRating > 0 && (
-                  <span className="flex items-center gap-1">
-                    • <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    {averageRating.toFixed(1)}
-                  </span>
-                )}
-              </DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            {provider.provider.name}
+            <div className="flex items-center gap-1 ml-2">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <span className="text-sm text-gray-600">
+                {provider.rating > 0 ? provider.rating.toFixed(1) : 'Sem avaliações'}
+              </span>
             </div>
-          </div>
+          </DialogTitle>
         </DialogHeader>
 
-        {!isWithinRadius && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 mb-4">
-            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-amber-800">Fora da área de atendimento</h4>
-              <p className="text-sm text-amber-700">
-                Este prestador está localizado fora da área selecionada. 
-                Ele ainda pode atender sua solicitação, mas pode haver custos adicionais.
-              </p>
+        <div className="space-y-4">
+          {/* Status da área de cobertura */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              <span className="text-sm text-gray-600">
+                {formatDistance(provider.distance)} de você
+              </span>
             </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Coluna da esquerda */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Sobre</h3>
-              <p className="text-sm text-gray-600">{bio || 'Nenhuma descrição disponível.'}</p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Preço</h3>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-primary">
-                  {formatCurrency(totalPrice)}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  *Preço estimado para o serviço solicitado
-                </p>
-                {renderPriceDetails()}
-              </div>
-            </div>
+            <Badge 
+              variant={provider.isWithinRadius ? "default" : "destructive"}
+              className="flex items-center gap-1"
+            >
+              {provider.isWithinRadius ? "Dentro da área de cobertura" : "Fora da área de cobertura"}
+            </Badge>
           </div>
 
-          {/* Coluna da direita */}
-          <div className="space-y-6">
-            {portfolioItems.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Portfolio</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {portfolioItems.map((item) => (
-                    <div key={item.id} className="relative aspect-square rounded-md overflow-hidden">
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.description || 'Portfolio item'} 
-                        className="w-full h-full object-cover"
-                      />
+          {/* Abas */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="price" className="flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Preço & Detalhes
+              </TabsTrigger>
+              <TabsTrigger value="portfolio" className="flex items-center gap-2">
+                <Image className="h-4 w-4" />
+                Portfolio
+              </TabsTrigger>
+              <TabsTrigger value="provider" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Dados do Prestador
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Aba Preço & Detalhes */}
+            <TabsContent value="price" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Resumo do Orçamento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Detalhes do serviço solicitado */}
+                  <div className="border-b pb-4">
+                    <h4 className="font-medium mb-2">Serviço Solicitado</h4>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p><strong>Serviço:</strong> {quoteDetails.serviceName}</p>
+                      {quoteDetails.subServiceName && (
+                        <p><strong>Categoria:</strong> {quoteDetails.subServiceName}</p>
+                      )}
+                      {quoteDetails.specialtyName && (
+                        <p><strong>Especialidade:</strong> {quoteDetails.specialtyName}</p>
+                      )}
+                      {quoteDetails.description && (
+                        <p><strong>Descrição:</strong> {quoteDetails.description}</p>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+                  </div>
 
-        <div className="mt-6 flex flex-col sm:flex-row gap-3">
-          <Button 
-            variant="outline" 
-            onClick={onClose} 
-            className="sm:flex-1"
-          >
-            Fechar
-          </Button>
-          
-          <Button 
-            onClick={handleSendQuote} 
-            disabled={isSending || quoteSent} 
-            className="sm:flex-1"
-          >
-            {isSending ? (
-              <><span className="animate-spin mr-2">◌</span>Enviando...</>
-            ) : quoteSent ? (
-              <>Orçamento Enviado</>
-            ) : (
-              <><Send className="h-4 w-4 mr-2" />Enviar Orçamento</>
-            )}
-          </Button>
+                  {/* Detalhamento dos preços */}
+                  {provider.priceDetails && provider.priceDetails.length > 0 && (
+                    <div className="border-b pb-4">
+                      <h4 className="font-medium mb-2">Detalhamento dos Preços</h4>
+                      <div className="space-y-2">
+                        {provider.priceDetails.map((detail, index) => (
+                          <div key={index} className="flex justify-between items-center text-sm">
+                            <div>
+                              <span className="font-medium">{detail.itemName || `Item ${detail.itemId}`}</span>
+                              {detail.quantity && (
+                                <span className="text-gray-500 ml-2">
+                                  {detail.quantity} x {formatPrice(detail.pricePerUnit)}
+                                </span>
+                              )}
+                              {detail.area && (
+                                <span className="text-gray-500 ml-2">
+                                  {detail.area.toFixed(2)}m² x {formatPrice(detail.pricePerUnit)}/m²
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-medium">{formatPrice(detail.total)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="flex justify-between items-center text-lg font-bold">
+                    <span>Total Estimado:</span>
+                    <span className="text-green-600">{formatPrice(provider.totalPrice)}</span>
+                  </div>
+
+                  {/* Informações sobre o orçamento */}
+                  <div className="text-xs text-gray-500 mt-2">
+                    * Este é um valor estimado. O preço final pode variar após avaliação presencial.
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Aba Portfolio */}
+            <TabsContent value="portfolio" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Portfolio de Trabalhos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {provider.portfolioItems && provider.portfolioItems.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {provider.portfolioItems.map((item) => (
+                        <div key={item.id} className="space-y-2">
+                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={item.imageUrl}
+                              alt={item.description || 'Portfolio item'}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          {item.description && (
+                            <p className="text-sm text-gray-600">{item.description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Image className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>Este prestador ainda não adicionou trabalhos ao portfolio.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Aba Dados do Prestador */}
+            <TabsContent value="provider" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informações do Prestador</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Biografia */}
+                  {provider.provider.bio && (
+                    <div>
+                      <h4 className="font-medium mb-2">Sobre</h4>
+                      <p className="text-sm text-gray-600">{provider.provider.bio}</p>
+                    </div>
+                  )}
+
+                  {/* Localização */}
+                  <div>
+                    <h4 className="font-medium mb-2">Localização</h4>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin className="h-4 w-4" />
+                      <span>
+                        {provider.provider.neighborhood && provider.provider.city
+                          ? `${provider.provider.neighborhood}, ${provider.provider.city}`
+                          : provider.provider.city || 'Localização não informada'}
+                      </span>
+                    </div>
+                    {provider.provider.serviceRadiusKm && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Atende em um raio de {provider.provider.serviceRadiusKm}km
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Contato */}
+                  <div>
+                    <h4 className="font-medium mb-2">Contato</h4>
+                    <div className="space-y-2">
+                      {provider.provider.phone && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone className="h-4 w-4" />
+                          <span>{provider.provider.phone}</span>
+                        </div>
+                      )}
+                      {provider.provider.email && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Mail className="h-4 w-4" />
+                          <span>{provider.provider.email}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Especialidades */}
+                  <div>
+                    <h4 className="font-medium mb-2">Especialidades</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {provider.provider.specialties.map((specialty) => (
+                        <Badge key={specialty.id} variant="secondary">
+                          {specialty.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Avaliação */}
+                  <div>
+                    <h4 className="font-medium mb-2">Avaliação</h4>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-4 w-4 ${
+                              star <= provider.rating
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600">
+                        {provider.rating > 0 
+                          ? `${provider.rating.toFixed(1)} de 5.0`
+                          : 'Sem avaliações ainda'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Botão de ação */}
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={() => onSendQuote(provider.provider.userId)}
+              disabled={!provider.isWithinRadius}
+              className="flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              {provider.isWithinRadius ? 'Enviar Solicitação' : 'Fora da Área de Cobertura'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 };
-
-export default ProviderDetailsModal;
