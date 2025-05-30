@@ -41,7 +41,6 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
           id,
           name,
           phone,
-          email,
           role
         ),
         provider_settings(
@@ -88,8 +87,8 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
       const distance = calculateDistance(
         quoteDetails.address.latitude,
         quoteDetails.address.longitude,
-        settings.latitude,
-        settings.longitude
+        Number(settings.latitude),
+        Number(settings.longitude)
       );
 
       console.log(`Distância calculada para ${provider.profiles.name}: ${distance.toFixed(2)}km`);
@@ -170,7 +169,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
         userId: provider.provider_id,
         name: provider.profiles.name,
         phone: provider.profiles.phone,
-        email: provider.profiles.email || '',
+        email: '', // Email não está disponível na tabela profiles
         role: provider.profiles.role,
         bio: settings.bio || '',
         city: settings.city || '',
