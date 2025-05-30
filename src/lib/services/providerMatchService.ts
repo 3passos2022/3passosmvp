@@ -77,7 +77,10 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
       console.log('Processando prestador:', provider);
 
       // Verificar se o prestador tem configurações de localização
-      const settings = provider.provider_settings?.[0];
+      const settings = Array.isArray(provider.provider_settings) 
+        ? provider.provider_settings[0] 
+        : provider.provider_settings;
+        
       if (!settings || !settings.latitude || !settings.longitude) {
         console.log(`Prestador ${provider.profiles.name} não tem coordenadas configuradas`);
         continue;
