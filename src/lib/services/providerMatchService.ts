@@ -59,7 +59,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
     // Obter prestadores que prestam serviços para a especialidade
     console.log(`🔍 [ProviderMatch] Buscando prestadores para especialidade ID: ${quoteDetails.specialtyId}`);
     
-    const { data: providers, error: providersError } = await supabase
+  /*  const { data: providers, error: providersError } = await supabase
       .from('provider_services')
       .select(`
         provider_id,
@@ -83,7 +83,57 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
           name
         )
       `)
-      .eq('specialty_id', quoteDetails.specialtyId);
+      .eq('specialty_id', quoteDetails.specialtyId);  */
+
+/*       const { data: providers, error: providersError } = await supabase
+  .from('profiles')
+  .select(`
+    id,
+    name,
+    phone,
+    role,
+    provider_settings(
+      bio,
+      city,
+      neighborhood,
+      latitude,
+      longitude,
+      service_radius_km
+    ),
+    provider_services(
+      provider_id,
+      base_price,
+      specialty_id
+    ),
+    provider_services:specialties(
+      id,
+      name
+    )
+  `)
+  .filter('provider_services.specialty_id', 'eq', quoteDetails.specialtyId); GPT1*/
+
+ /*  GPT 2 */
+
+ const { data: providers, error: providersError } = await supabase
+ .from('profiles')
+ .select(`
+   id,
+   name,
+   phone,
+   role,
+   provider_settings(*),
+   provider_services(
+     id,
+     provider_id,
+     base_price,
+     specialty_id,
+     specialties(
+       id,
+       name
+     )
+   )
+ `)
+ .eq('role', 'provider');
 
     if (providersError) {
       console.error('❌ [ProviderMatch] Erro ao buscar prestadores:', providersError);
@@ -96,25 +146,25 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
     }
 
     console.log(`📋 [ProviderMatch] Encontrados ${providers.length} prestadores na base`);
+    console.log('Primeiro prestador:', JSON.stringify(providers[0], null, 2));
 
     // Processar cada prestador
     const matches: ProviderMatch[] = [];
 
     for (const provider of providers) {
-      console.log('👤 [ProviderMatch] Processando prestador:', provider.profiles.name);
+      console.log('👤 [ProviderMatch] Processando prestador:', provider.name);
+      console.log('Serviços do prestador:', JSON.stringify(provider.provider_services, null, 2));
 
       // Verificar se o prestador tem configurações de localização
-      const settings = Array.isArray(provider.provider_settings) 
-        ? provider.provider_settings[0] 
-        : provider.provider_settings;
+      const settings = provider.provider_settings;
         
       if (!settings) {
-        console.log(`⚠️ [ProviderMatch] Prestador ${provider.profiles.name} não tem configurações`);
+        console.log(`⚠️ [ProviderMatch] Prestador ${provider.name} não tem configurações`);
         continue;
       }
 
       if (!settings.latitude || !settings.longitude) {
-        console.log(`⚠️ [ProviderMatch] Prestador ${provider.profiles.name} não tem coordenadas configuradas`);
+        console.log(`⚠️ [ProviderMatch] Prestador ${provider.name} não tem coordenadas configuradas`);
         continue;
       }
 
@@ -126,7 +176,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
         Number(settings.longitude)
       );
 
-      console.log(`📏 [ProviderMatch] Distância calculada para ${provider.profiles.name}: ${distance.toFixed(2)}km`);
+      console.log(`📏 [ProviderMatch] Distância calculada para ${provider.name}: ${distance.toFixed(2)}km`);
 
       // Verificar raio de atendimento (padrão 50km se não configurado)
       const serviceRadius = Number(settings.service_radius_km) || 50;
@@ -134,26 +184,35 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
 
       console.log(`🎯 [ProviderMatch] Raio de atendimento: ${serviceRadius}km, Dentro da área: ${isWithinRadius}`);
 
+      // Encontrar o serviço da especialidade específica
+      const matchingService = provider.provider_services?.find(
+        service => service.specialty_id === quoteDetails.specialtyId
+      );
+      console.log('Serviço encontrado para especialidade:', matchingService);
+
       // Calcular preço total baseado nos itens ou medidas
-      let totalPrice = provider.base_price || 0;
+      let totalPrice = matchingService?.base_price || 0;
+      let itemsTotal = 0;
+      let areaPrice = 0;
+      let itemPrices: any[] | null | undefined = undefined;
       const priceDetails: PriceDetail[] = [];
 
       // Se há itens, calcular preço baseado nos itens
       if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
-        console.log(`💰 [ProviderMatch] Calculando preços por itens para ${provider.profiles.name}`);
+        console.log(`💰 [ProviderMatch] Calculando preços por itens para ${provider.name}`);
         
-        const { data: itemPrices } = await supabase
+        const { data } = await supabase
           .from('provider_item_prices')
           .select(`
             item_id,
             price_per_unit,
             service_items(name, type)
           `)
-          .eq('provider_id', provider.provider_id)
+          .eq('provider_id', provider.id)
           .in('item_id', Object.keys(quoteDetails.items));
+        itemPrices = data;
 
         if (itemPrices) {
-          let itemsTotal = 0;
           for (const itemPrice of itemPrices) {
             const quantity = quoteDetails.items[itemPrice.item_id] || 0;
             const itemTotal = quantity * itemPrice.price_per_unit;
@@ -167,28 +226,38 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
               total: itemTotal
             });
           }
-          totalPrice += itemsTotal;
-          console.log(`💰 [ProviderMatch] Preço total com itens: R$ ${totalPrice.toFixed(2)}`);
+          console.log(`💰 [ProviderMatch] Preço total com itens: R$ ${itemsTotal.toFixed(2)}`);
         }
       }
 
       // Se há medidas, calcular preço baseado na área
       if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
-        console.log(`📐 [ProviderMatch] Calculando preços por área para ${provider.profiles.name}`);
+        console.log(`📐 [ProviderMatch] Calculando preços por área para ${provider.name}`);
         
         const totalArea = quoteDetails.measurements.reduce((sum, measurement) => {
           return sum + (measurement.area || measurement.width * measurement.length);
         }, 0);
 
+        // Procurar item do tipo m² ou metro quadrado
+        let areaItem = null;
+        if (typeof itemPrices !== 'undefined' && itemPrices !== null) {
+          areaItem = itemPrices.find(item => item.service_items?.type === 'm²' || item.service_items?.type === 'metro quadrado');
+        }
+
         if (totalArea > 0) {
-          const areaPrice = totalArea * (provider.base_price || 0);
-          totalPrice = areaPrice;
+          let areaUnitPrice = 0;
+          if (areaItem) {
+            areaUnitPrice = areaItem.price_per_unit;
+          } else {
+            areaUnitPrice = matchingService?.base_price || 0;
+          }
+          areaPrice = totalArea * areaUnitPrice;
 
           priceDetails.push({
-            itemId: 'area',
-            itemName: 'Área total',
+            itemId: areaItem ? areaItem.item_id : 'area',
+            itemName: areaItem ? areaItem.service_items?.name : 'Área total',
             area: totalArea,
-            pricePerUnit: provider.base_price || 0,
+            pricePerUnit: areaUnitPrice,
             total: areaPrice
           });
           
@@ -196,34 +265,38 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
         }
       }
 
+      // Soma final do total
+      totalPrice += itemsTotal + areaPrice;
+      console.log('Total final calculado:', totalPrice);
+
       // Obter avaliação média do prestador
       const { data: ratings } = await supabase
         .from('provider_ratings')
         .select('rating')
-        .eq('provider_id', provider.provider_id);
+        .eq('provider_id', provider.id);
 
       const averageRating = ratings && ratings.length > 0
         ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
         : 0;
 
-      console.log(`⭐ [ProviderMatch] Avaliação média de ${provider.profiles.name}: ${averageRating.toFixed(1)}`);
+      console.log(`⭐ [ProviderMatch] Avaliação média de ${provider.name}: ${averageRating.toFixed(1)}`);
 
       // Criar perfil do prestador
       const providerProfile: ProviderProfile = {
-        userId: provider.provider_id,
-        name: provider.profiles.name,
-        phone: provider.profiles.phone,
+        userId: provider.id,
+        name: provider.name,
+        phone: provider.phone,
         email: '', // Email não está disponível na tabela profiles
-        role: provider.profiles.role,
+        role: provider.role,
         bio: settings.bio || '',
         city: settings.city || '',
         neighborhood: settings.neighborhood || '',
         averageRating,
-        specialties: [{
-          id: provider.specialties.id,
-          name: provider.specialties.name,
-          price: provider.base_price
-        }],
+        specialties: provider.provider_services.map(service => ({
+          id: service.specialties.id,
+          name: service.specialties.name,
+          price: service.base_price
+        })),
         hasAddress: true,
         serviceRadiusKm: serviceRadius
       };
@@ -238,7 +311,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
       };
 
       matches.push(match);
-      console.log(`✅ [ProviderMatch] Prestador ${provider.profiles.name} adicionado aos resultados`);
+      console.log(`✅ [ProviderMatch] Prestador ${provider.name} adicionado aos resultados`);
     }
 
     // Ordenar por relevância (dentro da área primeiro, depois por distância)

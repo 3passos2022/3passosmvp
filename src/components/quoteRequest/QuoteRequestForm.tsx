@@ -1550,7 +1550,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-muted-foreground">
-            Passo {currentStep + 1} de 4
+            Passo {currentStep + 1} de 3
           </span>
           <span className="text-sm font-medium">
             {currentStep === 0 ? 'Dados do Serviço' : 
@@ -1559,7 +1559,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
           </span>
         </div>
         <Progress 
-          value={((currentStep + 1) / 4) * 100} 
+          value={((currentStep + 1) / 3) * 100} 
           className="h-2"
         />
       </div>

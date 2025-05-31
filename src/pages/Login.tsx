@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -29,7 +30,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { UserRole } from '@/lib/types';
 import { User as UserIcon, Briefcase } from 'lucide-react';
-import { validateCPF, validateCNPJ, maskCPF, maskCNPJ } from '@/lib/utils/documentValidation';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 
 const loginSchema = z.object({
@@ -57,25 +57,6 @@ const signupSchema = z.object({
   role: z.enum([UserRole.CLIENT, UserRole.PROVIDER], {
     message: "Selecione o tipo de conta",
   }),
-  cpf: z.string().optional(),
-  cnpj: z.string().optional(),
-}).refine((data) => {
-  // Validação condicional para CPF/CNPJ
-  if (data.role === UserRole.CLIENT) {
-    if (!data.cpf) return false;
-    return validateCPF(data.cpf);
-  }
-  if (data.role === UserRole.PROVIDER) {
-    if (!data.cpf) return false;
-    if (!validateCPF(data.cpf)) return false;
-    // CNPJ é opcional para prestadores
-    if (data.cnpj && !validateCNPJ(data.cnpj)) return false;
-    return true;
-  }
-  return true;
-}, {
-  message: "Documentos inválidos",
-  path: ["cpf"]
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -138,12 +119,8 @@ const Login: React.FC = () => {
       phone: "",
       password: "",
       role: UserRole.CLIENT,
-      cpf: "",
-      cnpj: "",
     },
   });
-
-  const watchRole = signupForm.watch("role");
 
   const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
@@ -153,6 +130,8 @@ const Login: React.FC = () => {
         toast.error(`Erro ao fazer login: ${error.message}`);
       } else {
         toast.success("Login realizado com sucesso!");
+        
+        // Não é necessário redirecionar aqui, o useEffect cuidará disso
       }
     } catch (error) {
       toast.error("Erro inesperado ao fazer login");
@@ -355,6 +334,24 @@ const Login: React.FC = () => {
 
                       <FormField
                         control={signupForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Senha</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Sua senha"
+                                type="password"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={signupForm.control}
                         name="role"
                         render={({ field }) => (
                           <FormItem className="space-y-2">
@@ -394,70 +391,6 @@ const Login: React.FC = () => {
                                   </Label>
                                 </div>
                               </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={signupForm.control}
-                        name="cpf"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>CPF {watchRole === UserRole.CLIENT ? "*" : "*"}</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="000.000.000-00"
-                                {...field}
-                                onChange={(e) => {
-                                  const maskedValue = maskCPF(e.target.value);
-                                  field.onChange(maskedValue);
-                                }}
-                                maxLength={14}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {watchRole === UserRole.PROVIDER && (
-                        <FormField
-                          control={signupForm.control}
-                          name="cnpj"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>CNPJ (opcional)</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="00.000.000/0000-00"
-                                  {...field}
-                                  onChange={(e) => {
-                                    const maskedValue = maskCNPJ(e.target.value);
-                                    field.onChange(maskedValue);
-                                  }}
-                                  maxLength={18}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-
-                      <FormField
-                        control={signupForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Senha</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Sua senha"
-                                type="password"
-                                {...field}
-                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
