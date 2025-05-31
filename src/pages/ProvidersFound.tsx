@@ -18,7 +18,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { retrieveQuoteData } from '@/lib/utils/quoteStorage';
+import { retrieveQuoteData, markQuoteSentToProvider } from '@/lib/utils/quoteStorage';
+import { supabase } from '@/integrations/supabase/client';
 
 // Definindo a variável de ambiente do Google Maps
 declare global {
@@ -56,69 +57,48 @@ const ProvidersFound: React.FC = () => {
     const fetchQuoteDetails = async () => {
       setIsLoading(true);
       setErrorMessage(null);
-      
       try {
-        console.log('Starting to load quote details from location state or sessionStorage');
-        
-        // First try to get quote details from location state
+        // Sempre priorize o quoteDetails do state
         if (location.state?.quoteDetails) {
-          console.log('Quote details found in router state:', location.state.quoteDetails);
-          // Ensure we have a valid ID for this quote or generate one
-          if (!location.state.quoteDetails.id) {
-            const quoteWithId = {
-              ...location.state.quoteDetails,
-              id: crypto.randomUUID() // Generate a unique ID if none exists
-            };
-            setQuoteDetails(quoteWithId);
-            console.log('Generated ID for quote:', quoteWithId.id);
-          } else {
+          if (location.state.quoteDetails.id) {
             setQuoteDetails(location.state.quoteDetails);
-          }
-          return;
-        }
-        
-        // If not in location state, try to get from sessionStorage using our utility
-        const storedQuote = retrieveQuoteData();
-        if (storedQuote) {
-          console.log('Quote details found in sessionStorage:', storedQuote);
-          // Ensure we have a valid ID for this quote or generate one
-          if (!storedQuote.id) {
-            const quoteWithId = {
-              ...storedQuote,
-              id: crypto.randomUUID() // Generate a unique ID if none exists
-            };
-            setQuoteDetails(quoteWithId);
-            console.log('Generated ID for quote:', quoteWithId.id);
+            return;
           } else {
-            setQuoteDetails(storedQuote);
+            // Se não tem id real, redireciona para criar orçamento
+            toast({
+              title: 'Orçamento não encontrado',
+              description: 'Por favor, crie o orçamento antes de escolher o prestador.',
+              variant: 'destructive',
+            });
+            navigate('/request-quote');
+            return;
           }
+        }
+        // Se não veio do state, tenta pegar do sessionStorage
+        const storedQuote = retrieveQuoteData();
+        if (storedQuote && storedQuote.id) {
+          setQuoteDetails(storedQuote);
           return;
         }
-        
-        // If we reach here, no quote details were found
-        console.error('No quote details found in location state or sessionStorage');
-        
+        // Se não encontrou id real, redireciona
         toast({
-          title: "Informações insuficientes",
-          description: "Por favor, complete o formulário de orçamento primeiro.",
-          variant: "destructive",
+          title: 'Orçamento não encontrado',
+          description: 'Por favor, crie o orçamento antes de escolher o prestador.',
+          variant: 'destructive',
         });
-        
         navigate('/request-quote');
       } catch (error) {
         console.error('Error loading quote details:', error);
-        setErrorMessage("Erro ao carregar detalhes do orçamento");
-        
+        setErrorMessage('Erro ao carregar detalhes do orçamento');
         toast({
-          title: "Erro ao carregar orçamento",
-          description: "Ocorreu um erro ao processar seu orçamento.",
-          variant: "destructive",
+          title: 'Erro ao carregar orçamento',
+          description: 'Ocorreu um erro ao processar seu orçamento.',
+          variant: 'destructive',
         });
       } finally {
         setIsLoading(false);
       }
     };
-    
     fetchQuoteDetails();
   }, [location, navigate, toast]);
   
@@ -358,6 +338,57 @@ const ProvidersFound: React.FC = () => {
     fetchProviderDetails();
   }, [selectedProviderId, providers, quoteDetails, toast]);
   
+  // Função para enviar orçamento ao prestador
+  const handleSendQuote = async (providerId: string) => {
+    if (!user) {
+      handleLoginRedirect();
+      return;
+    }
+    if (!quoteDetails || !providerId) return;
+    try {
+      // Verifica se já existe relacionamento
+      const { data: existing, error: existingError } = await supabase
+        .from('quote_providers')
+        .select('id')
+        .eq('quote_id', quoteDetails.id)
+        .eq('provider_id', providerId)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (existing) {
+        toast({
+          title: 'Já enviado',
+          description: 'Você já enviou este orçamento para este prestador.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Insere relacionamento
+      const { error } = await supabase
+        .from('quote_providers')
+        .insert({
+          quote_id: quoteDetails.id,
+          provider_id: providerId,
+          status: 'pending',
+          total_price: selectedProvider?.totalPrice || null
+        });
+      if (error) throw error;
+      markQuoteSentToProvider(providerId);
+      toast({
+        title: 'Solicitação enviada',
+        description: 'O orçamento foi enviado para o prestador!',
+        variant: 'success',
+      });
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error('Erro ao enviar orçamento ao prestador:', err);
+      toast({
+        title: 'Erro ao enviar',
+        description: err.message || 'Não foi possível enviar o orçamento.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
   const renderNoProvidersMessage = () => {
     if (errorMessage) {
       return (
@@ -479,7 +510,7 @@ const ProvidersFound: React.FC = () => {
                     ...quoteDetails,
                     clientId: user?.id || undefined
                   }}
-                  onSendQuote={handleLoginRedirect}
+                  onSendQuote={handleSendQuote}
                 />
               )}
             </>

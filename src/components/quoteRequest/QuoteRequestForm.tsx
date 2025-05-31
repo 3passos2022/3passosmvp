@@ -654,7 +654,7 @@ const ServiceDetailsStep: React.FC<{
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
         
         setHasSquareMeterItems(hasSquareItems);
-        setHasLinearMeterItems(hasLinearMeterItems);
+        setHasLinearMeterItems(hasLinearItems);
         
         const neededSteps = [];
         if (allQuestions.length > 0) {
@@ -1336,12 +1336,13 @@ const ReviewStep: React.FC<{
         
         console.log("Quote created via RPC:", quoteResult);
         const quoteId = quoteResult;
-        
+        // Atualiza o id real em quoteDetails
+        quoteDetails.id = quoteId;
         // Insert answers if any
         await handleAdditionalData(quoteId);
         
         toast.success('Orçamento solicitado com sucesso!');
-        handleRedirect();
+        handleRedirect(quoteDetails);
         onSubmit();
         return;
       } catch (rpcError) {
@@ -1364,12 +1365,13 @@ const ReviewStep: React.FC<{
       
       const quoteId = quoteResult.id;
       console.log("Quote created via direct insert:", quoteId);
-      
+      // Atualiza o id real em quoteDetails
+      quoteDetails.id = quoteId;
       // Insert additional data
       await handleAdditionalData(quoteId);
       
       toast.success('Orçamento solicitado com sucesso!');
-      handleRedirect();
+      handleRedirect(quoteDetails);
       onSubmit();
       
     } catch (error) {
@@ -1452,9 +1454,9 @@ const ReviewStep: React.FC<{
     }
   };
   
-  const handleRedirect = () => {
-    // Always redirect to providers found page regardless of login status
-    navigate('/prestadoresencontrados');
+  const handleRedirect = (quoteDetails: QuoteDetails) => {
+    // Redireciona para providers found page passando o orçamento real
+    navigate('/prestadoresencontrados', { state: { quoteDetails } });
   };
   
   return (
