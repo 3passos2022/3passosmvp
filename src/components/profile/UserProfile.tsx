@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 import ProfileImageEditor from './ProfileImageEditor';
+import ProviderRating from './ProviderRating';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -76,6 +77,8 @@ const UserProfile: React.FC = () => {
     return user.email.substring(0, 2).toUpperCase();
   };
 
+  const isProvider = RoleUtils.isProvider(user);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -95,9 +98,14 @@ const UserProfile: React.FC = () => {
               </span>
             </div>
           </div>
-          <div>
+          <div className="flex-1">
             <CardTitle>{user.name || 'Usuário'}</CardTitle>
             <CardDescription>{user.email}</CardDescription>
+            {isProvider && (
+              <div className="mt-2">
+                <ProviderRating providerId={user.id} />
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>

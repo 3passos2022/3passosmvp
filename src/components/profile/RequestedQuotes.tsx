@@ -65,6 +65,7 @@ const RequestedQuotes: React.FC = () => {
     
     setLoading(true);
     try {
+      // Buscar quote_providers com informações dos orçamentos
       const { data: quoteProviders, error: quoteProvidersError } = await supabase
         .from('quote_providers')
         .select(`
@@ -85,6 +86,7 @@ const RequestedQuotes: React.FC = () => {
             zip_code,
             created_at,
             client_id,
+            status,
             services:service_id (name),
             sub_services:sub_service_id (name),
             specialties:specialty_id (name)
@@ -115,10 +117,26 @@ const RequestedQuotes: React.FC = () => {
             }
           }
 
+          // Verificar se existe avaliação para este orçamento
+          // Se existe avaliação, o status deve ser 'completed'
+          let finalStatus = quoteProvider.status;
+          if (quoteProvider.status === 'accepted') {
+            const { data: rating, error: ratingError } = await supabase
+              .from('provider_ratings')
+              .select('id')
+              .eq('provider_id', user.id)
+              .eq('quote_id', quoteProvider.quote_id)
+              .single();
+
+            if (!ratingError && rating) {
+              finalStatus = 'completed';
+            }
+          }
+
           return {
             id: quoteProvider.id,
             quoteId: quoteProvider.quote_id,
-            status: quoteProvider.status,
+            status: finalStatus,
             created_at: quoteProvider.created_at,
             total_price: quoteProvider.total_price,
             quote: {
@@ -143,7 +161,7 @@ const RequestedQuotes: React.FC = () => {
         })
       );
 
-      // Correção: Filtrando os orçamentos de acordo com a aba selecionada
+      // Filtrar os orçamentos de acordo com a aba selecionada
       let filteredQuotes;
       if (tab === 'all') {
         filteredQuotes = quotesWithClientInfo;
