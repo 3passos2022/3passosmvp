@@ -83,23 +83,7 @@ const UserProfile: React.FC = () => {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-          <div className="relative group cursor-pointer" onClick={() => setIsImageEditorOpen(true)}>
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={user.avatar_url} alt={user.name || 'Avatar'} />
-              <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
-            </Avatar>
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-full flex items-center justify-center transition-all duration-200">
-              <span className="text-white opacity-0 group-hover:opacity-100 text-xs font-medium">
-                Editar
-              </span>
-            </div>
-          </div>
-          <div>
-            <CardTitle>{user.name || 'Usuário'}</CardTitle>
-            <CardDescription>{user.email}</CardDescription>
-          </div>
-        </CardHeader>
+        <br></br>
         <CardContent>
           {isEditing ? (
             <div className="space-y-4">
