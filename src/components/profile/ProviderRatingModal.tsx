@@ -42,17 +42,24 @@ const ProviderRatingModal: React.FC<ProviderRatingModalProps> = ({
       return;
     }
 
+    if (rating < 1 || rating > 5) {
+      toast.error('A avaliação deve ser entre 1 e 5 estrelas');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Usar a função do Supabase para adicionar a avaliação
-      const { error } = await supabase.rpc('add_provider_rating', {
-        p_provider_id: providerId,
-        p_quote_id: quoteId,
-        p_rating: rating,
-        p_comment: comment || null
-      });
+      // Inserir a avaliação diretamente na tabela provider_ratings
+      const { error: ratingError } = await supabase
+        .from('provider_ratings')
+        .insert({
+          provider_id: providerId,
+          quote_id: quoteId,
+          rating: rating,
+          comment: comment || null
+        });
 
-      if (error) throw error;
+      if (ratingError) throw ratingError;
 
       // Marcar o orçamento como concluído
       const { error: quoteError } = await supabase
