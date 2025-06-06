@@ -9,45 +9,55 @@ import logoMenu from './../img/Logos/LOGOBRANCO.png';
 const Hero: React.FC = () => {
   return (
     <div className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-blue-50 to-white">
-      {/* Premium Header Section */}
-      <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent z-5">
-        <div className="container mx-auto px-10 py-6 flex items-center justify-between">
+      {/* New Premium Header Section */}
+      <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-r from-primary via-primary/90 to-primary/80 z-10">
+        <div className="container mx-auto px-10 py-8 flex items-center justify-between h-full">
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-            className="flex items-center space-x-4"
+            transition={{ duration: 0.8 }}
+            className="flex items-center space-x-6"
           >
-            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <img 
-                src="https://images.unsplash.com/photo-1649972904349-6e44c42644a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150&q=80" 
-                alt="Mulher sorrindo" 
-                className="w-12 h-12 rounded-full object-cover border-2 border-white/50"
-              />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl border border-white/30">
+                <img 
+                  src="https://images.unsplash.com/photo-1649972904349-6e44c42644a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80" 
+                  alt="Mulher sorrindo" 
+                  className="w-16 h-16 rounded-full object-cover border-3 border-white/60"
+                />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-400 rounded-full border-2 border-white flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
             </div>
-            <div className="text-left">
-              <h3 className="text-lg font-bold text-primary">Serviços Premium</h3>
-              <p className="text-sm text-gray-600">Profissionais qualificados ao seu alcance</p>
+            <div className="text-white">
+              <h2 className="text-2xl font-bold mb-1">Conecte-se com profissionais</h2>
+              <p className="text-white/80 text-lg">Qualidade garantida em cada serviço</p>
             </div>
           </motion.div>
           
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="hidden md:flex items-center space-x-6"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="hidden lg:flex items-center space-x-8"
           >
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">1.500+</div>
-              <div className="text-xs text-gray-600">Profissionais</div>
+            <div className="text-center text-white">
+              <div className="text-3xl font-bold">1.500+</div>
+              <div className="text-sm text-white/70">Profissionais</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">10K+</div>
-              <div className="text-xs text-gray-600">Clientes</div>
+            <div className="w-px h-12 bg-white/30"></div>
+            <div className="text-center text-white">
+              <div className="text-3xl font-bold">10K+</div>
+              <div className="text-sm text-white/70">Clientes</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">4.8★</div>
-              <div className="text-xs text-gray-600">Avaliação</div>
+            <div className="w-px h-12 bg-white/30"></div>
+            <div className="text-center text-white">
+              <div className="text-3xl font-bold flex items-center">
+                4.8
+                <span className="text-yellow-300 ml-1">★</span>
+              </div>
+              <div className="text-sm text-white/70">Avaliação</div>
             </div>
           </motion.div>
         </div>
@@ -59,7 +69,7 @@ const Hero: React.FC = () => {
         <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto px-10 py-20 z-10 mt-16">
+      <div className="container mx-auto px-10 py-20 z-10 mt-20">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
