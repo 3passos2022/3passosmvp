@@ -9,13 +9,57 @@ import logoMenu from './../img/Logos/LOGOBRANCO.png';
 const Hero: React.FC = () => {
   return (
     <div className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-blue-50 to-white">
+      {/* Premium Header Section */}
+      <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent z-5">
+        <div className="container mx-auto px-10 py-6 flex items-center justify-between">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex items-center space-x-4"
+          >
+            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <img 
+                src="https://images.unsplash.com/photo-1649972904349-6e44c42644a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150&q=80" 
+                alt="Mulher sorrindo" 
+                className="w-12 h-12 rounded-full object-cover border-2 border-white/50"
+              />
+            </div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold text-primary">Serviços Premium</h3>
+              <p className="text-sm text-gray-600">Profissionais qualificados ao seu alcance</p>
+            </div>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="hidden md:flex items-center space-x-6"
+          >
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">1.500+</div>
+              <div className="text-xs text-gray-600">Profissionais</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">10K+</div>
+              <div className="text-xs text-gray-600">Clientes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">4.8★</div>
+              <div className="text-xs text-gray-600">Avaliação</div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl"></div>
         <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto px-10 py-20 z-10">
+      <div className="container mx-auto px-10 py-20 z-10 mt-16">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
