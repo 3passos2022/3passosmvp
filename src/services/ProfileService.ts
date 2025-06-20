@@ -226,44 +226,8 @@ export class ProfileService {
     }
   }
   
-  /**
-   * Torna usuário admin
-   */
-  static async makeAdmin(adminUserId: string, targetUserId: string): Promise<{ error: Error | null, data: any }> {
-    try {
-      console.log(`Tornando usuário admin: targetUserId=${targetUserId}, por adminUserId=${adminUserId}`);
-      
-      // Verificar se usuário é admin usando função security definer
-      const { data: isAdmin, error: roleCheckError } = await supabase.rpc('is_admin_user', {
-        user_id: adminUserId
-      });
-      
-      if (roleCheckError || !isAdmin) {
-        console.error('Erro na verificação de admin:', roleCheckError);
-        return { error: new Error('Unauthorized - Not an admin'), data: null };
-      }
 
-      // Atualizar role do usuário diretamente no banco
-      const { error, data: updatedData } = await supabase
-        .from('profiles')
-        .update({ role: 'admin' })
-        .eq('id', targetUserId);
 
-      if (error) {
-        console.error('Erro ao atualizar role do usuário:', error);
-        return { error, data: null };
-      }
-      
-      // Invalidar cache
-      profileCache.delete(targetUserId);
-      
-      return { error: null, data: updatedData };
-    } catch (error) {
-      console.error('Erro em makeAdmin:', error);
-      return { error: error as Error, data: null };
-    }
-  }
-  
   /**
    * Limpar cache de perfil
    */

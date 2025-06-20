@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -211,6 +210,14 @@ const ProfileImageEditor: React.FC<ProfileImageEditorProps> = ({
         </DialogHeader>
         
         <div className="flex flex-col items-center gap-4">
+          <input
+            key={fileInputKey}
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
           {!image && (
             <div className="flex flex-col items-center gap-2 py-8">
               <Button onClick={() => fileInputRef.current?.click()}>
@@ -219,14 +226,6 @@ const ProfileImageEditor: React.FC<ProfileImageEditorProps> = ({
               <p className="text-sm text-gray-500">
                 Formatos recomendados: JPEG, PNG (máx. 5MB)
               </p>
-              <input
-                key={fileInputKey}
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
             </div>
           )}
           
@@ -271,7 +270,6 @@ const ProfileImageEditor: React.FC<ProfileImageEditorProps> = ({
                     onClick={() => fileInputRef.current?.click()}
                     title="Escolher nova imagem"
                   >
-                    <Crop className="h-4 w-4 mr-2" />
                     Nova imagem
                   </Button>
                 </div>

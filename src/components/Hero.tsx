@@ -103,11 +103,11 @@ function HeroServices({
             <div className="absolute -top-6 -right-6 bg-background border border-border rounded-xl p-4 shadow-lg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-semibold text-sm">24h</span>
+                  <span className="text-blue-600 font-semibold text-sm">🕒</span>
                 </div>
                 <div>
-                  <p className="font-medium text-sm">Resposta Rápida</p>
-                  <p className="text-xs text-muted-foreground">Orçamentos em até 24h</p>
+                  <p className="font-medium text-sm">Resposta Imediata</p>
+                  <p className="text-xs text-muted-foreground">Orçamentos na hora!</p>
                 </div>
               </div>
             </div>

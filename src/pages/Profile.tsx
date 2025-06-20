@@ -115,7 +115,7 @@ const Profile: React.FC = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-1 bg-gray-50">
+      <main className="flex-1 bg-gray-50 pt-[5%]">
         <div className="container mx-auto px-4 py-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -168,7 +168,7 @@ const Profile: React.FC = () => {
                     className="flex items-center justify-center px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                   >
                     <FileText className="mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">Orçamentos</span>
+                    <span className="hidden sm:inline">Orçamentos que enviei</span>
                   </TabsTrigger>
 
                   {(isProvider || isAdmin) && (
@@ -178,7 +178,7 @@ const Profile: React.FC = () => {
                         className="flex items-center justify-center px-3 py-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                       >
                         <FileText className="mr-2 h-4 w-4" />
-                        <span className="hidden sm:inline">Recebidos</span>
+                        <span className="hidden sm:inline">Orçamentos Recebidos</span>
                       </TabsTrigger>
 
                       <TabsTrigger
