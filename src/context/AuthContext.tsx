@@ -150,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Função de registro simplificada
+  // Função de registro simplificada - removida a criação manual de perfil
   async function signUp(userData: {
     email: string;
     password: string;
@@ -165,10 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
         options: {
           data: {
-            // A role pode ser armazenada em app_metadata se for mais seguro
-            // Aqui, usamos raw_user_meta_data para simplicidade
-            full_name: name,
+            // Dados que serão usados pelo trigger handle_new_user()
+            name: name,
             role: role,
+            phone: phone || '',
           },
         },
       });
@@ -179,25 +179,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data?.user) {
-        // Agora, crie o perfil na tabela 'profiles'
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            email: email,
-            name: name,
-            phone: phone,
-            role: role,
-          });
-
-        if (profileError) {
-          toast.error(`Erro ao criar perfil: ${profileError.message}`);
-          // Opcional: deletar o usuário da autenticação se a criação do perfil falhar
-          return { error: profileError, data: null };
-        }
-
-        // Força a atualização do estado local com o novo perfil
-        await fetchUserProfile(data.user);
+        // Aguardar um pouco para o trigger processar
+        setTimeout(async () => {
+          await fetchUserProfile(data.user);
+        }, 1000);
       }
 
       return { data, error: null };
