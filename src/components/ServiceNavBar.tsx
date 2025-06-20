@@ -65,6 +65,8 @@ const ServiceNavBar: React.FC = () => {
     return null;
   }
 
+  console.log("AQUI ESTA services", services)
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: -10 }}

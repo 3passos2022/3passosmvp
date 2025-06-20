@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Service, SubService, Specialty, ServiceQuestion, QuestionOption, ServiceItem } from '@/lib/types';
 
@@ -57,6 +56,8 @@ export const getAllServices = async (): Promise<Service[]> => {
       return {
         id: service.id,
         name: service.name,
+        icon_url: service.icon_url,
+        description: service.description,
         subServices: subServices.map((subService: any) => {
           const specialties = specialtiesBySubServiceId.get(subService.id) || [];
           

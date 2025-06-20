@@ -22,6 +22,7 @@ import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 import ServiceNavBar from './ServiceNavBar';
 import { Badge } from './ui/badge';
 import './customStylingfiles-and/servicenavbar.css';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,6 +42,18 @@ const Navbar: React.FC = () => {
   useEffect(() => {
     setIsOpen(false);
   }, [location.pathname]);
+
+  const getInitials = () => {
+    if (user.name) {
+      return user.name
+        .split(' ')
+        .map(part => part[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+    }
+    return user.name.substring(0, 2).toUpperCase();
+  };
 
   return (
     <>
@@ -85,7 +98,11 @@ const Navbar: React.FC = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="hover-scale">
-                    <UserCircle className="mr-2 h-4 w-4" />
+                     {user && user.avatar_url ?<Avatar className="h-8 w-8">
+                      <AvatarImage src={user.avatar_url} alt={user.name || 'Avatar'} />
+                      <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
+                    </Avatar>:
+                    <UserCircle className="mr-2 h-4 w-4" />}
                     {user.name || 'Minha Conta'}
                     {user.subscribed && (
                       <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/20">

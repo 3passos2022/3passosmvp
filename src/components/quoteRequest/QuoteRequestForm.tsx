@@ -482,10 +482,10 @@ const ServiceStep: React.FC<{
               <SelectValue placeholder="Selecione o horário preferencial" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="morning">Manhã</SelectItem>
-              <SelectItem value="afternoon">Tarde</SelectItem>
-              <SelectItem value="evening">Noite</SelectItem>
-              <SelectItem value="business">Horário comercial</SelectItem>
+              <SelectItem value="morning">Manhã (08h-12h)</SelectItem>
+              <SelectItem value="afternoon">Tarde (12h-18h)</SelectItem>
+              <SelectItem value="evening">Noite (18h-22h)</SelectItem>
+              <SelectItem value="business">Horário comercial (08h-18h)</SelectItem>
             </SelectContent>
           </Select>
         </div>

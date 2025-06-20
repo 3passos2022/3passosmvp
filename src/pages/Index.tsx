@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar';
 import { Wrench, Users, Star, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import BackgroundGradientAnimationDemo from '@/components/Gradient';
 
 const Index: React.FC = () => {
   // Scroll to top on component mount
@@ -48,9 +49,9 @@ const Index: React.FC = () => {
       
       <main>
         <Hero />
-        
+        <BackgroundGradientAnimationDemo />
         <Features />
-        
+       
         {/* How it works section */}
         <section className="py-24 bg-gray-50">
           <div className="container mx-auto px-4">

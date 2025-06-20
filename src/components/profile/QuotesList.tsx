@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/utils';
 import { QuoteWithProviders } from '@/lib/types/providerMatch';
 import QuoteDetails from './QuoteDetails';
+import ProviderRatingModal from './ProviderRatingModal';
 
 const QuotesList: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +19,10 @@ const QuotesList: React.FC = () => {
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
   const [selectedProviderName, setSelectedProviderName] = useState<string>('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingQuoteId, setRatingQuoteId] = useState<string>('');
+  const [ratingProviderId, setRatingProviderId] = useState<string>('');
+  const [ratingProviderName, setRatingProviderName] = useState<string>('');
 
   useEffect(() => {
     if (user) {
@@ -104,6 +108,17 @@ const QuotesList: React.FC = () => {
     setSelectedProviderId(providerId);
     setSelectedProviderName(providerName);
     setShowDetailsModal(true);
+  };
+
+  const openRatingModal = (quoteId: string, providerId: string, providerName: string) => {
+    setRatingQuoteId(quoteId);
+    setRatingProviderId(providerId);
+    setRatingProviderName(providerName);
+    setShowRatingModal(true);
+  };
+
+  const handleRatingSubmitted = () => {
+    fetchQuotes(); // Refresh the quotes list
   };
 
   const getStatusBadge = (status: string) => {
@@ -215,7 +230,7 @@ const QuotesList: React.FC = () => {
                                   {quote.status === 'pending' && provider.status === 'accepted' && (
                                     <Button 
                                       size="sm"
-                                      onClick={() => showQuoteDetails(quote, provider.providerId, provider.providerName)}
+                                      onClick={() => openRatingModal(quote.id, provider.providerId, provider.providerName)}
                                     >
                                       Finalizar
                                     </Button>
@@ -256,6 +271,15 @@ const QuotesList: React.FC = () => {
           isProvider={false}
         />
       )}
+
+      <ProviderRatingModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        quoteId={ratingQuoteId}
+        providerId={ratingProviderId}
+        providerName={ratingProviderName}
+        onRatingSubmitted={handleRatingSubmitted}
+      />
     </div>
   );
 };

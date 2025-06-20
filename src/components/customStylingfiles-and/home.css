@@ -1,0 +1,17 @@
+.heroImage {
+    width: 500px;
+    height: 100%;
+    object-fit: cover;
+}
+
+#heroImage{
+    width: 30vw;
+    height: 100%;
+    object-fit: cover;
+}
+
+#motionvideo{
+    backdrop-filter: chroma(#16FF0A);
+    mix-blend-mode: plus-lighter;
+    opacity: .10;
+}

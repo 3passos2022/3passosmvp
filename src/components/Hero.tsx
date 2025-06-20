@@ -1,151 +1,123 @@
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Search, Star, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import logoMenu from './../img/Logos/LOGOBRANCO.png';
+interface HeroServicesProps {
+  chipText?: string;
+  headline?: string;
+  description?: string;
+  imageSrc?: string;
+  imageAlt?: string;
+  primaryButtonText?: string;
+  secondaryButtonText?: string;
+}
 
-const Hero: React.FC = () => {
+function HeroServices({
+  chipText = "A forma mais simples de contratar serviços",
+  headline = "Serviços profissionais em 3passos simples",
+  description = "Encontre pedreiros, eletricistas, encanadores e outros profissionais qualificados para resolver seu problema. Solicite orçamentos, compare preços e contrate sem complicações.",
+  imageSrc = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+  imageAlt = "Prestador de serviços profissional trabalhando",
+  primaryButtonText = "Solicitar orçamento",
+  secondaryButtonText = "Como Funciona"
+}: HeroServicesProps) {
   return (
-    <div className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-blue-50 to-white">
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl"></div>
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-blue-100/50 blur-3xl"></div>
-      </div>
-
-      <div className="container mx-auto px-10 py-20 z-10">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="flex-1 max-w-2xl"
-          >
-            <motion.span 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="inline-block py-1 px-3 mb-6 rounded-full bg-primary/10 text-primary font-medium text-sm"
-            >
-              A forma mais simples de contratar serviços
-            </motion.span>
+    <section className="w-full py-20 lg:py-32 bg-background">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 gap-12 items-center lg:grid-cols-2">
+          <div className="flex gap-6 flex-col">
+            {/* Chip */}
+            <div>
+              <Badge variant="outline" className="text-sm px-4 py-2">
+                {chipText}
+              </Badge>
+            </div>
             
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3 tracking-tight"
-            >
-              Serviços profissionais em <span className="text-gradient">3passos simples</span>
-            </motion.h1>
+            {/* Content */}
+            <div className="flex gap-6 flex-col">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl max-w-2xl tracking-tight text-left font-semibold text-foreground">
+                {headline}
+              </h1>
+              <p className="text-lg md:text-xl leading-relaxed tracking-normal text-muted-foreground max-w-xl text-left">
+                {description}
+              </p>
+            </div>
             
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-              className="text-lg mb-8 text-gray-600"
-            >
-              Encontre pedreiros, eletricistas, encanadores e outros profissionais qualificados para resolver seu problema. 
-              Solicite orçamentos, compare preços e contrate sem complicações.
-            </motion.p>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-              className="flex flex-col sm:flex-row gap-4"
-            >
-              <Link to="/request-quote">
-                <Button size="lg" className="hover-scale">
-                  Solicitar orçamento
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+            <Link to="/request-quote">
+            <Button size="lg" className="gap-2">
+                <Search className="w-4 h-4" />
+                {primaryButtonText}
+              </Button>
               </Link>
-              <Link to="/services">
-                <Button variant="outline" size="lg" className="hover-scale">
-                  Ver todos os serviços
-                </Button>
-              </Link>
-            </motion.div>
-          </motion.div>
-          
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.6, duration: 0.8 }}
-            className="flex-1 relative max-w-md"
-          >
-            <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl glass-morphism bg-white/70">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 z-0"></div>
-              
-              <div className="relative z-10 p-8 flex flex-col h-full justify-center">
-                <div className="flex items-center justify-center mb-8">
-                  <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white font-bold text-2xl">
-                      <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
-                  </div>
+            
+              <Button size="lg" variant="outline" className="gap-2">
+                <Users className="w-4 h-4" />
+                {secondaryButtonText}
+              </Button>
+            </div>
+            
+            {/* Trust indicators */}
+            <div className="flex items-center gap-6 pt-4">
+              <div className="flex items-center gap-2">
+                <div className="flex">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  ))}
                 </div>
-
-                <div className="space-y-6">
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.7, duration: 0.5 }}
-                    className="flex items-start space-x-4"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">1</div>
-                    <div>
-                      <h3 className="font-bold text-lg">Informações pessoais</h3>
-                      <p className="text-gray-600">Preencha seus dados básicos para começar</p>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8, duration: 0.5 }}
-                    className="flex items-start space-x-4"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">2</div>
-                    <div>
-                      <h3 className="font-bold text-lg">Detalhes do serviço</h3>
-                      <p className="text-gray-600">Explique o que você precisa</p>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.9, duration: 0.5 }}
-                    className="flex items-start space-x-4"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">3</div>
-                    <div>
-                      <h3 className="font-bold text-lg">Seu endereço</h3>
-                      <p className="text-gray-600">Informe onde o serviço será realizado</p>
-                    </div>
-                  </motion.div>
+                <span className="text-sm text-muted-foreground">4.8/5</span>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                +10.000 profissionais cadastrados
+              </div>
+            </div>
+          </div>
+          
+          {/* Hero Image */}
+          <div className="relative">
+            <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+              <img
+                src={imageSrc}
+                alt={imageAlt}
+                className="w-full h-[500px] lg:h-[600px] object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+            </div>
+            
+            {/* Floating cards */}
+            <div className="absolute -bottom-6 -left-6 bg-background border border-border rounded-xl p-4 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 font-semibold text-sm">✓</span>
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Profissionais Verificados</p>
+                  <p className="text-xs text-muted-foreground">Documentos validados</p>
                 </div>
               </div>
             </div>
             
-            {/* Floating elements for decoration */}
-            <motion.div 
-              animate={{ y: [0, -10, 0] }}
-              transition={{ repeat: Infinity, duration: 3 }}
-              className="absolute w-24 h-24 bg-blue-100 rounded-lg -top-10 -right-10 shadow-lg"
-            />
-            <motion.div 
-              animate={{ y: [0, 10, 0] }}
-              transition={{ repeat: Infinity, duration: 4, delay: 1 }}
-              className="absolute w-16 h-16 bg-primary/10 rounded-full -bottom-8 -left-8"
-            />
-          </motion.div>
+            <div className="absolute -top-6 -right-6 bg-background border border-border rounded-xl p-4 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-semibold text-sm">24h</span>
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Resposta Rápida</p>
+                  <p className="text-xs text-muted-foreground">Orçamentos em até 24h</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
-};
+}
 
-export default Hero;
+export default function Hero() {
+  return <HeroServices />;
+}

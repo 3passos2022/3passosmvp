@@ -73,7 +73,7 @@ const UserProfile: React.FC = () => {
         .join('')
         .toUpperCase();
     }
-    return user.email.substring(0, 2).toUpperCase();
+    return user.name.substring(0, 2).toUpperCase();
   };
 
   return (
