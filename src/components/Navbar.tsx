@@ -56,6 +56,13 @@ const Navbar: React.FC = () => {
         .toUpperCase();
     }
     return user.name.substring(0, 2).toUpperCase();
+
+    
+  };
+
+  const getDisplayName = (name: string | null | undefined) => {
+    if (!name) return "";
+    return name.split(" ").slice(0, 2).join(" ");
   };
 
   return (
@@ -102,11 +109,11 @@ const Navbar: React.FC = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="hover-scale">
                      {user && user.avatar_url ?<Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar_url} alt={user.name || 'Avatar'} />
+                      <AvatarImage src={user.avatar_url} alt={user && getDisplayName(user.name) || 'Avatar'} />
                       <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
                     </Avatar>:
                     <UserCircle className="mr-2 h-4 w-4" />}
-                    {user.name || 'Minha Conta'}
+                    {user && getDisplayName(user.name) || 'Minha Conta'}
                     {user.subscribed && (
                       <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/20">
                         {user.subscription_tier === 'premium' ? 'Premium' : 'Básico'}
