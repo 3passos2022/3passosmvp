@@ -354,6 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     subscription,
     refreshSubscription,
     subscriptionLoading,
+    checkUserRole,
     hasRole: checkUserRole
   };
 
