@@ -49,8 +49,9 @@ const Index: React.FC = () => {
       
       <main>
         <Hero />
-        <BackgroundGradientAnimationDemo />
+
         <Features />
+        <BackgroundGradientAnimationDemo />
        
         {/* How it works section */}
         <section className="py-24 bg-gray-50">

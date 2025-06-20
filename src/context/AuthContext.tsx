@@ -180,15 +180,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data?.user) {
         // Agora, crie o perfil na tabela 'profiles'
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            email: email,
-            name: name,
-            phone: phone,
-            role: role,
-          });
+        const { error: profileError } = await supabase.from("profiles").insert({
+          id: data.user.id,
+          name: name,
+          phone: phone,
+          role: role,
+        });
 
         if (profileError) {
           toast.error(`Erro ao criar perfil: ${profileError.message}`);
