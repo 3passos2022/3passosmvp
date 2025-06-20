@@ -141,6 +141,9 @@ const Profile: React.FC = () => {
   };
 
 
+  console.log("Olá! Eu sou User", user)
+
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -167,7 +170,7 @@ const Profile: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                    <h1 className="text-2xl font-bold">Olá, {user.name || user.email.split('@')[0]}</h1>
+                    <h1 className="text-2xl font-bold">Olá, {user && user.name}</h1>
                     <p className="text-gray-600">{user.email}</p>
                   </div>
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -143,7 +142,13 @@ const Login: React.FC = () => {
   const handleSignupSubmit = async (formData: z.infer<typeof signupSchema>) => {
     setIsLoading(true);
     try {
-      const { error } = await signUp(formData.email, formData.password, formData.role);
+      const { error } = await signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone,
+        role: formData.role,
+      });
 
       if (error) {
         toast.error(`Erro ao criar conta: ${error.message}`);

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
@@ -6,6 +5,34 @@ import { UserRole, UserProfile } from '@/lib/types';
 import { SubscriptionStatus } from '@/lib/types/subscriptions';
 import { toast } from 'sonner';
 import ProfileService, { hasRole } from '@/services/ProfileService';
+
+type AuthContextType = {
+  user: UserProfile | null;
+  session: Session | null;
+  loading: boolean;
+  subscription: SubscriptionStatus | null;
+  subscriptionLoading: boolean;
+  checkUserRole: (role: UserRole | string) => boolean;
+  signUp: (userData: {
+    email: string;
+    password: string;
+    role: UserRole;
+    name: string;
+    phone?: string;
+  }) => Promise<any>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ data: { user: User; session: Session } | { user: null; session: null }; error: any }>;
+  signOut: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ data: any; error: any }>;
+  resetPassword: (newPassword: string) => Promise<{ data: any; error: any }>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<{ error: Error | null; data: UserProfile | null }>;
+  refreshUser: () => Promise<void>;
+  makeAdmin: (userId: string) => Promise<{ error: Error | null; data: any }>;
+  refreshSubscription: () => Promise<void>;
+  hasRole: (role: UserRole | string) => boolean;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -124,30 +151,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Função de registro simplificada
-  async function signUp(email: string, password: string, role: UserRole) {
+  async function signUp(userData: {
+    email: string;
+    password: string;
+    role: UserRole;
+    name: string;
+    phone?: string;
+  }) {
+    const { email, password, role, name, phone } = userData;
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { role },
+          data: {
+            // A role pode ser armazenada em app_metadata se for mais seguro
+            // Aqui, usamos raw_user_meta_data para simplicidade
+            full_name: name,
+            role: role,
+          },
         },
       });
 
       if (error) {
+        toast.error(error.message);
         return { error, data: null };
       }
-      
+
       if (data?.user) {
-        // Criar perfil após registro bem-sucedido
-        setTimeout(async () => {
-          await ProfileService.createDefaultProfile(data.user.id, email, role);
-        }, 500);
+        // Agora, crie o perfil na tabela 'profiles'
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: data.user.id,
+            email: email,
+            name: name,
+            phone: phone,
+            role: role,
+          });
+
+        if (profileError) {
+          toast.error(`Erro ao criar perfil: ${profileError.message}`);
+          // Opcional: deletar o usuário da autenticação se a criação do perfil falhar
+          return { error: profileError, data: null };
+        }
+
+        // Força a atualização do estado local com o novo perfil
+        await fetchUserProfile(data.user);
       }
-      
+
       return { data, error: null };
     } catch (error) {
-      return { error: error as Error, data: null };
+      const e = error as Error;
+      toast.error(e.message);
+      return { error: e, data: null };
     }
   }
 
