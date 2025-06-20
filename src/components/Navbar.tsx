@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,12 +43,16 @@ const Navbar: React.FC = () => {
   }, [location.pathname]);
 
   const getInitials = () => {
-    if (user.name) {
+    if (!user?.name) {
+      return "";
+    }
+
+    if (user.name.includes(" ")) {
       return user.name
-        .split(' ')
-        .map(part => part[0])
+        .split(" ")
+        .map((part) => part[0])
         .slice(0, 2)
-        .join('')
+        .join("")
         .toUpperCase();
     }
     return user.name.substring(0, 2).toUpperCase();
