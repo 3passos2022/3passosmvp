@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Star, Users } from "lucide-react";
 import { Link } from "react-router-dom";
+import worker from "./../img/worker2.jpg"
 
 interface HeroServicesProps {
   chipText?: string;
@@ -80,7 +81,7 @@ function HeroServices({
           <div className="relative">
             <div className="relative overflow-hidden rounded-2xl shadow-2xl">
               <img
-                src={imageSrc}
+                src={worker}
                 alt={imageAlt}
                 className="w-full h-[500px] lg:h-[600px] object-cover"
               />
