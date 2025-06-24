@@ -19,7 +19,8 @@ import { Label } from '@/components/ui/label';
 interface ServiceItem {
   id: string;
   name: string;
-  type: 'quantity' | 'square_meter' | 'linear_meter';
+  type: 'quantity' | 'square_meter' | 'linear_meter' | 'max_square_meter' | 'max_linear_meter';
+  referenceValue?: number;
   service_id?: string;
   sub_service_id?: string;
   specialty_id?: string;
@@ -30,7 +31,8 @@ interface ServiceItem {
 interface ItemFormData {
   id?: string;
   name: string;
-  type: 'quantity' | 'square_meter' | 'linear_meter';
+  type: 'quantity' | 'square_meter' | 'linear_meter' | 'max_square_meter' | 'max_linear_meter';
+  referenceValue?: number;
   serviceId?: string;
   subServiceId?: string;
   specialtyId?: string;
@@ -116,9 +118,10 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
   // Create item mutation
   const createItemMutation = useMutation({
     mutationFn: async (formData: ItemFormData) => {
-      const itemData: Omit<ServiceItem, 'id' | 'created_at' | 'updated_at'> = {
+      const itemData: Record<string, any> = {
         name: formData.name,
         type: formData.type,
+        reference_value: formData.referenceValue,
       };
       
       if (level === 'service' && serviceId) {
@@ -161,7 +164,8 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
         .from('service_items')
         .update({ 
           name: formData.name,
-          type: formData.type 
+          type: formData.type,
+          reference_value: formData.referenceValue
         })
         .eq('id', formData.id);
       
@@ -225,11 +229,12 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
     }
   };
 
-  const handleItemEdit = (item: ServiceItem) => {
+  const handleItemEdit = (item: any) => {
     setCurrentItem({
       id: item.id,
       name: item.name,
       type: item.type,
+      referenceValue: item.reference_value,
       serviceId: item.service_id,
       subServiceId: item.sub_service_id,
       specialtyId: item.specialty_id
@@ -249,6 +254,8 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
       case 'quantity': return 'Quantidade';
       case 'square_meter': return 'Metro quadrado';
       case 'linear_meter': return 'Metro linear';
+      case 'max_square_meter': return 'Medida máxima (m²)';
+      case 'max_linear_meter': return 'Medida máxima (m)';
       default: return type;
     }
   };
@@ -299,7 +306,8 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
                   value={currentItem.type}
                   onValueChange={(value) => setCurrentItem({
                     ...currentItem, 
-                    type: value as 'quantity' | 'square_meter' | 'linear_meter'
+                    type: value as 'quantity' | 'square_meter' | 'linear_meter' | 'max_square_meter' | 'max_linear_meter',
+                    referenceValue: value === 'max_square_meter' || value === 'max_linear_meter' ? currentItem.referenceValue : undefined
                   })}
                 >
                   <SelectTrigger>
@@ -309,12 +317,32 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
                     <SelectItem value="quantity">Quantidade</SelectItem>
                     <SelectItem value="square_meter">Metro quadrado</SelectItem>
                     <SelectItem value="linear_meter">Metro linear</SelectItem>
+                    <SelectItem value="max_square_meter">Medida máxima (m²)</SelectItem>
+                    <SelectItem value="max_linear_meter">Medida máxima (m)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   O tipo determina como este item será contabilizado nos orçamentos
                 </p>
               </div>
+              
+              {(currentItem.type === 'max_square_meter' || currentItem.type === 'max_linear_meter') && (
+                <div>
+                  <label htmlFor="referenceValue" className="text-sm font-medium">
+                    Valor de referência ({currentItem.type === 'max_square_meter' ? 'm²' : 'm'}) <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="referenceValue"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={currentItem.referenceValue || ''}
+                    onChange={(e) => setCurrentItem({ ...currentItem, referenceValue: parseFloat(e.target.value) || undefined })}
+                    placeholder={currentItem.type === 'max_square_meter' ? 'Ex: 80' : 'Ex: 100'}
+                    required
+                  />
+                </div>
+              )}
               
               <DialogFooter>
                 <Button 

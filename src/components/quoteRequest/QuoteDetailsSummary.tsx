@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Card, 
@@ -43,9 +42,18 @@ interface QuoteDetailsProps {
     serviceTimePreference?: string;
   };
   compact?: boolean;
+  priceDetails?: Array<{
+    itemId: string;
+    itemName: string;
+    quantity?: number;
+    area?: number;
+    pricePerUnit: number;
+    total: number;
+  }>;
+  totalPrice?: number;
 }
 
-const QuoteDetailsSummary: React.FC<QuoteDetailsProps> = ({ formData, compact = false }) => {
+const QuoteDetailsSummary: React.FC<QuoteDetailsProps> = ({ formData, compact = false, priceDetails, totalPrice }) => {
   // Helper function to format time preference
   const formatTimePreference = (preference?: string) => {
     switch(preference) {
@@ -56,6 +64,7 @@ const QuoteDetailsSummary: React.FC<QuoteDetailsProps> = ({ formData, compact = 
       default: return '-';
     }
   };
+
 
   return (
     <div className={`space-y-${compact ? '4' : '6'}`}>
@@ -220,6 +229,33 @@ const QuoteDetailsSummary: React.FC<QuoteDetailsProps> = ({ formData, compact = 
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detalhamento dos Preços Calculados */}
+  
+      {priceDetails && priceDetails.length > 0 && (
+        <Card>
+          <CardHeader className={compact ? 'pb-2' : undefined}>
+            <CardTitle>Detalhamento dos Preços</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {priceDetails.map((detail, idx) => (
+                <div key={detail.itemId + idx} className="flex justify-between pb-2 border-b last:border-b-0 last:pb-0">
+                  <span>{detail.itemName}</span>
+                  <span className="text-sm text-gray-500">
+                    {detail.quantity ? `${detail.quantity} x ` : detail.area ? `${detail.area.toFixed(2)}m² x ` : ''}
+                    R$ {detail.pricePerUnit.toFixed(2)}
+                  </span>
+                  <span className="font-medium">R$ {detail.total.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end pt-2">
+              <span className="font-bold text-lg">Total: R$ {totalPrice?.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>

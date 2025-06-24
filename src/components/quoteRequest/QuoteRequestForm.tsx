@@ -108,6 +108,7 @@ interface FormData {
   serviceDate?: Date;
   serviceEndDate?: Date;
   serviceTimePreference?: string;
+  items?: ServiceItem[];
 }
 
 interface QuoteRequestFormProps {
@@ -814,7 +815,8 @@ const ServiceDetailsStep: React.FC<{
       answers,
       itemQuantities,
       itemNames,
-      measurements
+      measurements,
+      items
     });
     
     onNext();
@@ -989,7 +991,7 @@ const ServiceDetailsStep: React.FC<{
           
           <div className="space-y-4">
             {items
-              .filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter')
+              .filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter' && item.type !== 'max_square_meter' && item.type !== 'max_linear_meter')
               .map((item) => (
                 <div key={item.id} className="flex items-center justify-between border p-4 rounded-md">
                   <div>
@@ -1009,8 +1011,7 @@ const ServiceDetailsStep: React.FC<{
               ))}
           </div>
           
-          {/* Show message if there are no regular items */}
-          {items.filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter').length === 0 && (
+          {items.filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter' && item.type !== 'max_square_meter' && item.type !== 'max_linear_meter').length === 0 && (
             <p className="text-center py-4">Não há itens que precisam de quantidade manual neste serviço.</p>
           )}
           
@@ -1246,6 +1247,20 @@ const ReviewStep: React.FC<{
       const serviceDateFormatted = formData.serviceDate ? formData.serviceDate.toISOString() : null;
       const serviceEndDateFormatted = formData.serviceEndDate ? formData.serviceEndDate.toISOString() : null;
       
+      // Montar metadados dos itens para cálculo correto
+      const _itemTypes: Record<string, string> = {};
+      const _itemReferenceValues: Record<string, number> = {};
+      const items = formData.items || [];
+      if (items && items.length > 0) {
+        items.forEach(item => {
+          _itemTypes[item.id] = item.type;
+          if (item.type === 'max_square_meter' || item.type === 'max_linear_meter') {
+            if (item.referenceValue !== undefined) {
+              _itemReferenceValues[item.id] = item.referenceValue;
+            }
+          }
+        });
+      }
       // Prepare the quote data
       const quoteData = {
         client_id: user?.id || null,
@@ -1296,7 +1311,9 @@ const ReviewStep: React.FC<{
         clientId: user?.id,
         serviceDate: formData.serviceDate,
         serviceEndDate: formData.serviceEndDate,
-        serviceTimePreference: formData.serviceTimePreference
+        serviceTimePreference: formData.serviceTimePreference,
+        _itemTypes,
+        _itemReferenceValues
       };
       
       // Store the complete quote details in session storage

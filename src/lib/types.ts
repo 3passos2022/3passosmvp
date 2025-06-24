@@ -1,4 +1,3 @@
-
 export enum UserRole {
   CLIENT = 'client',
   PROVIDER = 'provider',
@@ -55,7 +54,8 @@ export interface ServiceItem {
   id: string;
   name: string;
   description?: string;
-  type: 'quantity' | 'square_meter' | 'linear_meter';
+  type: 'quantity' | 'square_meter' | 'linear_meter' | 'max_square_meter' | 'max_linear_meter';
+  referenceValue?: number;
 }
 
 export interface QuoteMeasurement {
@@ -65,5 +65,5 @@ export interface QuoteMeasurement {
   length: number;
   height?: number;
   area?: number;
-  measurementType?: 'square_meter' | 'linear_meter';
+  measurementType?: 'square_meter' | 'linear_meter' | 'max_square_meter' | 'max_linear_meter';
 }

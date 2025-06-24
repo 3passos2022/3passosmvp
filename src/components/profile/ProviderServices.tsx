@@ -52,6 +52,7 @@ const ProviderServices = () => {
   const [serviceItems, setServiceItems] = useState<Record<string, ProviderServiceItemPrice[]>>({});
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
+  const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
   
   // Obter o limite de serviços baseado na assinatura
   const servicesLimit = featureLimits?.provider_services_limit?.limit ?? 1;
@@ -518,6 +519,33 @@ const ProviderServices = () => {
     ? filteredSubServices.find(s => s.id === selectedSubService)?.specialties || []
     : [];
 
+  // Função para atualizar o estado local ao digitar
+  const handleLocalPriceChange = (itemId: string, value: string) => {
+    const price = parseCurrencyInput(value);
+    setEditedPrices(prev => ({ ...prev, [itemId]: price }));
+  };
+
+  // Função para salvar todos os preços editados
+  const handleSaveAllPrices = async () => {
+    if (!currentServiceId) return;
+    setSavingPrice(true);
+    try {
+      const items = serviceItems[currentServiceId] || [];
+      for (const item of items) {
+        if (editedPrices[item.id] !== undefined && !isNaN(editedPrices[item.id])) {
+          await updateItemPrice(currentServiceId, item.id, editedPrices[item.id]);
+        }
+      }
+      toast.success('Preços salvos com sucesso!');
+      setEditedPrices({});
+      setIsItemDialogOpen(false);
+    } catch (error) {
+      toast.error('Erro ao salvar preços.');
+    } finally {
+      setSavingPrice(false);
+    }
+  };
+
   if (loading || loadingFeatures) {
     return (
       <div className="text-center p-8">
@@ -671,29 +699,30 @@ const ProviderServices = () => {
                                 <div>
                                   <p className="font-medium">{item.name}</p>
                                   <p className="text-sm text-gray-500">
-                                    Tipo: {item.type === 'quantity' ? 'Quantidade' : 
-                                           item.type === 'square_meter' ? 'Metro quadrado' : 
-                                           'Metro linear'}
+                                    Tipo: {item.type === 'quantity' ? 'Quantidade' :
+                                           item.type === 'square_meter' ? 'Metro quadrado' :
+                                           item.type === 'linear_meter' ? 'Metro linear' :
+                                           item.type === 'max_square_meter' ? 'Medida máxima (m²)' :
+                                           item.type === 'max_linear_meter' ? 'Medida máxima (m)' :
+                                           item.type}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="w-32">
                                     <Input 
                                       type="text"
-                                      defaultValue={item.pricePerUnit.toString()}
-                                      onChange={(e) => {
-                                        const price = parseCurrencyInput(e.target.value);
-                                        if (price >= 0) {
-                                          updateItemPrice(currentServiceId, item.id, price);
-                                        }
-                                      }}
+                                      value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : item.pricePerUnit}
+                                      onChange={(e) => handleLocalPriceChange(item.id, e.target.value)}
                                       placeholder="R$ 0,00"
                                     />
                                   </div>
                                   <span className="text-sm text-gray-500">
-                                    por {item.type === 'quantity' ? 'unidade' : 
-                                         item.type === 'square_meter' ? 'm²' : 
-                                         'm'}
+                                    por {item.type === 'quantity' ? 'unidade' :
+                                         item.type === 'square_meter' ? 'm²' :
+                                         item.type === 'linear_meter' ? 'm' :
+                                         item.type === 'max_square_meter' ? 'até m²' :
+                                         item.type === 'max_linear_meter' ? 'até m' :
+                                         ''}
                                   </span>
                                 </div>
                               </div>
@@ -721,29 +750,30 @@ const ProviderServices = () => {
                                 <div>
                                   <p className="font-medium">{item.name}</p>
                                   <p className="text-sm text-gray-500">
-                                    Tipo: {item.type === 'quantity' ? 'Quantidade' : 
-                                           item.type === 'square_meter' ? 'Metro quadrado' : 
-                                           'Metro linear'}
+                                    Tipo: {item.type === 'quantity' ? 'Quantidade' :
+                                           item.type === 'square_meter' ? 'Metro quadrado' :
+                                           item.type === 'linear_meter' ? 'Metro linear' :
+                                           item.type === 'max_square_meter' ? 'Medida máxima (m²)' :
+                                           item.type === 'max_linear_meter' ? 'Medida máxima (m)' :
+                                           item.type}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="w-32">
                                     <Input 
                                       type="text"
-                                      defaultValue={item.pricePerUnit.toString()}
-                                      onChange={(e) => {
-                                        const price = parseCurrencyInput(e.target.value);
-                                        if (price >= 0) {
-                                          updateItemPrice(currentServiceId, item.id, price);
-                                        }
-                                      }}
+                                      value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : item.pricePerUnit}
+                                      onChange={(e) => handleLocalPriceChange(item.id, e.target.value)}
                                       placeholder="R$ 0,00"
                                     />
                                   </div>
                                   <span className="text-sm text-gray-500">
-                                    por {item.type === 'quantity' ? 'unidade' : 
-                                         item.type === 'square_meter' ? 'm²' : 
-                                         'm'}
+                                    por {item.type === 'quantity' ? 'unidade' :
+                                         item.type === 'square_meter' ? 'm²' :
+                                         item.type === 'linear_meter' ? 'm' :
+                                         item.type === 'max_square_meter' ? 'até m²' :
+                                         item.type === 'max_linear_meter' ? 'até m' :
+                                         ''}
                                   </span>
                                 </div>
                               </div>
@@ -771,29 +801,30 @@ const ProviderServices = () => {
                                 <div>
                                   <p className="font-medium">{item.name}</p>
                                   <p className="text-sm text-gray-500">
-                                    Tipo: {item.type === 'quantity' ? 'Quantidade' : 
-                                           item.type === 'square_meter' ? 'Metro quadrado' : 
-                                           'Metro linear'}
+                                    Tipo: {item.type === 'quantity' ? 'Quantidade' :
+                                           item.type === 'square_meter' ? 'Metro quadrado' :
+                                           item.type === 'linear_meter' ? 'Metro linear' :
+                                           item.type === 'max_square_meter' ? 'Medida máxima (m²)' :
+                                           item.type === 'max_linear_meter' ? 'Medida máxima (m)' :
+                                           item.type}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="w-32">
                                     <Input 
                                       type="text"
-                                      defaultValue={item.pricePerUnit.toString()}
-                                      onChange={(e) => {
-                                        const price = parseCurrencyInput(e.target.value);
-                                        if (price >= 0) {
-                                          updateItemPrice(currentServiceId, item.id, price);
-                                        }
-                                      }}
+                                      value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : item.pricePerUnit}
+                                      onChange={(e) => handleLocalPriceChange(item.id, e.target.value)}
                                       placeholder="R$ 0,00"
                                     />
                                   </div>
                                   <span className="text-sm text-gray-500">
-                                    por {item.type === 'quantity' ? 'unidade' : 
-                                         item.type === 'square_meter' ? 'm²' : 
-                                         'm'}
+                                    por {item.type === 'quantity' ? 'unidade' :
+                                         item.type === 'square_meter' ? 'm²' :
+                                         item.type === 'linear_meter' ? 'm' :
+                                         item.type === 'max_square_meter' ? 'até m²' :
+                                         item.type === 'max_linear_meter' ? 'até m' :
+                                         ''}
                                   </span>
                                 </div>
                               </div>
@@ -811,7 +842,12 @@ const ProviderServices = () => {
               )}
               
               <DialogFooter>
-                <Button onClick={() => setIsItemDialogOpen(false)}>Fechar</Button>
+                <Button onClick={handleSaveAllPrices} disabled={savingPrice}>
+                  {savingPrice ? 'Salvando...' : 'Salvar'}
+                </Button>
+                <Button variant="outline" onClick={() => setIsItemDialogOpen(false)} disabled={savingPrice}>
+                  Fechar
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

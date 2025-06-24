@@ -81,6 +81,7 @@ export interface QuoteDetails {
   _storedAt?: string;
   _itemTypes?: Record<string, string>;
   _itemNames?: Record<string, string>;
+  _itemReferenceValues?: Record<string, number>;
   // Added service date fields
   serviceDate?: Date;
   serviceEndDate?: Date; 

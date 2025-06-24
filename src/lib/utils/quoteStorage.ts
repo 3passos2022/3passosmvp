@@ -26,6 +26,7 @@ const calculateAreaBasedQuantities = (
 
   // Percorre os metadados dos itens, se disponíveis
   if (quote._itemTypes) {
+    // Itens de área e perímetro
     Object.entries(quote._itemTypes).forEach(([itemId, type]) => {
       if (type === "square_meter") {
         updatedItems[itemId] = totalArea;
@@ -34,6 +35,38 @@ const calculateAreaBasedQuantities = (
       }
       // Nota: os itens regulares (quantity) mantêm seus valores originais
     });
+
+    // Itens de medida máxima (m²)
+    const maxSquareItems = Object.entries(quote._itemTypes)
+      .filter(([_, type]) => type === 'max_square_meter')
+      .map(([itemId]) => ({
+        itemId,
+        referenceValue: quote._itemReferenceValues?.[itemId],
+      }))
+      .filter(item => typeof item.referenceValue === 'number');
+    if (maxSquareItems.length > 0) {
+      // Seleciona o item com menor referenceValue >= totalArea
+      const valid = maxSquareItems.filter(item => totalArea <= item.referenceValue);
+      if (valid.length > 0) {
+        const selected = valid.reduce((min, curr) => curr.referenceValue < min.referenceValue ? curr : min, valid[0]);
+        updatedItems[selected.itemId] = 1; // Marca como selecionado (quantidade 1)
+      }
+    }
+    // Itens de medida máxima (m)
+    const maxLinearItems = Object.entries(quote._itemTypes)
+      .filter(([_, type]) => type === 'max_linear_meter')
+      .map(([itemId]) => ({
+        itemId,
+        referenceValue: quote._itemReferenceValues?.[itemId],
+      }))
+      .filter(item => typeof item.referenceValue === 'number');
+    if (maxLinearItems.length > 0) {
+      const valid = maxLinearItems.filter(item => totalPerimeter <= item.referenceValue);
+      if (valid.length > 0) {
+        const selected = valid.reduce((min, curr) => curr.referenceValue < min.referenceValue ? curr : min, valid[0]);
+        updatedItems[selected.itemId] = 1;
+      }
+    }
   }
 
   return updatedItems;

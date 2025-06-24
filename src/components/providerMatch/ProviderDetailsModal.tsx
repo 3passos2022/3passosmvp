@@ -40,6 +40,8 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
     if (distance < 1) return `${(distance * 1000).toFixed(0)}m`;
     return `${distance.toFixed(1)}km`;
   };
+  
+  console.log("provider.priceDetails_ ANDRE", provider.priceDetails);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -114,7 +116,7 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                       )}
                     </div>
                   </div>
-
+                 
                   {/* Detalhamento dos preços */}
                   {provider.priceDetails && provider.priceDetails.length > 0 && (
                     <div className="border-b pb-4">

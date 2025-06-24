@@ -206,10 +206,9 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
           .select(`
             item_id,
             price_per_unit,
-            service_items(name, type)
+            service_items(name, type, reference_value)
           `)
-          .eq('provider_id', provider.id)
-          .in('item_id', Object.keys(quoteDetails.items));
+          .eq('provider_id', provider.id);
         itemPrices = data;
 
         if (itemPrices) {
@@ -237,31 +236,113 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
         const totalArea = quoteDetails.measurements.reduce((sum, measurement) => {
           return sum + (measurement.area || measurement.width * measurement.length);
         }, 0);
+        const totalPerimeter = quoteDetails.measurements.reduce((sum, measurement) => {
+          return sum + (2 * measurement.width + 2 * measurement.length);
+        }, 0);
 
-        // Procurar item do tipo m² ou metro quadrado
+        // Buscar todos os itens de medida máxima (m²)
+        let maxAreaItems = [];
         let areaItem = null;
+        let maxLinearItems = [];
+        let linearItem = null;
         if (typeof itemPrices !== 'undefined' && itemPrices !== null) {
-          areaItem = itemPrices.find(item => item.service_items?.type === 'm²' || item.service_items?.type === 'metro quadrado');
+          maxAreaItems = itemPrices.filter(item => item.service_items?.type === 'max_square_meter');
+          areaItem = itemPrices.find(item => item.service_items?.type === 'm²' || item.service_items?.type === 'metro quadrado' || item.service_items?.type === 'square_meter');
+          maxLinearItems = itemPrices.filter(item => item.service_items?.type === 'max_linear_meter');
+          linearItem = itemPrices.find(item => item.service_items?.type === 'linear_meter');
         }
 
-        if (totalArea > 0) {
-          let areaUnitPrice = 0;
-          if (areaItem) {
-            areaUnitPrice = areaItem.price_per_unit;
-          } else {
-            areaUnitPrice = matchingService?.base_price || 0;
-          }
-          areaPrice = totalArea * areaUnitPrice;
+        let maxAreaItem = null;
+        // Lógica robusta para medida máxima (m²)
+        if (maxAreaItems.length > 0) {
+          // Filtra e ordena itens válidos por reference_value crescente
+          const maxAreaItemsValid = maxAreaItems
+            .map(item => ({
+              ...item,
+              referenceValue: Number(item.service_items?.reference_value)
+            }))
+            .filter(item => !isNaN(item.referenceValue))
+            .sort((a, b) => a.referenceValue - b.referenceValue);
 
-          priceDetails.push({
-            itemId: areaItem ? areaItem.item_id : 'area',
-            itemName: areaItem ? areaItem.service_items?.name : 'Área total',
-            area: totalArea,
-            pricePerUnit: areaUnitPrice,
-            total: areaPrice
-          });
-          
-          console.log(`📐 [ProviderMatch] Área total: ${totalArea}m², Preço: R$ ${areaPrice.toFixed(2)}`);
+          let excedente = 0;
+
+          // Busca o menor item cujo reference_value >= totalArea
+          for (const item of maxAreaItemsValid) {
+            if (totalArea <= item.referenceValue) {
+              maxAreaItem = item;
+              break;
+            }
+          }
+
+          if (maxAreaItem) {
+            // Caso 1: área dentro de um dos limites
+            areaPrice = maxAreaItem.price_per_unit;
+            if (areaPrice > 0) {
+              priceDetails.push({
+                itemId: maxAreaItem.item_id,
+                itemName: maxAreaItem.service_items?.name,
+                quantity: 1,
+                pricePerUnit: maxAreaItem.price_per_unit,
+                total: maxAreaItem.price_per_unit
+              });
+            }
+          } else {
+            // Caso 2: área maior que todos os limites cadastrados
+            const maiorItem = maxAreaItemsValid[maxAreaItemsValid.length - 1];
+            if (maiorItem) {
+              areaPrice = maiorItem.price_per_unit;
+              excedente = totalArea - maiorItem.referenceValue;
+              if (areaPrice > 0) {
+                priceDetails.push({
+                  itemId: maiorItem.item_id,
+                  itemName: maiorItem.service_items?.name,
+                  quantity: 1,
+                  pricePerUnit: maiorItem.price_per_unit,
+                  total: maiorItem.price_per_unit
+                });
+              }
+              if (areaItem && excedente > 0) {
+                const excedenteTotal = excedente * areaItem.price_per_unit;
+                areaPrice += excedenteTotal;
+                if (excedenteTotal > 0) {
+                  priceDetails.push({
+                    itemId: areaItem.item_id,
+                    itemName: areaItem.service_items?.name + ' (excedente)',
+                    area: excedente,
+                    pricePerUnit: areaItem.price_per_unit,
+                    total: excedenteTotal
+                  });
+                }
+              }
+            }
+          }
+        } else if (areaItem && totalArea > 0) {
+          // Lógica tradicional de área
+          let areaUnitPrice = areaItem.price_per_unit;
+          areaPrice = totalArea * areaUnitPrice;
+          if (areaPrice > 0) {
+            priceDetails.push({
+              itemId: areaItem.item_id,
+              itemName: areaItem.service_items?.name,
+              area: totalArea,
+              pricePerUnit: areaUnitPrice,
+              total: areaPrice
+            });
+          }
+        }
+        // Não calcular/exibir linear_meter se só houver área (m²)
+        if (!maxAreaItem && !areaItem && linearItem && totalPerimeter > 0) {
+          const linearTotal = totalPerimeter * linearItem.price_per_unit;
+          areaPrice += linearTotal;
+          if (linearTotal > 0) {
+            priceDetails.push({
+              itemId: linearItem.item_id,
+              itemName: linearItem.service_items?.name,
+              area: totalPerimeter,
+              pricePerUnit: linearItem.price_per_unit,
+              total: linearTotal
+            });
+          }
         }
       }
 
@@ -321,9 +402,9 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
       return (a.distance || 0) - (b.distance || 0);
     });
 
-    console.log(`🎉 [ProviderMatch] Retornando ${matches.length} prestadores encontrados`);
+    /* console.log(`🎉 [ProviderMatch] Retornando ${matches.length} prestadores encontrados`);
     console.log(`📊 [ProviderMatch] Dentro da área: ${matches.filter(m => m.isWithinRadius).length}`);
-    console.log(`📊 [ProviderMatch] Fora da área: ${matches.filter(m => !m.isWithinRadius).length}`);
+    console.log(`📊 [ProviderMatch] Fora da área: ${matches.filter(m => !m.isWithinRadius).length}`); */
     
     return matches;
 
@@ -357,7 +438,7 @@ export async function getProviderDetails(providerId: string, quoteDetails: Quote
     // Calcular distância e preço
     const matches = await findMatchingProviders(quoteDetails);
     const match = matches.find(m => m.provider.userId === providerId);
-
+    console.log("match.priceDetails", match.priceDetails)
     if (!match) {
       throw new Error('Prestador não está disponível para este serviço');
     }
