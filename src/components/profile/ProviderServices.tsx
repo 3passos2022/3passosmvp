@@ -19,6 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { UUID, randomUUID } from 'crypto';
 
 // Basic type definitions to avoid deep types
 interface SpecialtyItem {
@@ -34,7 +35,6 @@ interface ProviderServiceItem {
   specialtyName: string;
   serviceName: string;
   subServiceName: string;
-  basePrice: number;
 }
 
 const ProviderServices = () => {
@@ -47,7 +47,6 @@ const ProviderServices = () => {
   const [selectedService, setSelectedService] = useState<string>('');
   const [selectedSubService, setSelectedSubService] = useState<string>('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
-  const [basePrice, setBasePrice] = useState<string>('');
   const [providerServices, setProviderServices] = useState<ProviderServiceItem[]>([]);
   const [serviceItems, setServiceItems] = useState<Record<string, ProviderServiceItemPrice[]>>({});
   const [currentServiceId, setCurrentServiceId] = useState<string>('');
@@ -134,8 +133,7 @@ const ProviderServices = () => {
             specialtyId: providerService.specialty_id,
             specialtyName,
             serviceName,
-            subServiceName,
-            basePrice: providerService.base_price,
+            subServiceName
           });
         }
         
@@ -273,7 +271,7 @@ const ProviderServices = () => {
   };
   
   const handleAddService = async () => {
-    if (!user || !selectedSpecialty || !basePrice) return;
+    if (!user) return;
     
     // Verificar limite de serviços
     if (!isUnlimited && providerServices.length >= servicesLimit) {
@@ -282,15 +280,17 @@ const ProviderServices = () => {
     }
     
     setAddingService(true);
+    
     try {
       // Check if already exists
       const { data: existingService, error: checkError } = await supabase
         .from('provider_services')
         .select('id')
         .eq('provider_id', user.id)
-        .eq('specialty_id', selectedSpecialty)
+        .eq('sub_service_id', selectedSubService)
+        .eq('specialty_id', selectedSpecialty ? selectedSpecialty : null)
         .maybeSingle();
-      
+        
       if (checkError) throw checkError;
       
       if (existingService) {
@@ -299,13 +299,24 @@ const ProviderServices = () => {
       }
       
       // Insert new service
+      const insertPayload: any = {
+        provider_id: user.id,
+        sub_service_id: selectedSubService || 
+      null
+      , 
+      // Isso já está correto
+        specialty_id: selectedSpecialty || 
+      null
+      // Adiciona specialty_id diretamente
+      };
+     
+      if (selectedSpecialty) {
+        insertPayload.specialty_id = selectedSpecialty;
+      }
+      console.log("insertPayload",insertPayload);
       const { data, error } = await supabase
         .from('provider_services')
-        .insert({
-          provider_id: user.id,
-          specialty_id: selectedSpecialty,
-          base_price: parseFloat(basePrice),
-        })
+        .insert(insertPayload)
         .select()
         .single();
       
@@ -317,7 +328,6 @@ const ProviderServices = () => {
       setSelectedService('');
       setSelectedSubService('');
       setSelectedSpecialty('');
-      setBasePrice('');
       
       // Add to the list without reloading
       let serviceName = '';
@@ -326,14 +336,13 @@ const ProviderServices = () => {
       
       for (const service of services) {
         for (const subService of service.subServices) {
-          const specialty = subService.specialties.find(
-            spec => spec.id === selectedSpecialty
-          );
-          
-          if (specialty) {
+          if (subService.id === selectedSubService) {
             serviceName = service.name;
             subServiceName = subService.name;
-            specialtyName = specialty.name;
+            if (selectedSpecialty) {
+              const specialty = subService.specialties.find(spec => spec.id === selectedSpecialty);
+              specialtyName = specialty ? specialty.name : '';
+            }
             break;
           }
         }
@@ -343,11 +352,10 @@ const ProviderServices = () => {
       
       const newProviderService = {
         id: data.id,
-        specialtyId: selectedSpecialty,
+        specialtyId: selectedSpecialty || '',
         specialtyName,
         serviceName,
         subServiceName,
-        basePrice: parseFloat(basePrice),
       };
       
       setProviderServices([
@@ -355,8 +363,10 @@ const ProviderServices = () => {
         newProviderService
       ]);
       
-      // Load service items for the new service
-      await loadServiceItems(selectedSpecialty, data.id);
+      // Load service items for the new service (se houver especialidade)
+      if (selectedSpecialty) {
+        await loadServiceItems(selectedSpecialty, data.id);
+      }
       
     } catch (error: any) {
       console.error('Error adding provider service:', error);
@@ -382,7 +392,7 @@ const ProviderServices = () => {
       setProviderServices(
         providerServices.map(service => 
           service.id === serviceId 
-            ? { ...service, basePrice: newPrice }
+            ? { ...service}
             : service
         )
       );
@@ -601,7 +611,6 @@ const ProviderServices = () => {
                   
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                      <span>Preço base: {formatCurrency(service.basePrice)}</span>
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -616,14 +625,6 @@ const ProviderServices = () => {
                             <div className="space-y-2">
                               <Label>Serviço</Label>
                               <p>{service.specialtyName}</p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor={`price-${service.id}`}>Preço base (R$)</Label>
-                              <Input 
-                                id={`price-${service.id}`}
-                                type="text"
-                                defaultValue={service.basePrice.toString()}
-                              />
                             </div>
                             <Button 
                               className="w-full"
@@ -925,28 +926,11 @@ const ProviderServices = () => {
                   </div>
                 )}
                 
-                {selectedSpecialty && (
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Preço base (R$)</Label>
-                    <Input 
-                      id="price" 
-                      type="text"
-                      value={basePrice}
-                      onChange={(e) => setBasePrice(e.target.value)}
-                      placeholder="Ex: 100,00"
-                    />
-                  </div>
-                )}
-                
                 <Button 
                   onClick={handleAddService}
                   disabled={
                     addingService || 
-                    !selectedService || 
-                    !selectedSubService || 
-                    !selectedSpecialty || 
-                    !basePrice ||
-                    parseFloat(basePrice.replace(',', '.')) <= 0
+                    !selectedService
                   }
                 >
                   <Plus className="h-4 w-4 mr-1" />

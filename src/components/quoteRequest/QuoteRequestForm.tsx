@@ -103,7 +103,7 @@ interface FormData {
     width: number;
     length: number;
     height?: number;
-    measurementType?: 'square_meter' | 'linear_meter';
+    measurementType?: 'square_meter' | 'max_square_meter' | 'linear_meter' | 'max_linear_meter';
   }[];
   serviceDate?: Date;
   serviceEndDate?: Date;
@@ -602,10 +602,19 @@ const ServiceDetailsStep: React.FC<{
     length: number;
     height?: number;
     measurementType?: 'square_meter' | 'linear_meter';
-  }[]>(formData.measurements || []);
+    linearMeters: number;
+  }[]>(
+    Array.isArray(formData.measurements)
+      ? (formData.measurements as any[]).map(m => ({
+          ...m,
+          measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType,
+          linearMeters: 'linearMeters' in m && typeof m.linearMeters === 'number' ? m.linearMeters : 0
+        }))
+      : []
+  );
   const [loading, setLoading] = useState(true);
-  const [hasSquareMeterItems, setHasSquareMeterItems] = useState(false);
-  const [hasLinearMeterItems, setHasLinearMeterItems] = useState(false);
+  const [hasArea, setHasArea] = useState(false);
+  const [hasLinear, setHasLinear] = useState(false);
   const [allQuestionsAnswered, setAllQuestionsAnswered] = useState(false);
   const [requiredSteps, setRequiredSteps] = useState<string[]>(['quiz']);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
@@ -651,11 +660,11 @@ const ServiceDetailsStep: React.FC<{
         setItemTypes(typesMap);
         setItemNames(namesMap);
         
-        const hasSquareItems = allItems.some(item => item.type === 'square_meter');
-        const hasLinearItems = allItems.some(item => item.type === 'linear_meter');
+        const hasSquareItems = allItems.some(item => item.type === 'square_meter' || item.type === 'max_square_meter');
+        const hasLinearItems = allItems.some(item => item.type === 'linear_meter' || item.type === 'max_linear_meter');
         
-        setHasSquareMeterItems(hasSquareItems);
-        setHasLinearMeterItems(hasLinearItems);
+        setHasArea(hasSquareItems);
+        setHasLinear(hasLinearItems);
         
         const neededSteps = [];
         if (allQuestions.length > 0) {
@@ -759,7 +768,9 @@ const ServiceDetailsStep: React.FC<{
         roomName: '', 
         width: 0, 
         length: 0,
-        measurementType: 'square_meter' // Default to square meters
+        height: undefined,
+        measurementType: hasArea ? 'square_meter' : hasLinear ? 'linear_meter' : undefined,
+        linearMeters: 0
       }
     ]);
   };
@@ -815,7 +826,10 @@ const ServiceDetailsStep: React.FC<{
       answers,
       itemQuantities,
       itemNames,
-      measurements,
+      measurements: measurements.map(m => ({
+        ...m,
+        measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType
+      })),
       items
     });
     
@@ -849,6 +863,7 @@ const ServiceDetailsStep: React.FC<{
       </div>
     );
   }
+
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-6">
@@ -1062,7 +1077,7 @@ const ServiceDetailsStep: React.FC<{
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Nome do cômodo/área (opcional)</Label>
+                        <Label>Nome do cômodo/área ou objeto (opcional)</Label>
                         <Input 
                           value={measurement.roomName || ''} 
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
@@ -1070,72 +1085,48 @@ const ServiceDetailsStep: React.FC<{
                         />
                       </div>
                       
-                      <div className="space-y-2">
-                        <Label>Tipo de medida</Label>
-                        <RadioGroup 
-                          value={measurement.measurementType || 'square_meter'} 
-                          onValueChange={(value) => updateMeasurement(index, 'measurementType', value)}
-                          className="flex space-x-4"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="square_meter" id={`square-${index}`} />
-                            <Label htmlFor={`square-${index}`}>Metros quadrados (m²)</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="linear_meter" id={`linear-${index}`} />
-                            <Label htmlFor={`linear-${index}`}>Metros lineares (m)</Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {hasArea && (
                         <div className="space-y-2">
-                          <Label>Largura (m)</Label>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            min="0"
-                            value={measurement.width || ''} 
-                            onChange={(e) => updateMeasurement(index, 'width', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label>Comprimento (m)</Label>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            min="0"
-                            value={measurement.length || ''} 
-                            onChange={(e) => updateMeasurement(index, 'length', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                        
-                        {measurement.measurementType === 'square_meter' && hasSquareMeterItems && (
-                          <div className="space-y-2">
-                            <Label>Altura (m) (opcional)</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              min="0"
-                              value={measurement.height || ''} 
-                              onChange={(e) => updateMeasurement(index, 'height', parseFloat(e.target.value) || undefined)}
-                            />
+                          <Label>Área (m²)</Label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Largura (m)</Label>
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                min="0"
+                                value={measurement.width || ''} 
+                                onChange={(e) => updateMeasurement(index, 'width', parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Comprimento (m)</Label>
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                min="0"
+                                value={measurement.length || ''} 
+                                onChange={(e) => updateMeasurement(index, 'length', parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="p-3 bg-gray-50 rounded-md">
-                        {measurement.measurementType === 'linear_meter' ? (
-                          <p className="text-sm font-medium">
-                            Perímetro total: {((measurement.width * 2) + (measurement.length * 2)).toFixed(2)} m
-                          </p>
-                        ) : (
-                          <p className="text-sm font-medium">
+                          <div>
                             Área total: {(measurement.width * measurement.length).toFixed(2)} m²
-                          </p>
-                        )}
-                      </div>
+                          </div>
+                        </div>
+                      )}
+                      {hasLinear && (
+                        <div className="space-y-2 mt-4">
+                          <Label>Metros lineares</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={measurement.linearMeters || ''}
+                            onChange={(e) => updateMeasurement(index, 'linearMeters', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1481,7 +1472,13 @@ const ReviewStep: React.FC<{
       <h3 className="text-lg font-medium">Revise os dados do seu orçamento</h3>
       
       {/* Use the QuoteDetailsSummary component to show all the quote details */}
-      <QuoteDetailsSummary formData={formData} />
+      <QuoteDetailsSummary formData={{
+        ...formData,
+        measurements: formData.measurements?.map(m => ({
+          ...m,
+          measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType
+        }))
+      }} />
       
       <div className="pt-4 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
@@ -1564,6 +1561,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
     }
   };
   
+
   return (
     <div>
       <div className="mb-8">

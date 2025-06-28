@@ -346,8 +346,32 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
         }
       }
 
-      // Soma final do total
-      totalPrice += itemsTotal + areaPrice;
+      // Remover duplicatas de priceDetails pelo campo itemId
+      const uniquePriceDetails = [];
+      const seenItemIds = new Set();
+      const groupedByItemId = {};
+      for (const detail of priceDetails) {
+        if (!groupedByItemId[detail.itemId]) {
+          groupedByItemId[detail.itemId] = [];
+        }
+        groupedByItemId[detail.itemId].push(detail);
+      }
+      for (const itemId in groupedByItemId) {
+        const details = groupedByItemId[itemId];
+        if (details.length === 1) {
+          uniquePriceDetails.push(details[0]);
+        } else {
+          // Se houver mais de um, priorize o que tem total diferente de 0
+          const nonZero = details.find(d => d.total !== 0);
+          if (nonZero) {
+            uniquePriceDetails.push(nonZero);
+          } else {
+            uniquePriceDetails.push(details[0]);
+          }
+        }
+      }
+      // Soma final do total APENAS com itens únicos
+      totalPrice = uniquePriceDetails.reduce((sum, detail) => sum + (detail.total || 0), 0);
       console.log('Total final calculado:', totalPrice);
 
       // Obter avaliação média do prestador
@@ -388,7 +412,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
         distance,
         totalPrice,
         isWithinRadius,
-        priceDetails
+        priceDetails: uniquePriceDetails
       };
 
       matches.push(match);
