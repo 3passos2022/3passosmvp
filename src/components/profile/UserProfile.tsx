@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RoleUtils } from '@/lib/utils/RoleUtils';
 import ProfileImageEditor from './ProfileImageEditor';
+import { supabase } from '@/integrations/supabase/client';
 
 const UserProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -17,6 +17,9 @@ const UserProfile: React.FC = () => {
   const [phone, setPhone] = useState(user?.phone || '');
   const [loading, setLoading] = useState(false);
   const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
+  const [email, setEmail] = useState(user?.email || '');
+  const [password, setPassword] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
   
   const handleUpdate = async () => {
     setLoading(true);
@@ -30,12 +33,21 @@ const UserProfile: React.FC = () => {
         throw error;
       }
       
-      toast.success('Perfil atualizado com sucesso');
+      if (email !== user.email) {
+        setEmailLoading(true);
+        const { error: emailError } = await supabase.auth.updateUser({ email });
+        setEmailLoading(false);
+        if (emailError) throw emailError;
+        toast.success('E-mail atualizado! Verifique seu novo e-mail para confirmar a alteração.');
+      } else {
+        toast.success('Perfil atualizado com sucesso');
+      }
       setIsEditing(false);
-    } catch (error) {
-      toast.error('Erro ao atualizar perfil');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao atualizar perfil');
     } finally {
       setLoading(false);
+      setEmailLoading(false);
     }
   };
 
@@ -96,7 +108,28 @@ const UserProfile: React.FC = () => {
                   placeholder="Seu nome completo"
                 />
               </div>
-              
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                />
+              </div>
+              {email !== user.email && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha atual (necessária para alterar o e-mail)</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Digite sua senha"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
                 <Input
