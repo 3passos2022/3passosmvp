@@ -283,14 +283,20 @@ const ProviderServices = () => {
     
     try {
       // Check if already exists
-      const { data: existingService, error: checkError } = await supabase
-        .from('provider_services')
-        .select('id')
-        .eq('provider_id', user.id)
-        .eq('sub_service_id', selectedSubService)
-        .eq('specialty_id', selectedSpecialty ? selectedSpecialty : null)
-        .maybeSingle();
-        
+      let query = supabase
+      .from('provider_services')
+      .select('id')
+      .eq('provider_id', user.id)
+      .eq('sub_service_id', selectedSubService);
+    
+    if (selectedSpecialty) {
+      query = query.eq('specialty_id', selectedSpecialty);
+    } else {
+      query = query.is('specialty_id', null);
+    }
+    
+    const { data: existingService, error: checkError } = await query.maybeSingle();
+      
       if (checkError) throw checkError;
       
       if (existingService) {
@@ -301,13 +307,7 @@ const ProviderServices = () => {
       // Insert new service
       const insertPayload: any = {
         provider_id: user.id,
-        sub_service_id: selectedSubService || 
-      null
-      , 
-      // Isso já está correto
-        specialty_id: selectedSpecialty || 
-      null
-      // Adiciona specialty_id diretamente
+        sub_service_id: selectedSubService || null, // Isso já está correto
       };
      
       if (selectedSpecialty) {
@@ -352,11 +352,13 @@ const ProviderServices = () => {
       
       const newProviderService = {
         id: data.id,
-        specialtyId: selectedSpecialty || '',
+        specialtyId: selectedSpecialty || null,
         specialtyName,
         serviceName,
         subServiceName,
       };
+
+      console.log("newProviderService", newProviderService)
       
       setProviderServices([
         ...providerServices,
