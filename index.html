@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -36,9 +37,14 @@
       // Add a small wrapper to handle potential cross-origin issues with third-party scripts
       document.addEventListener('DOMContentLoaded', function() {
         try {
+          // Skip when running inside an iframe (e.g., Lovable preview) to avoid cross-origin frame access
+          if (window.top !== window.self) {
+            console.info('Skipping Adopt injector in embedded iframe to avoid cross-origin errors.');
+            return;
+          }
           // Safely create script element for the Adopt script
           const adoptScript = document.createElement('script');
-          adoptScript.src = "//tag.goadopt.io/injector.js?website_code=e38bd646-ca31-4448-a2e7-55a491992ce0";
+          adoptScript.src = "https://tag.goadopt.io/injector.js?website_code=e38bd646-ca31-4448-a2e7-55a491992ce0";
           adoptScript.className = "adopt-injector";
           adoptScript.async = true;
           document.body.appendChild(adoptScript);
