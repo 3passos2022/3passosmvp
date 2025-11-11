@@ -1,16 +1,12 @@
+
+import './env'; // Import environment variables
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { Toaster } from 'sonner';
 
-// Debug env to verify Supabase variables at runtime
-console.info('[Env check]', {
-  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-  VITE_SUPABASE_PROJECT_ID: import.meta.env.VITE_SUPABASE_PROJECT_ID,
-  HAS_KEY: Boolean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
-});
-
+// Get the root element
 const rootElement = document.getElementById("root");
 
 // Make sure the root element exists

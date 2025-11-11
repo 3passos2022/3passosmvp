@@ -7,10 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
+  // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "12.2.3 (519615d)"
   }
   public: {
     Tables: {
@@ -959,11 +959,155 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_feature_limit: {
-        Args: { p_feature_name: string; p_user_id: string }
+      add_quote_answer: {
+        Args: { p_quote_id: string; p_question_id: string; p_option_id: string }
+        Returns: string
+      }
+      add_quote_item: {
+        Args: { p_quote_id: string; p_item_id: string; p_quantity: number }
+        Returns: string
+      }
+      add_quote_measurement: {
+        Args: {
+          p_quote_id: string
+          p_room_name: string
+          p_width: number
+          p_length: number
+          p_height?: number
+        }
+        Returns: string
+      }
+      add_user_notification: {
+        Args: {
+          p_user_id: string
+          p_type: string
+          p_title: string
+          p_message: string
+        }
+        Returns: string
+      }
+      can_start_trial: {
+        Args: { p_user_id: string; p_tier: string }
+        Returns: boolean
+      }
+      create_user_profile: {
+        Args: { user_id: string; user_name: string; user_role: string }
+        Returns: boolean
+      }
+      get_all_providers: {
+        Args: Record<PropertyKey, never>
         Returns: {
-          limit_val: number
+          id: string
+          name: string
+          phone: string
+          role: string
         }[]
+      }
+      get_feature_limit: {
+        Args: { p_user_id: string; p_feature_name: string }
+        Returns: Json
+      }
+      get_provider_average_rating: {
+        Args: { p_provider_id: string }
+        Returns: number
+      }
+      get_provider_quotes: {
+        Args: { _provider_id: string }
+        Returns: {
+          quote_id: string
+          status: string
+        }[]
+      }
+      get_role_for_user: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_role_safely: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_user_role_from_id: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_user_role_safely: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      is_admin_user: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      is_anonymous_quote: {
+        Args: { quote_id: string }
+        Returns: boolean
+      }
+      KeepDbActive: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      submit_quote: {
+        Args:
+          | {
+              p_full_name?: string
+              p_service_id?: string
+              p_sub_service_id?: string
+              p_specialty_id?: string
+              p_description?: string
+              p_street?: string
+              p_number?: string
+              p_complement?: string
+              p_neighborhood?: string
+              p_city?: string
+              p_state?: string
+              p_zip_code?: string
+              p_is_anonymous?: boolean
+            }
+          | {
+              p_full_name?: string
+              p_service_id?: string
+              p_sub_service_id?: string
+              p_specialty_id?: string
+              p_description?: string
+              p_street?: string
+              p_number?: string
+              p_complement?: string
+              p_neighborhood?: string
+              p_city?: string
+              p_state?: string
+              p_zip_code?: string
+              p_is_anonymous?: boolean
+              p_service_date?: string
+              p_service_end_date?: string
+              p_service_time_preference?: string
+            }
+          | {
+              p_service_id: string
+              p_sub_service_id?: string
+              p_specialty_id?: string
+              p_description?: string
+              p_street?: string
+              p_number?: string
+              p_complement?: string
+              p_neighborhood?: string
+              p_city?: string
+              p_state?: string
+              p_zip_code?: string
+              p_is_anonymous?: boolean
+            }
+        Returns: string
+      }
+      update_user_role: {
+        Args: { user_id: string; new_role: string }
+        Returns: boolean
       }
     }
     Enums: {

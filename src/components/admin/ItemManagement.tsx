@@ -118,13 +118,10 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
   // Create item mutation
   const createItemMutation = useMutation({
     mutationFn: async (formData: ItemFormData) => {
-      const itemData: any = {
+      const itemData: Record<string, any> = {
         name: formData.name,
         type: formData.type,
-        reference_value: formData.referenceValue || null,
-        service_id: null,
-        sub_service_id: null,
-        specialty_id: null,
+        reference_value: formData.referenceValue,
       };
       
       if (level === 'service' && serviceId) {
@@ -140,7 +137,7 @@ const ItemManagement: React.FC<ItemManagementProps> = ({
       
       const { data, error } = await supabase
         .from('service_items')
-        .insert(itemData)
+        .insert([itemData])
         .select('id')
         .single();
       

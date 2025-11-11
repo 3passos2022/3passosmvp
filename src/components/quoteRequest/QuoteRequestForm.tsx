@@ -826,18 +826,10 @@ const ServiceDetailsStep: React.FC<{
       answers,
       itemQuantities,
       itemNames,
-      measurements: measurements.map(m => {
-        let measurementType: 'square_meter' | 'linear_meter' = m.measurementType;
-        if (m.measurementType === 'max_square_meter' as any) {
-          measurementType = 'square_meter';
-        } else if (m.measurementType === 'max_linear_meter' as any) {
-          measurementType = 'linear_meter';
-        }
-        return {
-          ...m,
-          measurementType
-        };
-      }),
+      measurements: measurements.map(m => ({
+        ...m,
+        measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType
+      })),
       items
     });
     

@@ -12,6 +12,7 @@ import ProviderCard from '@/components/providerMatch/ProviderCard';
 import { ProviderDetailsModal } from '@/components/providerMatch/ProviderDetailsModal';
 import ProviderFilters, { FilterOption } from '@/components/providerMatch/ProviderFilters';
 import { toast as sonnerToast } from 'sonner';
+import { ENV } from '@/env';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -49,7 +50,7 @@ const ProvidersFound: React.FC = () => {
   const providersLimit = featureLimits?.visible_providers_limit?.limit ?? 3;
   const isUnlimited = providersLimit === null;
   
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const googleMapsApiKey = ENV.GOOGLE_MAPS_API_KEY;
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
   
   useEffect(() => {
