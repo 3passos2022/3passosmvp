@@ -1,322 +1,392 @@
-# Scripts de Migração de Dados - Supabase para Lovable Cloud
+# Scripts de Migração - Supabase Antigo → Lovable Cloud
 
-## 📋 PASSO 1: Exportar Dados do Projeto Supabase Antigo
+✅ **Estrutura do banco recriada com sucesso!**
 
-Execute os seguintes scripts SQL no **SQL Editor** do seu projeto Supabase antigo. Cada query vai gerar um resultado que você deve copiar.
+Agora execute os scripts abaixo **NO PROJETO SUPABASE ANTIGO** para exportar os dados.
 
-### 1.1 - Exportar Profiles
+---
+
+## 📤 PASSO 1: Exportar Dados (Execute no Supabase Antigo)
+
+### 1. Profiles
 ```sql
-SELECT 
-  'INSERT INTO public.profiles (id, email, name, role, avatar_url, address, phone, bio, city, neighborhood, subscribed, subscription_tier, subscription_end) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || COALESCE(REPLACE(email, '''', ''''''), '') || ''', ' ||
-    CASE WHEN name IS NULL THEN 'NULL' ELSE '''' || REPLACE(name, '''', '''''') || '''' END || ', ' ||
-    '''' || COALESCE(role, 'client') || ''', ' ||
-    CASE WHEN avatar_url IS NULL THEN 'NULL' ELSE '''' || REPLACE(avatar_url, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN address IS NULL THEN 'NULL' ELSE '''' || REPLACE(address, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN phone IS NULL THEN 'NULL' ELSE '''' || REPLACE(phone, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN bio IS NULL THEN 'NULL' ELSE '''' || REPLACE(bio, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN city IS NULL THEN 'NULL' ELSE '''' || REPLACE(city, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN neighborhood IS NULL THEN 'NULL' ELSE '''' || REPLACE(neighborhood, '''', '''''') || '''' END || ', ' ||
-    COALESCE(subscribed::text, 'false') || ', ' ||
-    '''' || COALESCE(subscription_tier, 'free') || ''', ' ||
-    CASE WHEN subscription_end IS NULL THEN 'NULL' ELSE '''' || subscription_end || '''::timestamptz' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name;'
-FROM public.profiles;
+SELECT string_agg(
+  'INSERT INTO public.profiles (id, name, phone, role, avatar_url, cpf, cnpj) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  COALESCE(quote_literal(name), 'NULL') || ', ' ||
+  COALESCE(quote_literal(phone), 'NULL') || ', ' ||
+  quote_literal(role) || ', ' ||
+  COALESCE(quote_literal(avatar_url), 'NULL') || ', ' ||
+  COALESCE(quote_literal(cpf), 'NULL') || ', ' ||
+  COALESCE(quote_literal(cnpj), 'NULL') ||
+  ') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone;',
+  E'\n'
+) FROM public.profiles;
 ```
 
-### 1.2 - Exportar Services
+### 2. Services
 ```sql
-SELECT 
-  'INSERT INTO public.services (id, name, description, image_url) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || REPLACE(name, '''', '''''') || ''', ' ||
-    CASE WHEN description IS NULL THEN 'NULL' ELSE '''' || REPLACE(description, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN image_url IS NULL THEN 'NULL' ELSE '''' || REPLACE(image_url, '''', '''''') || '''' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.services;
+SELECT string_agg(
+  'INSERT INTO public.services (id, name, description, tags, icon_url) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(name) || ', ' ||
+  COALESCE(quote_literal(description), 'NULL') || ', ' ||
+  CASE WHEN tags IS NULL THEN 'NULL' ELSE 'ARRAY[' || (SELECT string_agg(quote_literal(t), ',') FROM unnest(tags) t) || ']::text[]' END || ', ' ||
+  COALESCE(quote_literal(icon_url), 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.services;
 ```
 
-### 1.3 - Exportar Sub Services
+### 3. Sub Services
 ```sql
-SELECT 
-  'INSERT INTO public.sub_services (id, service_id, name, description) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || service_id || '''::uuid, ' ||
-    '''' || REPLACE(name, '''', '''''') || ''', ' ||
-    CASE WHEN description IS NULL THEN 'NULL' ELSE '''' || REPLACE(description, '''', '''''') || '''' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.sub_services;
+SELECT string_agg(
+  'INSERT INTO public.sub_services (id, service_id, name, description) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(service_id::text) || '::uuid, ' ||
+  quote_literal(name) || ', ' ||
+  COALESCE(quote_literal(description), 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.sub_services;
 ```
 
-### 1.4 - Exportar Specialties
+### 4. Specialties
 ```sql
-SELECT 
-  'INSERT INTO public.specialties (id, sub_service_id, name, description) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || sub_service_id || '''::uuid, ' ||
-    '''' || REPLACE(name, '''', '''''') || ''', ' ||
-    CASE WHEN description IS NULL THEN 'NULL' ELSE '''' || REPLACE(description, '''', '''''') || '''' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.specialties;
+SELECT string_agg(
+  'INSERT INTO public.specialties (id, sub_service_id, name) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(sub_service_id::text) || '::uuid, ' ||
+  quote_literal(name) ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.specialties;
 ```
 
-### 1.5 - Exportar Service Questions
+### 5. Service Questions
 ```sql
-SELECT 
-  'INSERT INTO public.service_questions (id, service_id, sub_service_id, specialty_id, question) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    CASE WHEN service_id IS NULL THEN 'NULL' ELSE '''' || service_id || '''::uuid' END || ', ' ||
-    CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE '''' || sub_service_id || '''::uuid' END || ', ' ||
-    CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE '''' || specialty_id || '''::uuid' END || ', ' ||
-    '''' || REPLACE(question, '''', '''''') || '''' ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.service_questions;
+SELECT string_agg(
+  'INSERT INTO public.service_questions (id, question, service_id, sub_service_id, specialty_id) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(question) || ', ' ||
+  CASE WHEN service_id IS NULL THEN 'NULL' ELSE quote_literal(service_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE quote_literal(sub_service_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE quote_literal(specialty_id::text) || '::uuid' END ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.service_questions;
 ```
 
-### 1.6 - Exportar Question Options
+### 6. Question Options
 ```sql
-SELECT 
-  'INSERT INTO public.question_options (id, question_id, option_text) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || question_id || '''::uuid, ' ||
-    '''' || REPLACE(option_text, '''', '''''') || '''' ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.question_options;
+SELECT string_agg(
+  'INSERT INTO public.question_options (id, question_id, option_text) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(question_id::text) || '::uuid, ' ||
+  quote_literal(option_text) ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.question_options;
 ```
 
-### 1.7 - Exportar Service Items
+### 7. Service Items
 ```sql
-SELECT 
-  'INSERT INTO public.service_items (id, service_id, sub_service_id, specialty_id, name, description, type, reference_value) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    CASE WHEN service_id IS NULL THEN 'NULL' ELSE '''' || service_id || '''::uuid' END || ', ' ||
-    CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE '''' || sub_service_id || '''::uuid' END || ', ' ||
-    CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE '''' || specialty_id || '''::uuid' END || ', ' ||
-    '''' || REPLACE(name, '''', '''''') || ''', ' ||
-    CASE WHEN description IS NULL THEN 'NULL' ELSE '''' || REPLACE(description, '''', '''''') || '''' END || ', ' ||
-    '''' || type || ''', ' ||
-    COALESCE(reference_value::text, 'NULL') ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.service_items;
+SELECT string_agg(
+  'INSERT INTO public.service_items (id, name, type, service_id, sub_service_id, specialty_id, reference_value) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(name) || ', ' ||
+  quote_literal(type) || ', ' ||
+  CASE WHEN service_id IS NULL THEN 'NULL' ELSE quote_literal(service_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE quote_literal(sub_service_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE quote_literal(specialty_id::text) || '::uuid' END || ', ' ||
+  COALESCE(reference_value::text, 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.service_items;
 ```
 
-### 1.8 - Exportar Provider Settings
+### 8. Provider Settings
 ```sql
-SELECT 
-  'INSERT INTO public.provider_settings (id, provider_id, service_radius_km, accepts_new_clients) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || provider_id || '''::uuid, ' ||
-    COALESCE(service_radius_km::text, '50') || ', ' ||
-    COALESCE(accepts_new_clients::text, 'true') ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (provider_id) DO UPDATE SET service_radius_km = EXCLUDED.service_radius_km;'
-FROM public.provider_settings;
+SELECT string_agg(
+  'INSERT INTO public.provider_settings (id, provider_id, service_radius_km, bio, latitude, longitude, city, neighborhood, street, number, complement, zip_code, state) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(provider_id::text) || '::uuid, ' ||
+  COALESCE(service_radius_km::text, 'NULL') || ', ' ||
+  COALESCE(quote_literal(bio), 'NULL') || ', ' ||
+  COALESCE(latitude::text, 'NULL') || ', ' ||
+  COALESCE(longitude::text, 'NULL') || ', ' ||
+  COALESCE(quote_literal(city), 'NULL') || ', ' ||
+  COALESCE(quote_literal(neighborhood), 'NULL') || ', ' ||
+  COALESCE(quote_literal(street), 'NULL') || ', ' ||
+  COALESCE(quote_literal(number), 'NULL') || ', ' ||
+  COALESCE(quote_literal(complement), 'NULL') || ', ' ||
+  COALESCE(quote_literal(zip_code), 'NULL') || ', ' ||
+  COALESCE(quote_literal(state), 'NULL') ||
+  ') ON CONFLICT (provider_id) DO UPDATE SET service_radius_km = EXCLUDED.service_radius_km, bio = EXCLUDED.bio;',
+  E'\n'
+) FROM public.provider_settings;
 ```
 
-### 1.9 - Exportar Provider Services
+### 9. Provider Services
 ```sql
-SELECT 
-  'INSERT INTO public.provider_services (id, provider_id, service_id, sub_service_id, specialty_id) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || provider_id || '''::uuid, ' ||
-    CASE WHEN service_id IS NULL THEN 'NULL' ELSE '''' || service_id || '''::uuid' END || ', ' ||
-    CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE '''' || sub_service_id || '''::uuid' END || ', ' ||
-    CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE '''' || specialty_id || '''::uuid' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.provider_services;
+SELECT string_agg(
+  'INSERT INTO public.provider_services (id, provider_id, specialty_id, sub_service_id, base_price) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(provider_id::text) || '::uuid, ' ||
+  CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE quote_literal(specialty_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE quote_literal(sub_service_id::text) || '::uuid' END || ', ' ||
+  COALESCE(base_price::text, '0') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.provider_services;
 ```
 
-### 1.10 - Exportar Provider Item Prices
+### 10. Provider Item Prices
 ```sql
-SELECT 
-  'INSERT INTO public.provider_item_prices (id, provider_id, service_item_id, price_per_unit) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || provider_id || '''::uuid, ' ||
-    '''' || service_item_id || '''::uuid, ' ||
-    price_per_unit::text ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (provider_id, service_item_id) DO UPDATE SET price_per_unit = EXCLUDED.price_per_unit;'
-FROM public.provider_item_prices;
+SELECT string_agg(
+  'INSERT INTO public.provider_item_prices (id, provider_id, item_id, price_per_unit) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(provider_id::text) || '::uuid, ' ||
+  quote_literal(item_id::text) || '::uuid, ' ||
+  price_per_unit::text ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.provider_item_prices;
 ```
 
-### 1.11 - Exportar Provider Portfolio
+### 11. Provider Portfolio
 ```sql
-SELECT 
-  'INSERT INTO public.provider_portfolio (id, provider_id, image_url, description) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || provider_id || '''::uuid, ' ||
-    '''' || REPLACE(image_url, '''', '''''') || ''', ' ||
-    CASE WHEN description IS NULL THEN 'NULL' ELSE '''' || REPLACE(description, '''', '''''') || '''' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.provider_portfolio;
+SELECT string_agg(
+  'INSERT INTO public.provider_portfolio (id, provider_id, image_url, description) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(provider_id::text) || '::uuid, ' ||
+  quote_literal(image_url) || ', ' ||
+  COALESCE(quote_literal(description), 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.provider_portfolio;
 ```
 
-### 1.12 - Exportar Provider Ratings (se existir)
+### 12. Quotes
 ```sql
-SELECT 
-  'INSERT INTO public.provider_ratings (id, provider_id, quote_id, client_id, rating, comment) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || provider_id || '''::uuid, ' ||
-    '''' || quote_id || '''::uuid, ' ||
-    '''' || client_id || '''::uuid, ' ||
-    rating::text || ', ' ||
-    CASE WHEN comment IS NULL THEN 'NULL' ELSE '''' || REPLACE(comment, '''', '''''') || '''' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (quote_id) DO NOTHING;'
-FROM public.provider_ratings
-WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'provider_ratings');
+SELECT string_agg(
+  'INSERT INTO public.quotes (id, client_id, service_id, sub_service_id, specialty_id, description, status, street, number, complement, neighborhood, city, state, zip_code, latitude, longitude, is_anonymous, full_name, service_date, service_end_date, service_time_preference) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  CASE WHEN client_id IS NULL THEN 'NULL' ELSE quote_literal(client_id::text) || '::uuid' END || ', ' ||
+  quote_literal(service_id::text) || '::uuid, ' ||
+  CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE quote_literal(sub_service_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE quote_literal(specialty_id::text) || '::uuid' END || ', ' ||
+  COALESCE(quote_literal(description), 'NULL') || ', ' ||
+  quote_literal(status) || ', ' ||
+  quote_literal(street) || ', ' ||
+  quote_literal(number) || ', ' ||
+  COALESCE(quote_literal(complement), 'NULL') || ', ' ||
+  quote_literal(neighborhood) || ', ' ||
+  quote_literal(city) || ', ' ||
+  quote_literal(state) || ', ' ||
+  quote_literal(zip_code) || ', ' ||
+  COALESCE(latitude::text, 'NULL') || ', ' ||
+  COALESCE(longitude::text, 'NULL') || ', ' ||
+  COALESCE(is_anonymous::text, 'false') || ', ' ||
+  COALESCE(quote_literal(full_name), 'NULL') || ', ' ||
+  CASE WHEN service_date IS NULL THEN 'NULL' ELSE quote_literal(service_date::text) || '::timestamptz' END || ', ' ||
+  CASE WHEN service_end_date IS NULL THEN 'NULL' ELSE quote_literal(service_end_date::text) || '::timestamptz' END || ', ' ||
+  COALESCE(quote_literal(service_time_preference), 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.quotes;
 ```
 
-### 1.13 - Exportar Quotes (dados existentes)
+### 13. Quote Items
 ```sql
-SELECT 
-  'INSERT INTO public.quotes (id, user_id, service_id, sub_service_id, specialty_id, service_name, sub_service_name, specialty_name, items, measurements, address, description, status, service_date, service_end_date, service_time_preference) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || user_id || '''::uuid, ' ||
-    '''' || service_id || '''::uuid, ' ||
-    CASE WHEN sub_service_id IS NULL THEN 'NULL' ELSE '''' || sub_service_id || '''::uuid' END || ', ' ||
-    CASE WHEN specialty_id IS NULL THEN 'NULL' ELSE '''' || specialty_id || '''::uuid' END || ', ' ||
-    '''' || REPLACE(service_name, '''', '''''') || ''', ' ||
-    CASE WHEN sub_service_name IS NULL THEN 'NULL' ELSE '''' || REPLACE(sub_service_name, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN specialty_name IS NULL THEN 'NULL' ELSE '''' || REPLACE(specialty_name, '''', '''''') || '''' END || ', ' ||
-    CASE WHEN items IS NULL THEN 'NULL' ELSE '''' || REPLACE(items::text, '''', '''''') || '''::jsonb' END || ', ' ||
-    CASE WHEN measurements IS NULL THEN 'NULL' ELSE '''' || REPLACE(measurements::text, '''', '''''') || '''::jsonb' END || ', ' ||
-    '''' || REPLACE(address::text, '''', '''''') || '''::jsonb, ' ||
-    CASE WHEN description IS NULL THEN 'NULL' ELSE '''' || REPLACE(description, '''', '''''') || '''' END || ', ' ||
-    '''' || status || ''', ' ||
-    CASE WHEN service_date IS NULL THEN 'NULL' ELSE '''' || service_date || '''::timestamptz' END || ', ' ||
-    CASE WHEN service_end_date IS NULL THEN 'NULL' ELSE '''' || service_end_date || '''::timestamptz' END || ', ' ||
-    CASE WHEN service_time_preference IS NULL THEN 'NULL' ELSE '''' || REPLACE(service_time_preference, '''', '''''') || '''' END ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.quotes;
+SELECT string_agg(
+  'INSERT INTO public.quote_items (id, quote_id, item_id, quantity) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(quote_id::text) || '::uuid, ' ||
+  quote_literal(item_id::text) || '::uuid, ' ||
+  quantity::text ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.quote_items;
 ```
 
-### 1.14 - Exportar Quote Providers
+### 14. Quote Measurements
 ```sql
-SELECT 
-  'INSERT INTO public.quote_providers (id, quote_id, provider_id, status, total_price) VALUES ' ||
-  string_agg(
-    '(''' || id || '''::uuid, ' ||
-    '''' || quote_id || '''::uuid, ' ||
-    '''' || provider_id || '''::uuid, ' ||
-    '''' || status || ''', ' ||
-    COALESCE(total_price::text, 'NULL') ||
-    ')',
-    E',\n'
-  ) || ' ON CONFLICT (id) DO NOTHING;'
-FROM public.quote_providers;
+SELECT string_agg(
+  'INSERT INTO public.quote_measurements (id, quote_id, room_name, width, height, length) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(quote_id::text) || '::uuid, ' ||
+  COALESCE(quote_literal(room_name), 'NULL') || ', ' ||
+  width::text || ', ' ||
+  COALESCE(height::text, 'NULL') || ', ' ||
+  length::text ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.quote_measurements;
+```
+
+### 15. Quote Answers
+```sql
+SELECT string_agg(
+  'INSERT INTO public.quote_answers (id, quote_id, question_id, option_id) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(quote_id::text) || '::uuid, ' ||
+  quote_literal(question_id::text) || '::uuid, ' ||
+  quote_literal(option_id::text) || '::uuid' ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.quote_answers;
+```
+
+### 16. Quote Providers
+```sql
+SELECT string_agg(
+  'INSERT INTO public.quote_providers (id, quote_id, provider_id, status, total_price) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(quote_id::text) || '::uuid, ' ||
+  quote_literal(provider_id::text) || '::uuid, ' ||
+  quote_literal(status) || ', ' ||
+  COALESCE(total_price::text, 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.quote_providers;
+```
+
+### 17. Provider Ratings
+```sql
+SELECT string_agg(
+  'INSERT INTO public.provider_ratings (id, provider_id, quote_id, rating, comment) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(provider_id::text) || '::uuid, ' ||
+  quote_literal(quote_id::text) || '::uuid, ' ||
+  rating::text || ', ' ||
+  COALESCE(quote_literal(comment), 'NULL') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.provider_ratings;
+```
+
+### 18. Subscribers
+```sql
+SELECT string_agg(
+  'INSERT INTO public.subscribers (id, user_id, email, stripe_customer_id, subscribed, subscription_tier, subscription_status, subscription_end, trial_end, is_trial_used, stripe_subscription_id, last_invoice_url, next_invoice_amount) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  CASE WHEN user_id IS NULL THEN 'NULL' ELSE quote_literal(user_id::text) || '::uuid' END || ', ' ||
+  quote_literal(email) || ', ' ||
+  COALESCE(quote_literal(stripe_customer_id), 'NULL') || ', ' ||
+  subscribed::text || ', ' ||
+  quote_literal(subscription_tier) || ', ' ||
+  quote_literal(subscription_status) || ', ' ||
+  CASE WHEN subscription_end IS NULL THEN 'NULL' ELSE quote_literal(subscription_end::text) || '::timestamptz' END || ', ' ||
+  CASE WHEN trial_end IS NULL THEN 'NULL' ELSE quote_literal(trial_end::text) || '::timestamptz' END || ', ' ||
+  COALESCE(is_trial_used::text, 'false') || ', ' ||
+  COALESCE(quote_literal(stripe_subscription_id), 'NULL') || ', ' ||
+  COALESCE(quote_literal(last_invoice_url), 'NULL') || ', ' ||
+  COALESCE(next_invoice_amount::text, 'NULL') ||
+  ') ON CONFLICT (email) DO UPDATE SET subscribed = EXCLUDED.subscribed, subscription_tier = EXCLUDED.subscription_tier;',
+  E'\n'
+) FROM public.subscribers;
+```
+
+### 19. Feature Flags
+```sql
+SELECT string_agg(
+  'INSERT INTO public.feature_flags (id, name, description, enabled_globally) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(name) || ', ' ||
+  COALESCE(quote_literal(description), 'NULL') || ', ' ||
+  enabled_globally::text ||
+  ') ON CONFLICT (name) DO UPDATE SET enabled_globally = EXCLUDED.enabled_globally;',
+  E'\n'
+) FROM public.feature_flags;
+```
+
+### 20. Subscription Features
+```sql
+SELECT string_agg(
+  'INSERT INTO public.subscription_features (id, feature_id, subscription_tier, value) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  CASE WHEN feature_id IS NULL THEN 'NULL' ELSE quote_literal(feature_id::text) || '::uuid' END || ', ' ||
+  quote_literal(subscription_tier) || ', ' ||
+  quote_literal(value::text) || '::jsonb' ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.subscription_features;
+```
+
+### 21. User Features
+```sql
+SELECT string_agg(
+  'INSERT INTO public.user_features (id, user_id, feature_id, enabled, value, reason, expires_at) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  CASE WHEN user_id IS NULL THEN 'NULL' ELSE quote_literal(user_id::text) || '::uuid' END || ', ' ||
+  CASE WHEN feature_id IS NULL THEN 'NULL' ELSE quote_literal(feature_id::text) || '::uuid' END || ', ' ||
+  enabled::text || ', ' ||
+  quote_literal(value::text) || '::jsonb, ' ||
+  COALESCE(quote_literal(reason), 'NULL') || ', ' ||
+  CASE WHEN expires_at IS NULL THEN 'NULL' ELSE quote_literal(expires_at::text) || '::timestamptz' END ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.user_features;
+```
+
+### 22. User Notifications
+```sql
+SELECT string_agg(
+  'INSERT INTO public.user_notifications (id, user_id, type, title, message, read) VALUES (' ||
+  quote_literal(id::text) || '::uuid, ' ||
+  quote_literal(user_id::text) || '::uuid, ' ||
+  quote_literal(type) || ', ' ||
+  quote_literal(title) || ', ' ||
+  quote_literal(message) || ', ' ||
+  COALESCE(read::text, 'false') ||
+  ') ON CONFLICT (id) DO NOTHING;',
+  E'\n'
+) FROM public.user_notifications;
 ```
 
 ---
 
-## 📥 PASSO 2: Importar Dados no Lovable Cloud
+## 📥 PASSO 2: Importar no Lovable Cloud
 
-1. **Copie cada resultado** dos scripts acima
-2. **Abra o Lovable Cloud** → Database
-3. **Execute cada INSERT** na ordem apresentada
-4. **Verifique os dados** após cada importação
+1. Execute cada query acima **no SQL Editor do projeto Supabase antigo**
+2. Copie o resultado (será um ou mais comandos INSERT)
+3. Acesse **Lovable Cloud → Database**
+4. Cole e execute os INSERTs na **ordem apresentada**
 
 ---
 
-## ⚠️ OBSERVAÇÕES IMPORTANTES
+## ✅ PASSO 3: Validação
 
-1. **Ordem de Importação**: Execute os scripts na ordem apresentada para respeitar as foreign keys
-2. **auth.users**: Os perfis de usuário precisam existir em `auth.users` antes de importar profiles. Se necessário, os usuários devem fazer login novamente para criar os registros em auth.users
-3. **Conflitos**: Os scripts usam `ON CONFLICT DO NOTHING` ou `DO UPDATE` para evitar duplicatas
-4. **Validação**: Após importar, execute queries de validação:
+Após importar, execute esta query no Lovable Cloud para conferir:
 
 ```sql
--- Contar registros importados
-SELECT 'profiles' as tabela, COUNT(*) as total FROM public.profiles
-UNION ALL
-SELECT 'services', COUNT(*) FROM public.services
-UNION ALL
-SELECT 'sub_services', COUNT(*) FROM public.sub_services
-UNION ALL
-SELECT 'specialties', COUNT(*) FROM public.specialties
-UNION ALL
-SELECT 'service_items', COUNT(*) FROM public.service_items
-UNION ALL
-SELECT 'provider_settings', COUNT(*) FROM public.provider_settings
-UNION ALL
-SELECT 'provider_services', COUNT(*) FROM public.provider_services
-UNION ALL
-SELECT 'provider_item_prices', COUNT(*) FROM public.provider_item_prices
-UNION ALL
-SELECT 'provider_portfolio', COUNT(*) FROM public.provider_portfolio
-UNION ALL
-SELECT 'quotes', COUNT(*) FROM public.quotes
-UNION ALL
-SELECT 'quote_providers', COUNT(*) FROM public.quote_providers;
+SELECT 
+  'profiles' as tabela, COUNT(*) as total FROM public.profiles
+UNION ALL SELECT 'services', COUNT(*) FROM public.services
+UNION ALL SELECT 'sub_services', COUNT(*) FROM public.sub_services
+UNION ALL SELECT 'specialties', COUNT(*) FROM public.specialties
+UNION ALL SELECT 'service_questions', COUNT(*) FROM public.service_questions
+UNION ALL SELECT 'question_options', COUNT(*) FROM public.question_options
+UNION ALL SELECT 'service_items', COUNT(*) FROM public.service_items
+UNION ALL SELECT 'quotes', COUNT(*) FROM public.quotes
+UNION ALL SELECT 'quote_items', COUNT(*) FROM public.quote_items
+UNION ALL SELECT 'quote_measurements', COUNT(*) FROM public.quote_measurements
+UNION ALL SELECT 'quote_answers', COUNT(*) FROM public.quote_answers
+UNION ALL SELECT 'provider_settings', COUNT(*) FROM public.provider_settings
+UNION ALL SELECT 'provider_services', COUNT(*) FROM public.provider_services
+UNION ALL SELECT 'provider_item_prices', COUNT(*) FROM public.provider_item_prices
+UNION ALL SELECT 'provider_portfolio', COUNT(*) FROM public.provider_portfolio
+UNION ALL SELECT 'provider_ratings', COUNT(*) FROM public.provider_ratings
+UNION ALL SELECT 'quote_providers', COUNT(*) FROM public.quote_providers
+UNION ALL SELECT 'subscribers', COUNT(*) FROM public.subscribers
+ORDER BY tabela;
 ```
 
 ---
 
-## 🔍 TROUBLESHOOTING
+## ⚠️ OBSERVAÇÕES
 
-### Erro de Foreign Key
-Se encontrar erros de foreign key, verifique:
-1. A ordem de execução dos scripts
-2. Se os IDs referenciados existem nas tabelas pai
-
-### Aspas no Texto
-Se algum texto contém aspas simples e causa erro:
-- Os scripts já tratam aspas simples duplicando-as (`'`)
-- Se persistir, edite o INSERT manualmente
-
-### Profiles sem auth.users
-```sql
--- Verificar profiles sem usuário em auth
-SELECT p.id, p.email 
-FROM public.profiles p
-WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users u WHERE u.id = p.id
-);
-```
-
----
-
-## 📊 Próximos Passos
-
-Após importar todos os dados:
-1. ✅ Testar login com usuários existentes
-2. ✅ Verificar se serviços aparecem corretamente
-3. ✅ Testar criação de novos quotes
-4. ✅ Verificar perfis de provedores com portfólio
+- **auth.users**: Usuários precisam fazer login novamente para criar registros em `auth.users` do Lovable Cloud
+- **Ordem**: Execute os scripts na ordem para respeitar foreign keys
+- **Conflitos**: Scripts usam `ON CONFLICT DO NOTHING` ou `DO UPDATE` para evitar duplicatas
