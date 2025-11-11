@@ -346,7 +346,7 @@ const ProvidersFound: React.FC = () => {
     if (!quoteDetails || !providerId) return;
     try {
       // Verifica se já existe relacionamento
-      const { data: existing, error: existingError } = await (supabase as any)
+      const { data: existing, error: existingError } = await supabase
         .from('quote_providers')
         .select('id')
         .eq('quote_id', quoteDetails.id)
@@ -362,14 +362,14 @@ const ProvidersFound: React.FC = () => {
         return;
       }
       // Insere relacionamento
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('quote_providers')
         .insert({
           quote_id: quoteDetails.id,
           provider_id: providerId,
           status: 'pending',
           total_price: selectedProvider?.totalPrice || null
-        } as any);
+        });
       if (error) throw error;
       markQuoteSentToProvider(providerId);
       toast({
