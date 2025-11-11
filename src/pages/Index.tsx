@@ -46,6 +46,7 @@ const Index: React.FC = () => {
   return (
     <div className="min-h-screen">
       <Navbar />
+      
       <main>
         <Hero />
 

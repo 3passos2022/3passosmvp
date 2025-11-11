@@ -1,5 +1,3 @@
-
-import './env'; // Import environment variables
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
