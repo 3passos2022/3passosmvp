@@ -51,7 +51,7 @@ export async function getUserProfile(userId: string) {
     .eq('id', userId)
     .maybeSingle();
 
-    if (error) throw error;
+  if (error) throw error;
   
-  return data && console.log("OLHA O DATA AQUI",data);
+  return data;
 }
