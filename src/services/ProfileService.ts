@@ -229,6 +229,34 @@ export class ProfileService {
 
 
   /**
+   * Promove um usuário a admin
+   */
+  static async makeAdmin(currentUserId: string, targetUserId: string): Promise<{ error: Error | null; data: any }> {
+    try {
+      console.log(`Promovendo usuário ${targetUserId} a admin por ${currentUserId}`);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ role: 'admin' })
+        .eq('id', targetUserId)
+        .select();
+
+      if (error) {
+        console.error('Erro ao promover usuário a admin:', error);
+        return { error, data: null };
+      }
+
+      // Invalidar cache
+      profileCache.delete(targetUserId);
+      
+      return { data, error: null };
+    } catch (error) {
+      console.error('Erro em makeAdmin:', error);
+      return { error: error as Error, data: null };
+    }
+  }
+
+  /**
    * Limpar cache de perfil
    */
   static clearCache(userId?: string) {
