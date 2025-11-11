@@ -14,110 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
-      feature_limits: {
+      bd_active: {
+        Row: {
+          num: number | null
+        }
+        Insert: {
+          num?: number | null
+        }
+        Update: {
+          num?: number | null
+        }
+        Relationships: []
+      }
+      feature_flags: {
         Row: {
           created_at: string
-          feature_name: string
+          description: string | null
+          enabled_globally: boolean
           id: string
-          limit_value: number | null
-          subscription_tier: string
+          name: string
         }
         Insert: {
           created_at?: string
-          feature_name: string
+          description?: string | null
+          enabled_globally?: boolean
           id?: string
-          limit_value?: number | null
-          subscription_tier: string
+          name: string
         }
         Update: {
           created_at?: string
-          feature_name?: string
+          description?: string | null
+          enabled_globally?: boolean
           id?: string
-          limit_value?: number | null
-          subscription_tier?: string
+          name?: string
         }
         Relationships: []
       }
       profiles: {
         Row: {
-          address: string | null
           avatar_url: string | null
-          bio: string | null
-          city: string | null
-          created_at: string
-          email: string
+          cnpj: string | null
+          cpf: string | null
+          created_at: string | null
           id: string
           name: string | null
-          neighborhood: string | null
           phone: string | null
           role: string
-          subscribed: boolean | null
-          subscription_end: string | null
-          subscription_tier: string | null
-          updated_at: string
         }
         Insert: {
-          address?: string | null
           avatar_url?: string | null
-          bio?: string | null
-          city?: string | null
-          created_at?: string
-          email: string
+          cnpj?: string | null
+          cpf?: string | null
+          created_at?: string | null
           id: string
           name?: string | null
-          neighborhood?: string | null
           phone?: string | null
           role?: string
-          subscribed?: boolean | null
-          subscription_end?: string | null
-          subscription_tier?: string | null
-          updated_at?: string
         }
         Update: {
-          address?: string | null
           avatar_url?: string | null
-          bio?: string | null
-          city?: string | null
-          created_at?: string
-          email?: string
+          cnpj?: string | null
+          cpf?: string | null
+          created_at?: string | null
           id?: string
           name?: string | null
-          neighborhood?: string | null
           phone?: string | null
           role?: string
-          subscribed?: boolean | null
-          subscription_end?: string | null
-          subscription_tier?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
       provider_item_prices: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
+          item_id: string
           price_per_unit: number
           provider_id: string
-          service_item_id: string
-          updated_at: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          price_per_unit: number
+          item_id: string
+          price_per_unit?: number
           provider_id: string
-          service_item_id: string
-          updated_at?: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
+          item_id?: string
           price_per_unit?: number
           provider_id?: string
-          service_item_id?: string
-          updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "provider_item_prices_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "service_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "provider_item_prices_provider_id_fkey"
             columns: ["provider_id"]
@@ -125,32 +120,25 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "provider_item_prices_service_item_id_fkey"
-            columns: ["service_item_id"]
-            isOneToOne: false
-            referencedRelation: "service_items"
-            referencedColumns: ["id"]
-          },
         ]
       }
       provider_portfolio: {
         Row: {
-          created_at: string
+          created_at: string | null
           description: string | null
           id: string
           image_url: string
           provider_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
           image_url: string
           provider_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
           image_url?: string
@@ -168,7 +156,6 @@ export type Database = {
       }
       provider_ratings: {
         Row: {
-          client_id: string
           comment: string | null
           created_at: string
           id: string
@@ -177,7 +164,6 @@ export type Database = {
           rating: number
         }
         Insert: {
-          client_id: string
           comment?: string | null
           created_at?: string
           id?: string
@@ -186,7 +172,6 @@ export type Database = {
           rating: number
         }
         Update: {
-          client_id?: string
           comment?: string | null
           created_at?: string
           id?: string
@@ -196,23 +181,16 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "provider_ratings_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "provider_ratings_provider_id_fkey"
+            foreignKeyName: "fk_provider_ratings_provider"
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "provider_ratings_quote_id_fkey"
+            foreignKeyName: "fk_provider_ratings_quote"
             columns: ["quote_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
@@ -220,26 +198,26 @@ export type Database = {
       }
       provider_services: {
         Row: {
-          created_at: string
+          base_price: number
+          created_at: string | null
           id: string
           provider_id: string
-          service_id: string | null
           specialty_id: string | null
           sub_service_id: string | null
         }
         Insert: {
-          created_at?: string
+          base_price?: number
+          created_at?: string | null
           id?: string
           provider_id: string
-          service_id?: string | null
           specialty_id?: string | null
           sub_service_id?: string | null
         }
         Update: {
-          created_at?: string
+          base_price?: number
+          created_at?: string | null
           id?: string
           provider_id?: string
-          service_id?: string | null
           specialty_id?: string | null
           sub_service_id?: string | null
         }
@@ -249,13 +227,6 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "provider_services_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
             referencedColumns: ["id"]
           },
           {
@@ -276,28 +247,52 @@ export type Database = {
       }
       provider_settings: {
         Row: {
-          accepts_new_clients: boolean | null
-          created_at: string
+          bio: string | null
+          city: string | null
+          complement: string | null
+          created_at: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
+          neighborhood: string | null
+          number: string | null
           provider_id: string
           service_radius_km: number | null
-          updated_at: string
+          state: string | null
+          street: string | null
+          zip_code: string | null
         }
         Insert: {
-          accepts_new_clients?: boolean | null
-          created_at?: string
+          bio?: string | null
+          city?: string | null
+          complement?: string | null
+          created_at?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
+          neighborhood?: string | null
+          number?: string | null
           provider_id: string
           service_radius_km?: number | null
-          updated_at?: string
+          state?: string | null
+          street?: string | null
+          zip_code?: string | null
         }
         Update: {
-          accepts_new_clients?: boolean | null
-          created_at?: string
+          bio?: string | null
+          city?: string | null
+          complement?: string | null
+          created_at?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
+          neighborhood?: string | null
+          number?: string | null
           provider_id?: string
           service_radius_km?: number | null
-          updated_at?: string
+          state?: string | null
+          street?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {
@@ -311,19 +306,19 @@ export type Database = {
       }
       question_options: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           option_text: string
           question_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           option_text: string
           question_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           option_text?: string
           question_id?: string
@@ -338,35 +333,165 @@ export type Database = {
           },
         ]
       }
+      quote_answers: {
+        Row: {
+          created_at: string | null
+          id: string
+          option_id: string
+          question_id: string
+          quote_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          option_id: string
+          question_id: string
+          quote_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          option_id?: string
+          question_id?: string
+          quote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_answers_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "question_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "service_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_answers_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          item_id: string
+          quantity: number
+          quote_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          item_id: string
+          quantity?: number
+          quote_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          item_id?: string
+          quantity?: number
+          quote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "service_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_measurements: {
+        Row: {
+          area: number | null
+          created_at: string | null
+          height: number | null
+          id: string
+          length: number
+          quote_id: string
+          room_name: string | null
+          width: number
+        }
+        Insert: {
+          area?: number | null
+          created_at?: string | null
+          height?: number | null
+          id?: string
+          length: number
+          quote_id: string
+          room_name?: string | null
+          width: number
+        }
+        Update: {
+          area?: number | null
+          created_at?: string | null
+          height?: number | null
+          id?: string
+          length?: number
+          quote_id?: string
+          room_name?: string | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_measurements_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_providers: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           provider_id: string
           quote_id: string
           status: string
           total_price: number | null
-          updated_at: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           provider_id: string
           quote_id: string
           status?: string
           total_price?: number | null
-          updated_at?: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           provider_id?: string
           quote_id?: string
           status?: string
           total_price?: number | null
-          updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quote_providers_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quote_providers_quote_id_fkey"
             columns: ["quote_id"]
@@ -378,71 +503,111 @@ export type Database = {
       }
       quotes: {
         Row: {
-          address: Json
-          created_at: string
+          city: string
+          client_id: string | null
+          complement: string | null
+          created_at: string | null
           description: string | null
+          full_name: string | null
           id: string
-          items: Json | null
-          measurements: Json | null
+          is_anonymous: boolean | null
+          latitude: number | null
+          longitude: number | null
+          neighborhood: string
+          number: string
           service_date: string | null
           service_end_date: string | null
           service_id: string
-          service_name: string
           service_time_preference: string | null
           specialty_id: string | null
-          specialty_name: string | null
+          state: string
           status: string
+          street: string
           sub_service_id: string | null
-          sub_service_name: string | null
-          updated_at: string
-          user_id: string
+          zip_code: string
         }
         Insert: {
-          address: Json
-          created_at?: string
+          city: string
+          client_id?: string | null
+          complement?: string | null
+          created_at?: string | null
           description?: string | null
+          full_name?: string | null
           id?: string
-          items?: Json | null
-          measurements?: Json | null
+          is_anonymous?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          neighborhood: string
+          number: string
           service_date?: string | null
           service_end_date?: string | null
           service_id: string
-          service_name: string
           service_time_preference?: string | null
           specialty_id?: string | null
-          specialty_name?: string | null
+          state: string
           status?: string
+          street: string
           sub_service_id?: string | null
-          sub_service_name?: string | null
-          updated_at?: string
-          user_id: string
+          zip_code: string
         }
         Update: {
-          address?: Json
-          created_at?: string
+          city?: string
+          client_id?: string | null
+          complement?: string | null
+          created_at?: string | null
           description?: string | null
+          full_name?: string | null
           id?: string
-          items?: Json | null
-          measurements?: Json | null
+          is_anonymous?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          neighborhood?: string
+          number?: string
           service_date?: string | null
           service_end_date?: string | null
           service_id?: string
-          service_name?: string
           service_time_preference?: string | null
           specialty_id?: string | null
-          specialty_name?: string | null
+          state?: string
           status?: string
+          street?: string
           sub_service_id?: string | null
-          sub_service_name?: string | null
-          updated_at?: string
-          user_id?: string
+          zip_code?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_specialty_id_fkey"
+            columns: ["specialty_id"]
+            isOneToOne: false
+            referencedRelation: "specialties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_sub_service_id_fkey"
+            columns: ["sub_service_id"]
+            isOneToOne: false
+            referencedRelation: "sub_services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_items: {
         Row: {
-          created_at: string
-          description: string | null
+          created_at: string | null
           id: string
           name: string
           reference_value: number | null
@@ -452,8 +617,7 @@ export type Database = {
           type: string
         }
         Insert: {
-          created_at?: string
-          description?: string | null
+          created_at?: string | null
           id?: string
           name: string
           reference_value?: number | null
@@ -463,8 +627,7 @@ export type Database = {
           type: string
         }
         Update: {
-          created_at?: string
-          description?: string | null
+          created_at?: string | null
           id?: string
           name?: string
           reference_value?: number | null
@@ -499,7 +662,7 @@ export type Database = {
       }
       service_questions: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           question: string
           service_id: string | null
@@ -507,7 +670,7 @@ export type Database = {
           sub_service_id: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           question: string
           service_id?: string | null
@@ -515,7 +678,7 @@ export type Database = {
           sub_service_id?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           question?: string
           service_id?: string | null
@@ -548,46 +711,46 @@ export type Database = {
       }
       services: {
         Row: {
-          created_at: string
+          created_at: string | null
           description: string | null
+          icon_url: string | null
           id: string
-          image_url: string | null
           name: string
+          tags: string[] | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
+          icon_url?: string | null
           id?: string
-          image_url?: string | null
           name: string
+          tags?: string[] | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
+          icon_url?: string | null
           id?: string
-          image_url?: string | null
           name?: string
+          tags?: string[] | null
         }
         Relationships: []
       }
       specialties: {
         Row: {
-          created_at: string
-          description: string | null
+          created_at: string | null
           id: string
           name: string
           sub_service_id: string
         }
         Insert: {
-          created_at?: string
-          description?: string | null
+          created_at?: string | null
           id?: string
           name: string
           sub_service_id: string
         }
         Update: {
-          created_at?: string
-          description?: string | null
+          created_at?: string | null
           id?: string
           name?: string
           sub_service_id?: string
@@ -604,21 +767,21 @@ export type Database = {
       }
       sub_services: {
         Row: {
-          created_at: string
+          created_at: string | null
           description: string | null
           id: string
           name: string
           service_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
           name: string
           service_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
           name?: string
@@ -634,52 +797,162 @@ export type Database = {
           },
         ]
       }
-      subscriptions: {
+      subscribers: {
         Row: {
           created_at: string
-          end_date: string | null
+          email: string
           id: string
-          start_date: string
-          status: string
+          is_trial_used: boolean | null
+          last_invoice_url: string | null
+          next_invoice_amount: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
-          tier: string
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_status: string | null
+          subscription_tier: string | null
+          trial_end: string | null
           updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_trial_used?: boolean | null
+          last_invoice_url?: string | null
+          next_invoice_amount?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_trial_used?: boolean | null
+          last_invoice_url?: string | null
+          next_invoice_amount?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      subscription_features: {
+        Row: {
+          created_at: string
+          feature_id: string | null
+          id: string
+          subscription_tier: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          feature_id?: string | null
+          id?: string
+          subscription_tier: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string | null
+          id?: string
+          subscription_tier?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_features: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          expires_at: string | null
+          feature_id: string | null
+          id: string
+          reason: string | null
+          user_id: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          feature_id?: string | null
+          id?: string
+          reason?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          feature_id?: string | null
+          id?: string
+          reason?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          end_date?: string | null
           id?: string
-          start_date?: string
-          status: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          tier: string
-          updated_at?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type: string
           user_id: string
         }
         Update: {
           created_at?: string
-          end_date?: string | null
           id?: string
-          start_date?: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          tier?: string
-          updated_at?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
