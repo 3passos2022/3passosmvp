@@ -2,8 +2,48 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_URL_ENV = import.meta.env.VITE_SUPABASE_URL;
+
+// Extract Supabase URL from the JWT token
+// The JWT payload contains 'ref' which is the project reference used to construct the URL
+function getSupabaseUrlFromKey(key: string): string | null {
+  try {
+    if (!key || typeof key !== 'string') {
+      return null;
+    }
+    
+    const parts = key.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    
+    const payload = JSON.parse(atob(parts[1]));
+    if (payload.ref) {
+      return `https://${payload.ref}.supabase.co`;
+    }
+  } catch (e) {
+    // Silently fail and return null to use fallback
+    return null;
+  }
+  return null;
+}
+
+// Try to get URL from environment variable first, then from JWT token
+let SUPABASE_URL = SUPABASE_URL_ENV;
+
+if (!SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) {
+  SUPABASE_URL = getSupabaseUrlFromKey(SUPABASE_PUBLISHABLE_KEY) || '';
+}
+
+// Validate required environment variables
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY is required. Please check your .env file.');
+}
+
+if (!SUPABASE_URL) {
+  throw new Error('Supabase URL is required. Please set VITE_SUPABASE_URL in your .env file or ensure VITE_SUPABASE_PUBLISHABLE_KEY is valid.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
