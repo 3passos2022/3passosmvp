@@ -14,13 +14,684 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      feature_limits: {
+        Row: {
+          created_at: string
+          feature_name: string
+          id: string
+          limit_value: number | null
+          subscription_tier: string
+        }
+        Insert: {
+          created_at?: string
+          feature_name: string
+          id?: string
+          limit_value?: number | null
+          subscription_tier: string
+        }
+        Update: {
+          created_at?: string
+          feature_name?: string
+          id?: string
+          limit_value?: number | null
+          subscription_tier?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          avatar_url: string | null
+          bio: string | null
+          city: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          neighborhood: string | null
+          phone: string | null
+          role: string
+          subscribed: boolean | null
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          email: string
+          id: string
+          name?: string | null
+          neighborhood?: string | null
+          phone?: string | null
+          role?: string
+          subscribed?: boolean | null
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          neighborhood?: string | null
+          phone?: string | null
+          role?: string
+          subscribed?: boolean | null
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      provider_item_prices: {
+        Row: {
+          created_at: string
+          id: string
+          price_per_unit: number
+          provider_id: string
+          service_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price_per_unit: number
+          provider_id: string
+          service_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price_per_unit?: number
+          provider_id?: string
+          service_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_item_prices_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_item_prices_service_item_id_fkey"
+            columns: ["service_item_id"]
+            isOneToOne: false
+            referencedRelation: "service_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_portfolio: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          provider_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          provider_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          provider_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_portfolio_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_ratings: {
+        Row: {
+          client_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          provider_id: string
+          quote_id: string
+          rating: number
+        }
+        Insert: {
+          client_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id: string
+          quote_id: string
+          rating: number
+        }
+        Update: {
+          client_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id?: string
+          quote_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_ratings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_ratings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_ratings_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: true
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_services: {
+        Row: {
+          created_at: string
+          id: string
+          provider_id: string
+          service_id: string | null
+          specialty_id: string | null
+          sub_service_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          provider_id: string
+          service_id?: string | null
+          specialty_id?: string | null
+          sub_service_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          provider_id?: string
+          service_id?: string | null
+          specialty_id?: string | null
+          sub_service_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_services_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_services_specialty_id_fkey"
+            columns: ["specialty_id"]
+            isOneToOne: false
+            referencedRelation: "specialties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_services_sub_service_id_fkey"
+            columns: ["sub_service_id"]
+            isOneToOne: false
+            referencedRelation: "sub_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_settings: {
+        Row: {
+          accepts_new_clients: boolean | null
+          created_at: string
+          id: string
+          provider_id: string
+          service_radius_km: number | null
+          updated_at: string
+        }
+        Insert: {
+          accepts_new_clients?: boolean | null
+          created_at?: string
+          id?: string
+          provider_id: string
+          service_radius_km?: number | null
+          updated_at?: string
+        }
+        Update: {
+          accepts_new_clients?: boolean | null
+          created_at?: string
+          id?: string
+          provider_id?: string
+          service_radius_km?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_settings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_options: {
+        Row: {
+          created_at: string
+          id: string
+          option_text: string
+          question_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          option_text: string
+          question_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          option_text?: string
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "service_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_providers: {
+        Row: {
+          created_at: string
+          id: string
+          provider_id: string
+          quote_id: string
+          status: string
+          total_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          provider_id: string
+          quote_id: string
+          status?: string
+          total_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          provider_id?: string
+          quote_id?: string
+          status?: string
+          total_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_providers_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          address: Json
+          created_at: string
+          description: string | null
+          id: string
+          items: Json | null
+          measurements: Json | null
+          service_date: string | null
+          service_end_date: string | null
+          service_id: string
+          service_name: string
+          service_time_preference: string | null
+          specialty_id: string | null
+          specialty_name: string | null
+          status: string
+          sub_service_id: string | null
+          sub_service_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          items?: Json | null
+          measurements?: Json | null
+          service_date?: string | null
+          service_end_date?: string | null
+          service_id: string
+          service_name: string
+          service_time_preference?: string | null
+          specialty_id?: string | null
+          specialty_name?: string | null
+          status?: string
+          sub_service_id?: string | null
+          sub_service_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          items?: Json | null
+          measurements?: Json | null
+          service_date?: string | null
+          service_end_date?: string | null
+          service_id?: string
+          service_name?: string
+          service_time_preference?: string | null
+          specialty_id?: string | null
+          specialty_name?: string | null
+          status?: string
+          sub_service_id?: string | null
+          sub_service_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      service_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          reference_value: number | null
+          service_id: string | null
+          specialty_id: string | null
+          sub_service_id: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          reference_value?: number | null
+          service_id?: string | null
+          specialty_id?: string | null
+          sub_service_id?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          reference_value?: number | null
+          service_id?: string | null
+          specialty_id?: string | null
+          sub_service_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_items_specialty_id_fkey"
+            columns: ["specialty_id"]
+            isOneToOne: false
+            referencedRelation: "specialties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_items_sub_service_id_fkey"
+            columns: ["sub_service_id"]
+            isOneToOne: false
+            referencedRelation: "sub_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_questions: {
+        Row: {
+          created_at: string
+          id: string
+          question: string
+          service_id: string | null
+          specialty_id: string | null
+          sub_service_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          question: string
+          service_id?: string | null
+          specialty_id?: string | null
+          sub_service_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          question?: string
+          service_id?: string | null
+          specialty_id?: string | null
+          sub_service_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_questions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_questions_specialty_id_fkey"
+            columns: ["specialty_id"]
+            isOneToOne: false
+            referencedRelation: "specialties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_questions_sub_service_id_fkey"
+            columns: ["sub_service_id"]
+            isOneToOne: false
+            referencedRelation: "sub_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      specialties: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sub_service_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sub_service_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sub_service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialties_sub_service_id_fkey"
+            columns: ["sub_service_id"]
+            isOneToOne: false
+            referencedRelation: "sub_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_services: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          service_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          service_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          start_date: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          start_date?: string
+          status: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          start_date?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_feature_limit: {
+        Args: { p_feature_name: string; p_user_id: string }
+        Returns: {
+          limit_val: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
