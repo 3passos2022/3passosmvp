@@ -84,12 +84,10 @@ export interface QuoteDetails {
   _itemReferenceValues?: Record<string, number>;
   // Added service date fields
   serviceDate?: Date;
-  serviceEndDate?: Date; 
+  serviceEndDate?: Date;
   serviceTimePreference?: string;
+  questions?: Record<string, { question: string, answer: string }>;
 }
-
-// Re-export QuoteMeasurement from lib/types to fix the import issue
-export type { QuoteMeasurement };
 
 export interface ProviderServiceItemPrice {
   id: string;

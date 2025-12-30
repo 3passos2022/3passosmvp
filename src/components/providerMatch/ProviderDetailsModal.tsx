@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, Star, Phone, Mail, Send, User, Image, Calculator } from 'lucide-react';
-import { ProviderDetails } from '@/lib/types/providerMatch';
-import { QuoteDetails } from '@/lib/types/providerMatch';
+import { MapPin, Star, Phone, Mail, Send, User, Image, Calculator, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
+import { ProviderDetails, QuoteDetails } from '@/lib/types/providerMatch';
+import QuoteDetailsSummary from '@/components/quoteRequest/QuoteDetailsSummary';
 
 interface ProviderDetailsModalProps {
   isOpen: boolean;
@@ -25,6 +25,9 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
   onSendQuote
 }) => {
   const [activeTab, setActiveTab] = useState('price');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   if (!provider) return null;
 
@@ -40,7 +43,36 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
     if (distance < 1) return `${(distance * 1000).toFixed(0)}m`;
     return `${distance.toFixed(1)}km`;
   };
-  
+
+  const openImageViewer = (index: number) => {
+    setSelectedImageIndex(index);
+    setZoomLevel(1);
+  };
+
+  const closeImageViewer = () => {
+    setSelectedImageIndex(null);
+    setZoomLevel(1);
+  };
+
+  const handleZoom = (delta: number) => {
+    setZoomLevel(prev => Math.max(0.5, Math.min(3, prev + delta)));
+  };
+
+  const navigateImage = (direction: 'next' | 'prev') => {
+    if (selectedImageIndex === null || !provider.portfolioItems) return;
+
+    if (direction === 'next') {
+      setSelectedImageIndex((prev) =>
+        prev === null || prev === provider.portfolioItems.length - 1 ? 0 : prev + 1
+      );
+    } else {
+      setSelectedImageIndex((prev) =>
+        prev === null || prev === 0 ? provider.portfolioItems.length - 1 : prev - 1
+      );
+    }
+    setZoomLevel(1);
+  };
+
   console.log("provider.priceDetails_ ANDRE", provider.priceDetails);
 
   return (
@@ -68,7 +100,7 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                 {formatDistance(provider.distance)} de você
               </span>
             </div>
-            <Badge 
+            <Badge
               variant={provider.isWithinRadius ? "default" : "destructive"}
               className="flex items-center gap-1"
             >
@@ -116,7 +148,7 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                       )}
                     </div>
                   </div>
-                    
+
                   {/* Detalhamento dos preços */}
                   {provider.priceDetails && provider.priceDetails.length > 0 && (
                     <div className="border-b pb-4">
@@ -167,14 +199,20 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                 <CardContent>
                   {provider.portfolioItems && provider.portfolioItems.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {provider.portfolioItems.map((item) => (
-                        <div key={item.id} className="space-y-2">
-                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                      {provider.portfolioItems.map((item, index) => (
+                        <div key={item.id} className="space-y-2 group">
+                          <div
+                            className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer relative"
+                            onClick={() => openImageViewer(index)}
+                          >
                             <img
                               src={item.imageUrl}
                               alt={item.description || 'Portfolio item'}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                             />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <Maximize2 className="text-white h-8 w-8 drop-shadow-lg" />
+                            </div>
                           </div>
                           {item.description && (
                             <p className="text-sm text-gray-600">{item.description}</p>
@@ -264,16 +302,15 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
                             key={star}
-                            className={`h-4 w-4 ${
-                              star <= provider.rating
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
+                            className={`h-4 w-4 ${star <= provider.rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                              }`}
                           />
                         ))}
                       </div>
                       <span className="text-sm text-gray-600">
-                        {provider.rating > 0 
+                        {provider.rating > 0
                           ? `${provider.rating.toFixed(1)} de 5.0`
                           : 'Sem avaliações ainda'
                         }
@@ -286,7 +323,14 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
           </Tabs>
 
           {/* Botão de ação */}
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-between pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowReviewModal(true)}
+              className="flex items-center gap-2"
+            >
+              Revisar minha solicitação
+            </Button>
             <Button
               onClick={() => onSendQuote(provider.provider.userId)}
               disabled={!provider.isWithinRadius}
@@ -298,6 +342,138 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal de Revisão da Solicitação */}
+      <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Revisão da Solicitação</DialogTitle>
+          </DialogHeader>
+          <QuoteDetailsSummary
+            formData={{
+              serviceName: quoteDetails.serviceName,
+              subServiceName: quoteDetails.subServiceName,
+              specialtyName: quoteDetails.specialtyName,
+              description: quoteDetails.description,
+              street: quoteDetails.address.street,
+              number: quoteDetails.address.number,
+              complement: quoteDetails.address.complement,
+              neighborhood: quoteDetails.address.neighborhood,
+              city: quoteDetails.address.city,
+              state: quoteDetails.address.state,
+              zipCode: quoteDetails.address.zipCode,
+              questions: quoteDetails.questions,
+              itemQuantities: quoteDetails.items,
+              measurements: quoteDetails.measurements?.map(m => ({
+                id: m.id || Math.random().toString(),
+                roomName: m.roomName || '',
+                width: m.width,
+                length: m.length,
+                height: m.height,
+                measurementType: m.measurementType
+              })),
+              serviceDate: quoteDetails.serviceDate,
+              serviceEndDate: quoteDetails.serviceEndDate,
+              serviceTimePreference: quoteDetails.serviceTimePreference
+            }}
+          />
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowReviewModal(false)}>
+              Voltar para o Orçamento
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Image Viewer Modal */}
+      {selectedImageIndex !== null && provider.portfolioItems && (
+        <Dialog open={selectedImageIndex !== null} onOpenChange={(open) => !open && closeImageViewer()}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 bg-black/90 border-none">
+            <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+              {/* Controls */}
+              <div className="absolute top-4 right-4 z-50 flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => handleZoom(-0.25)}
+                  className="bg-black/50 hover:bg-black/70 text-white border-none"
+                >
+                  <ZoomOut className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => setZoomLevel(1)}
+                  className="bg-black/50 hover:bg-black/70 text-white border-none"
+                >
+                  <Maximize2 className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => handleZoom(0.25)}
+                  className="bg-black/50 hover:bg-black/70 text-white border-none"
+                >
+                  <ZoomIn className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={closeImageViewer}
+                  className="ml-2"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Navigation - Left */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigateImage('prev')}
+                className="absolute left-4 z-50 text-white hover:bg-white/20 h-12 w-12 rounded-full"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </Button>
+
+              {/* Image */}
+              <div
+                className="transition-transform duration-200 ease-out"
+                style={{ transform: `scale(${zoomLevel})` }}
+              >
+                <img
+                  src={provider.portfolioItems[selectedImageIndex].imageUrl}
+                  alt={provider.portfolioItems[selectedImageIndex].description || 'Portfolio item'}
+                  className="max-w-full max-h-[90vh] object-contain"
+                />
+              </div>
+
+              {/* Navigation - Right */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigateImage('next')}
+                className="absolute right-4 z-50 text-white hover:bg-white/20 h-12 w-12 rounded-full"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </Button>
+
+              {/* Description Caption */}
+              {provider.portfolioItems[selectedImageIndex].description && (
+                <div className="absolute bottom-8 left-0 right-0 text-center z-50 pointer-events-none">
+                  <span className="bg-black/60 text-white px-4 py-2 rounded-full text-sm pointer-events-auto">
+                    {provider.portfolioItems[selectedImageIndex].description}
+                  </span>
+                </div>
+              )}
+
+              {/* Counter */}
+              <div className="absolute top-4 left-4 z-50 text-white bg-black/50 px-3 py-1 rounded-full text-sm">
+                {selectedImageIndex + 1} / {provider.portfolioItems.length}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 };

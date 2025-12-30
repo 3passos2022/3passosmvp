@@ -12,11 +12,11 @@ function calculateDistance(
   const R = 6371; // Raio da Terra em km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
   return distance;
 }
@@ -33,11 +33,11 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
 
     if (!coordinates.latitude || !coordinates.longitude) {
       console.warn('⚠️ [ProviderMatch] Coordenadas não disponíveis, tentando geocodificar endereço');
-      
+
       // Tentar geocodificar o endereço
       const fullAddress = `${quoteDetails.address.street}, ${quoteDetails.address.number}, ${quoteDetails.address.neighborhood}, ${quoteDetails.address.city}, ${quoteDetails.address.state}`;
       console.log('🌍 [ProviderMatch] Tentando geocodificar:', fullAddress);
-      
+
       try {
         const geocoded = await geocodeAddress(fullAddress);
         if (geocoded) {
@@ -58,18 +58,40 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
 
     // Obter prestadores que prestam serviços para a especialidade
     console.log(`🔍 [ProviderMatch] Buscando prestadores para especialidade ID: ${quoteDetails.specialtyId}`);
-    
-  /*  const { data: providers, error: providersError } = await supabase
-      .from('provider_services')
+
+    /*  const { data: providers, error: providersError } = await supabase
+        .from('provider_services')
+        .select(`
+          provider_id,
+          base_price,
+          profiles!inner(
+            id,
+            name,
+            phone,
+            role
+          ),
+          provider_settings(
+            bio,
+            city,
+            neighborhood,
+            latitude,
+            longitude,
+            service_radius_km
+          ),
+          specialties!inner(
+            id,
+            name
+          )
+        `)
+        .eq('specialty_id', quoteDetails.specialtyId);  */
+
+    /*       const { data: providers, error: providersError } = await supabase
+      .from('profiles')
       .select(`
-        provider_id,
-        base_price,
-        profiles!inner(
-          id,
-          name,
-          phone,
-          role
-        ),
+        id,
+        name,
+        phone,
+        role,
         provider_settings(
           bio,
           city,
@@ -78,45 +100,23 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
           longitude,
           service_radius_km
         ),
-        specialties!inner(
+        provider_services(
+          provider_id,
+          base_price,
+          specialty_id
+        ),
+        provider_services:specialties(
           id,
           name
         )
       `)
-      .eq('specialty_id', quoteDetails.specialtyId);  */
+      .filter('provider_services.specialty_id', 'eq', quoteDetails.specialtyId); GPT1*/
 
-/*       const { data: providers, error: providersError } = await supabase
-  .from('profiles')
-  .select(`
-    id,
-    name,
-    phone,
-    role,
-    provider_settings(
-      bio,
-      city,
-      neighborhood,
-      latitude,
-      longitude,
-      service_radius_km
-    ),
-    provider_services(
-      provider_id,
-      base_price,
-      specialty_id
-    ),
-    provider_services:specialties(
-      id,
-      name
-    )
-  `)
-  .filter('provider_services.specialty_id', 'eq', quoteDetails.specialtyId); GPT1*/
+    /*  GPT 2 */
 
- /*  GPT 2 */
-
- const { data: providers, error: providersError } = await supabase
- .from('profiles')
- .select(`
+    const { data: providers, error: providersError } = await supabase
+      .from('profiles')
+      .select(`
    id,
    name,
    phone,
@@ -133,7 +133,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
      )
    )
  `)
- .eq('role', 'provider');
+      .eq('role', 'provider');
 
     if (providersError) {
       console.error('❌ [ProviderMatch] Erro ao buscar prestadores:', providersError);
@@ -157,7 +157,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
 
       // Verificar se o prestador tem configurações de localização
       const settings = provider.provider_settings;
-        
+
       if (!settings) {
         console.log(`⚠️ [ProviderMatch] Prestador ${provider.name} não tem configurações`);
         continue;
@@ -200,7 +200,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
       // Se há itens, calcular preço baseado nos itens
       if (quoteDetails.items && Object.keys(quoteDetails.items).length > 0) {
         console.log(`💰 [ProviderMatch] Calculando preços por itens para ${provider.name}`);
-        
+
         const { data } = await supabase
           .from('provider_item_prices')
           .select(`
@@ -232,7 +232,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
       // Se há medidas, calcular preço baseado na área
       if (quoteDetails.measurements && quoteDetails.measurements.length > 0) {
         console.log(`📐 [ProviderMatch] Calculando preços por área para ${provider.name}`);
-        
+
         const totalArea = quoteDetails.measurements.reduce((sum, measurement) => {
           return sum + (measurement.area || measurement.width * measurement.length);
         }, 0);
@@ -283,40 +283,73 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
                 itemName: maxAreaItem.service_items?.name,
                 quantity: 1,
                 pricePerUnit: maxAreaItem.price_per_unit,
-                total: maxAreaItem.price_per_unit
+                total: areaPrice
               });
             }
           } else {
             // Caso 2: área maior que todos os limites cadastrados
             const maiorItem = maxAreaItemsValid[maxAreaItemsValid.length - 1];
             if (maiorItem) {
-              areaPrice = maiorItem.price_per_unit;
-              excedente = totalArea - maiorItem.referenceValue;
-              if (areaPrice > 0) {
-                priceDetails.push({
-                  itemId: maiorItem.item_id,
-                  itemName: maiorItem.service_items?.name,
-                  quantity: 1,
-                  pricePerUnit: maiorItem.price_per_unit,
-                  total: maiorItem.price_per_unit
-                });
-              }
-              if (areaItem && excedente > 0) {
-                const excedenteTotal = excedente * areaItem.price_per_unit;
-                areaPrice += excedenteTotal;
-                if (excedenteTotal > 0) {
+              // Valor base (flat fee para o limite)
+              const basePrice = maiorItem.price_per_unit;
+              const limit = maiorItem.referenceValue;
+
+              if (limit > 0) {
+                // Calcula quantas vezes o pacote base cabe na área total
+                const quantity = Math.floor(totalArea / limit);
+                const remainder = totalArea % limit;
+
+                // Garante pelo menos 1 unidade se a área for menor que o limite (embora deva cair no Caso 1)
+                // Mas se cair aqui por algum motivo, garante 1.
+                const finalQuantity = quantity < 1 ? 1 : quantity;
+                const baseTotal = finalQuantity * basePrice;
+
+                // Adiciona o item base (multiplicado pela quantidade)
+                if (basePrice > 0) {
                   priceDetails.push({
-                    itemId: areaItem.item_id,
-                    itemName: areaItem.service_items?.name + ' (excedente)',
-                    area: excedente,
-                    pricePerUnit: areaItem.price_per_unit,
-                    total: excedenteTotal
+                    itemId: maiorItem.item_id,
+                    itemName: maiorItem.service_items?.name,
+                    quantity: finalQuantity,
+                    pricePerUnit: basePrice,
+                    total: baseTotal
+                  });
+                }
+
+                // Calcula excedente proporcional (resto da divisão)
+                if (remainder > 0 && quantity >= 1) {
+                  const derivedRate = basePrice / limit;
+                  const surplusPrice = remainder * derivedRate;
+
+                  areaPrice = baseTotal + surplusPrice;
+
+                  priceDetails.push({
+                    itemId: `${maiorItem.item_id}_surplus`, // ID único para evitar deduplicação
+                    itemName: `${maiorItem.service_items?.name} (excedente)`,
+                    area: remainder,
+                    pricePerUnit: derivedRate,
+                    total: surplusPrice
+                  });
+                } else {
+                  areaPrice = baseTotal;
+                }
+              } else {
+                // Fallback se limite for 0 (não deve acontecer com dados válidos)
+                areaPrice = basePrice;
+                if (basePrice > 0) {
+                  priceDetails.push({
+                    itemId: maiorItem.item_id,
+                    itemName: maiorItem.service_items?.name,
+                    quantity: 1,
+                    pricePerUnit: basePrice,
+                    total: basePrice
                   });
                 }
               }
             }
           }
-        } else if (areaItem && totalArea > 0) {
+        }
+
+        if (areaItem && totalArea > 0) {
           // Lógica tradicional de área
           let areaUnitPrice = areaItem.price_per_unit;
           areaPrice = totalArea * areaUnitPrice;
@@ -330,8 +363,8 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
             });
           }
         }
-        // Não calcular/exibir linear_meter se só houver área (m²)
-        if (!maxAreaItem && !areaItem && linearItem && totalPerimeter > 0) {
+        // Calcular linear_meter independentemente
+        if (linearItem && totalPerimeter > 0) {
           const linearTotal = totalPerimeter * linearItem.price_per_unit;
           areaPrice += linearTotal;
           if (linearTotal > 0) {
@@ -429,7 +462,7 @@ export async function findMatchingProviders(quoteDetails: QuoteDetails): Promise
     /* console.log(`🎉 [ProviderMatch] Retornando ${matches.length} prestadores encontrados`);
     console.log(`📊 [ProviderMatch] Dentro da área: ${matches.filter(m => m.isWithinRadius).length}`);
     console.log(`📊 [ProviderMatch] Fora da área: ${matches.filter(m => !m.isWithinRadius).length}`); */
-    
+
     return matches;
 
   } catch (error) {

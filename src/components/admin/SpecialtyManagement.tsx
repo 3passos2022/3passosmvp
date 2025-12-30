@@ -8,6 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import QuestionManagement from './QuestionManagement';
+import ItemManagement from './ItemManagement';
 
 interface Specialty {
   id: string;
@@ -43,6 +46,8 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
     subServiceId: subServiceId
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedSpecialtyId, setSelectedSpecialtyId] = useState<string | null>(null);
+  const [selectedSpecialtyName, setSelectedSpecialtyName] = useState<string>('');
 
   // Fetch specialties for the current sub-service
   const { data: specialties = [], isLoading } = useQuery({
@@ -53,7 +58,7 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
         .select('*')
         .eq('sub_service_id', subServiceId)
         .order('name');
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -67,6 +72,8 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
       subServiceId: subServiceId
     });
     setIsEditing(false);
+    setSelectedSpecialtyId(null);
+    setSelectedSpecialtyName('');
   }, [subServiceId]);
 
   // Create specialty mutation
@@ -75,14 +82,14 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
       const { data, error } = await supabase
         .from('specialties')
         .insert([
-          { 
+          {
             name: formData.name,
             sub_service_id: formData.subServiceId
           }
         ])
         .select('id')
         .single();
-      
+
       if (error) throw error;
       return data.id;
     },
@@ -106,7 +113,7 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
         .from('specialties')
         .update({ name: formData.name })
         .eq('id', formData.id);
-      
+
       if (error) throw error;
       return formData.id;
     },
@@ -128,12 +135,16 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
         .from('specialties')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
       return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['specialties', subServiceId] });
+      if (selectedSpecialtyId === currentSpecialty.id) {
+        setSelectedSpecialtyId(null);
+        setSelectedSpecialtyName('');
+      }
       toast.success('Especialidade excluída com sucesso');
     },
     onError: (error: any) => {
@@ -151,12 +162,12 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!currentSpecialty.name) {
       toast.error('Nome da especialidade é obrigatório');
       return;
     }
-    
+
     if (isEditing && currentSpecialty.id) {
       updateSpecialtyMutation.mutate(currentSpecialty);
     } else {
@@ -180,114 +191,157 @@ const SpecialtyManagement: React.FC<SpecialtyManagementProps> = ({ subServiceId,
     }
   };
 
+  const selectSpecialty = (specialty: Specialty) => {
+    setSelectedSpecialtyId(specialty.id);
+    setSelectedSpecialtyName(specialty.name);
+  };
+
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Especialidades de {subServiceName}</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gerencie as especialidades disponíveis para este sub-serviço
-          </p>
+    <div className="space-y-6">
+      <Card className="h-full">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Especialidades de {subServiceName}</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Gerencie as especialidades disponíveis para este sub-serviço
+            </p>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(true);
+                }}
+                size="sm"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Especialidade
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px]">
+              <DialogHeader>
+                <DialogTitle>{isEditing ? 'Editar Especialidade' : 'Nova Especialidade'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="text-sm font-medium">
+                    Nome da Especialidade <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    id="name"
+                    value={currentSpecialty.name}
+                    onChange={(e) => setCurrentSpecialty({ ...currentSpecialty, name: e.target.value })}
+                    placeholder="Ex: Pintura Residencial, Instalação de Piso"
+                    required
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      resetForm();
+                      setIsDialogOpen(false);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createSpecialtyMutation.isPending || updateSpecialtyMutation.isPending}
+                  >
+                    {createSpecialtyMutation.isPending || updateSpecialtyMutation.isPending
+                      ? 'Salvando...'
+                      : isEditing
+                        ? 'Atualizar'
+                        : 'Criar'
+                    }
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-10">Carregando especialidades...</div>
+          ) : specialties.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              Nenhuma especialidade cadastrada para este sub-serviço.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {specialties.map((specialty: Specialty) => (
+                <Card
+                  key={specialty.id}
+                  className={`hover:bg-muted/50 transition-colors cursor-pointer ${selectedSpecialtyId === specialty.id ? 'border-primary' : ''
+                    }`}
+                  onClick={() => selectSpecialty(specialty)}
+                >
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-medium">{specialty.name}</h3>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSpecialtyEdit(specialty);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Editar</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSpecialtyDelete(specialty.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Excluir</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {selectedSpecialtyId && (
+        <div className="mt-6">
+          <Tabs defaultValue="questions">
+            <TabsList>
+              <TabsTrigger value="questions">Perguntas</TabsTrigger>
+              <TabsTrigger value="items">Itens</TabsTrigger>
+            </TabsList>
+            <TabsContent value="questions" className="pt-4">
+              <QuestionManagement
+                specialtyId={selectedSpecialtyId}
+                parentName={selectedSpecialtyName}
+                level="specialty"
+              />
+            </TabsContent>
+            <TabsContent value="items" className="pt-4">
+              <ItemManagement
+                specialtyId={selectedSpecialtyId}
+                parentName={selectedSpecialtyName}
+                level="specialty"
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={() => {
-                resetForm();
-                setIsDialogOpen(true);
-              }}
-              size="sm"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Especialidade
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px]">
-            <DialogHeader>
-              <DialogTitle>{isEditing ? 'Editar Especialidade' : 'Nova Especialidade'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="name" className="text-sm font-medium">
-                  Nome da Especialidade <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  id="name"
-                  value={currentSpecialty.name}
-                  onChange={(e) => setCurrentSpecialty({...currentSpecialty, name: e.target.value})}
-                  placeholder="Ex: Pintura Residencial, Instalação de Piso"
-                  required
-                />
-              </div>
-              
-              <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    resetForm();
-                    setIsDialogOpen(false);
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={createSpecialtyMutation.isPending || updateSpecialtyMutation.isPending}
-                >
-                  {createSpecialtyMutation.isPending || updateSpecialtyMutation.isPending
-                    ? 'Salvando...'
-                    : isEditing 
-                      ? 'Atualizar' 
-                      : 'Criar'
-                  }
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      
-      <CardContent>
-        {isLoading ? (
-          <div className="text-center py-10">Carregando especialidades...</div>
-        ) : specialties.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            Nenhuma especialidade cadastrada para este sub-serviço.
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
-            {specialties.map((specialty: Specialty) => (
-              <Card key={specialty.id} className="hover:bg-muted/50 transition-colors">
-                <CardContent className="p-4 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-medium">{specialty.name}</h3>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleSpecialtyEdit(specialty)}
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">Editar</span>
-                    </Button>
-                    <Button
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleSpecialtyDelete(specialty.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Excluir</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 

@@ -93,10 +93,10 @@ interface FormData {
   subServiceName?: string;
   specialtyName?: string;
   description?: string;
-  answers?: {[key: string]: string};
-  questions?: {[questionId: string]: { question: string, answer: string }};
-  itemQuantities?: {[key: string]: number};
-  itemNames?: {[key: string]: string};
+  answers?: { [key: string]: string };
+  questions?: { [questionId: string]: { question: string, answer: string } };
+  itemQuantities?: { [key: string]: number };
+  itemNames?: { [key: string]: string };
   measurements?: {
     id: string;
     roomName: string;
@@ -148,13 +148,13 @@ const AddressStep: React.FC<{
   useEffect(() => {
     const fetchAddressFromCep = async () => {
       const cleanZipCode = zipCode?.replace(/\D/g, '');
-      
+
       if (cleanZipCode?.length === 8) {
         setIsFetchingCep(true);
         try {
           const response = await fetch(`https://viacep.com.br/ws/${cleanZipCode}/json/`);
           const data = await response.json();
-          
+
           if (!data.erro) {
             setValue('street', data.logradouro, { shouldValidate: true });
             setValue('neighborhood', data.bairro, { shouldValidate: true });
@@ -190,14 +190,14 @@ const AddressStep: React.FC<{
       <div className="space-y-2">
         <Label htmlFor="zipCode">CEP</Label>
         <div className="flex items-center">
-          <Input 
-            id="zipCode" 
+          <Input
+            id="zipCode"
             {...register('zipCode')}
             placeholder="00000-000"
             className="flex-grow"
           />
           {isFetchingCep && <Loader2 className="animate-spin ml-2 h-4 w-4 text-primary" />}
-          {!isFetchingCep && zipCode?.length >= 8 && !errors.zipCode && 
+          {!isFetchingCep && zipCode?.length >= 8 && !errors.zipCode &&
             <CheckCircle2 className="ml-2 h-4 w-4 text-green-500" />
           }
         </div>
@@ -284,12 +284,12 @@ const ServiceStep: React.FC<{
     formData.serviceEndDate && formData.serviceEndDate !== formData.serviceDate ? 'range' : 'single'
   );
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(formData.serviceDate);
-  const [selectedDateRange, setSelectedDateRange] = useState<{from: Date; to?: Date}>({
+  const [selectedDateRange, setSelectedDateRange] = useState<{ from: Date; to?: Date }>({
     from: formData.serviceDate || new Date(),
     to: formData.serviceEndDate || undefined
   });
   const [timePreference, setTimePreference] = useState<string>(formData.serviceTimePreference || '');
-  
+
   const subServices = servicesList.find(s => s.id === selectedService)?.subServices || [];
   const specialties = subServices.find(s => s.id === selectedSubService)?.specialties || [];
 
@@ -318,12 +318,12 @@ const ServiceStep: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedService) {
       toast.error('Por favor, selecione pelo menos um serviço');
       return;
     }
-    
+
     if (!formData.fullName || formData.fullName.trim() === '') {
       toast.error('Por favor, informe seu nome completo');
       return;
@@ -333,26 +333,26 @@ const ServiceStep: React.FC<{
       toast.error('Por favor, selecione uma data para o serviço');
       return;
     }
-    
+
     if (dateSelectionMode === 'range' && (!selectedDateRange.from || !selectedDateRange.to)) {
       toast.error('Por favor, selecione o período completo para o serviço');
       return;
     }
-    
+
     if (!timePreference) {
       toast.error('Por favor, selecione um horário preferencial');
       return;
     }
-    
+
     const serviceName = services.find(s => s.id === selectedService)?.name;
     const subServiceName = selectedSubService ? subServices.find(s => s.id === selectedSubService)?.name : undefined;
     const specialtyName = selectedSpecialty ? specialties.find(s => s.id === selectedSpecialty)?.name : undefined;
-    
-    console.log('Seleções do usuário:',  {
+
+    console.log('Seleções do usuário:', {
       fullName: formData.fullName,
       serviceId: selectedService,
-      serviceName, 
-      subServiceId: selectedSubService, 
+      serviceName,
+      subServiceId: selectedSubService,
       subServiceName,
       specialtyId: selectedSpecialty,
       specialtyName,
@@ -360,7 +360,7 @@ const ServiceStep: React.FC<{
       serviceEndDate: dateSelectionMode === 'range' ? selectedDateRange.to : selectedDate,
       serviceTimePreference: timePreference
     });
-    
+
     updateFormData({
       serviceId: selectedService,
       subServiceId: selectedSubService || undefined,
@@ -372,7 +372,7 @@ const ServiceStep: React.FC<{
       serviceEndDate: dateSelectionMode === 'range' ? selectedDateRange.to : selectedDate,
       serviceTimePreference: timePreference
     });
-    
+
     onNext();
   };
 
@@ -393,7 +393,7 @@ const ServiceStep: React.FC<{
             required
           />
         </div>
-        
+
         <div className="space-y-2">
           <Label>Tipo de seleção de data</Label>
           <div className="flex space-x-4">
@@ -417,7 +417,7 @@ const ServiceStep: React.FC<{
             </label>
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <Label>Data do serviço</Label>
           <Popover>
@@ -462,7 +462,7 @@ const ServiceStep: React.FC<{
                 <Calendar
                   mode="range"
                   selected={selectedDateRange}
-                  onSelect={(range) => setSelectedDateRange(range || {from: new Date()})}
+                  onSelect={(range) => setSelectedDateRange(range || { from: new Date() })}
                   disabled={(date) => date < new Date()}
                   initialFocus
                   className="p-3 pointer-events-auto"
@@ -471,11 +471,11 @@ const ServiceStep: React.FC<{
             </PopoverContent>
           </Popover>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="timePreference">Horário preferencial</Label>
-          <Select 
-            value={timePreference} 
+          <Select
+            value={timePreference}
             onValueChange={setTimePreference}
             required
           >
@@ -490,11 +490,11 @@ const ServiceStep: React.FC<{
             </SelectContent>
           </Select>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="service">Selecione o serviço</Label>
-          <Select 
-            value={selectedService} 
+          <Select
+            value={selectedService}
             onValueChange={handleServiceChange}
             required
           >
@@ -514,8 +514,8 @@ const ServiceStep: React.FC<{
         {selectedService && (
           <div className="space-y-2">
             <Label htmlFor="subService">Selecione o tipo de serviço (opcional)</Label>
-            <Select 
-              value={selectedSubService} 
+            <Select
+              value={selectedSubService}
               onValueChange={handleSubServiceChange}
             >
               <SelectTrigger id="subService">
@@ -535,8 +535,8 @@ const ServiceStep: React.FC<{
         {selectedSubService && (
           <div className="space-y-2">
             <Label htmlFor="specialty">Selecione a especialidade (opcional)</Label>
-            <Select 
-              value={selectedSpecialty} 
+            <Select
+              value={selectedSpecialty}
               onValueChange={handleSpecialtyChange}
             >
               <SelectTrigger id="specialty">
@@ -556,8 +556,8 @@ const ServiceStep: React.FC<{
 
       <div className="space-y-2">
         <Label htmlFor="description">Descrição do serviço (opcional)</Label>
-        <Textarea 
-          id="description" 
+        <Textarea
+          id="description"
           placeholder="Descreva detalhes adicionais sobre o serviço que você precisa..."
           value={formData.description || ''}
           onChange={(e) => updateFormData({ description: e.target.value })}
@@ -566,12 +566,12 @@ const ServiceStep: React.FC<{
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           disabled={
-            !selectedService || 
-            !formData.fullName?.trim() || 
-            !timePreference || 
+            !selectedService ||
+            !formData.fullName?.trim() ||
+            !timePreference ||
             (dateSelectionMode === 'single' ? !selectedDate : !selectedDateRange.from || !selectedDateRange.to)
           }
         >
@@ -591,10 +591,10 @@ const ServiceDetailsStep: React.FC<{
   const [detailsSubStep, setDetailsSubStep] = useState<'quiz' | 'items' | 'measurements'>('quiz');
   const [questionsData, setQuestionsData] = useState<ServiceQuestion[]>([]);
   const [items, setItems] = useState<ServiceItem[]>([]);
-  const [answers, setAnswers] = useState<{[key: string]: string}>(formData.answers || {});
-  const [itemQuantities, setItemQuantities] = useState<{[key: string]: number}>(formData.itemQuantities || {});
-  const [itemNames, setItemNames] = useState<{[key: string]: string}>(formData.itemNames || {});
-  const [itemTypes, setItemTypes] = useState<{[key: string]: string}>({});
+  const [answers, setAnswers] = useState<{ [key: string]: string }>(formData.answers || {});
+  const [itemQuantities, setItemQuantities] = useState<{ [key: string]: number }>(formData.itemQuantities || {});
+  const [itemNames, setItemNames] = useState<{ [key: string]: string }>(formData.itemNames || {});
+  const [itemTypes, setItemTypes] = useState<{ [key: string]: string }>({});
   const [measurements, setMeasurements] = useState<{
     id: string;
     roomName: string;
@@ -606,10 +606,10 @@ const ServiceDetailsStep: React.FC<{
   }[]>(
     Array.isArray(formData.measurements)
       ? (formData.measurements as any[]).map(m => ({
-          ...m,
-          measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType,
-          linearMeters: 'linearMeters' in m && typeof m.linearMeters === 'number' ? m.linearMeters : 0
-        }))
+        ...m,
+        measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType,
+        linearMeters: 'linearMeters' in m && typeof m.linearMeters === 'number' ? m.linearMeters : 0
+      }))
       : []
   );
   const [loading, setLoading] = useState(true);
@@ -627,64 +627,64 @@ const ServiceDetailsStep: React.FC<{
       setLoading(true);
       try {
         if (!formData.serviceId) return;
-        
+
         console.log("Loading service details for:", formData.serviceId, formData.subServiceId, formData.specialtyId);
-        
+
         // Fetch questions for service, subservice, and specialty
         const serviceQuestions = formData.serviceId ? await getQuestions(formData.serviceId) : [];
         const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
         const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
-        
+
         const allQuestions = [...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions];
         console.log("Fetched questions:", allQuestions.length, "service:", serviceQuestions.length, "subservice:", subServiceQuestions.length, "specialty:", specialtyQuestions.length);
-        
+
         setQuestionsData(allQuestions);
         setQuestionsLoaded(true);
-        
+
         // Fetch items for service, subservice, and specialty
         const serviceItems = formData.serviceId ? await getServiceItems(formData.serviceId) : [];
         const subServiceItems = formData.subServiceId ? await getServiceItems(undefined, formData.subServiceId) : [];
         const specialtyItems = formData.specialtyId ? await getServiceItems(undefined, undefined, formData.specialtyId) : [];
-        
+
         const allItems = [...serviceItems, ...subServiceItems, ...specialtyItems];
         setItems(allItems);
-        
+
         // Armazena o tipo de cada item para referência futura
-        const typesMap: {[key: string]: string} = {};
-        const namesMap: {[key: string]: string} = {};
+        const typesMap: { [key: string]: string } = {};
+        const namesMap: { [key: string]: string } = {};
         allItems.forEach(item => {
           typesMap[item.id] = item.type;
           namesMap[item.id] = item.name;
         });
-        
+
         setItemTypes(typesMap);
         setItemNames(namesMap);
-        
+
         const hasSquareItems = allItems.some(item => item.type === 'square_meter' || item.type === 'max_square_meter');
         const hasLinearItems = allItems.some(item => item.type === 'linear_meter' || item.type === 'max_linear_meter');
-        
+
         setHasArea(hasSquareItems);
         setHasLinear(hasLinearItems);
-        
+
         const neededSteps = [];
         if (allQuestions.length > 0) {
           neededSteps.push('quiz');
         }
-        
+
         // Se temos itens regulares (quantidade)
         const hasRegularItems = allItems.some(item => item.type !== 'square_meter' && item.type !== 'linear_meter');
         if (hasRegularItems) {
           neededSteps.push('items');
         }
-        
+
         // Se temos itens de metro quadrado ou linear, precisamos da etapa de medidas
         if (hasSquareItems || hasLinearItems) {
           neededSteps.push('measurements');
         }
-        
+
         console.log("Required steps:", neededSteps);
         setRequiredSteps(neededSteps);
-        
+
         if (neededSteps.length > 0) {
           // Se não tiver perguntas, pular para o próximo passo disponível
           if (neededSteps[0] === 'quiz' && allQuestions.length === 0) {
@@ -705,7 +705,7 @@ const ServiceDetailsStep: React.FC<{
         setLoading(false);
       }
     }
-    
+
     loadServiceDetails();
   }, [formData, formData.serviceId, formData.subServiceId, formData.specialtyId, onNext]);
 
@@ -730,11 +730,11 @@ const ServiceDetailsStep: React.FC<{
         setAllQuestionsAnswered(true);
         return;
       }
-      
+
       const answeredQuestions = questionsData.filter(q => answers[q.id]);
       setAllQuestionsAnswered(answeredQuestions.length === questionsData.length);
     };
-    
+
     checkQuestionsAnswered();
   }, [answers, questionsData]);
 
@@ -763,10 +763,10 @@ const ServiceDetailsStep: React.FC<{
     const newId = `temp-${Date.now()}`;
     setMeasurements(prev => [
       ...prev,
-      { 
-        id: newId, 
-        roomName: '', 
-        width: 0, 
+      {
+        id: newId,
+        roomName: '',
+        width: 0,
         length: 0,
         height: undefined,
         measurementType: hasArea ? 'square_meter' : hasLinear ? 'linear_meter' : undefined,
@@ -776,7 +776,7 @@ const ServiceDetailsStep: React.FC<{
   };
 
   const updateMeasurement = (index: number, field: string, value: any) => {
-    setMeasurements(prev => 
+    setMeasurements(prev =>
       prev.map((m, i) => (i === index ? { ...m, [field]: value } : m))
     );
   };
@@ -816,12 +816,12 @@ const ServiceDetailsStep: React.FC<{
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (detailsSubStep === 'quiz' && questionsData.length > 0 && !allQuestionsAnswered) {
       toast.error('Por favor, responda todas as perguntas');
       return;
     }
-    
+
     updateFormData({
       answers,
       itemQuantities,
@@ -832,7 +832,7 @@ const ServiceDetailsStep: React.FC<{
       })),
       items
     });
-    
+
     onNext();
   };
 
@@ -851,7 +851,7 @@ const ServiceDetailsStep: React.FC<{
         <div className="text-center py-8">
           <p>Não há detalhes adicionais necessários para este serviço.</p>
         </div>
-        
+
         <div className="flex justify-between pt-4">
           <Button type="button" variant="outline" onClick={onBack}>
             <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
@@ -870,15 +870,15 @@ const ServiceDetailsStep: React.FC<{
       <div className="flex justify-center mb-6">
         {requiredSteps.map((step, index) => (
           <div key={step} className="flex items-center">
-            <Button 
+            <Button
               type="button"
               variant={detailsSubStep === step ? "default" : "outline"}
               size="sm"
               className={`rounded-full px-4 ${index === 0 ? "" : "ml-2"}`}
               onClick={() => goToSubStep(step as 'quiz' | 'items' | 'measurements')}
             >
-              {step === 'quiz' ? 'Questionário' : 
-               step === 'items' ? 'Itens' : 'Medidas'}
+              {step === 'quiz' ? 'Questionário' :
+                step === 'items' ? 'Itens' : 'Medidas'}
             </Button>
             {index < requiredSteps.length - 1 && (
               <div className="h-px w-4 bg-gray-200"></div>
@@ -895,17 +895,17 @@ const ServiceDetailsStep: React.FC<{
           <p className="text-sm font-medium">
             {
               detailsSubStep === 'quiz' ? 'Questionário' :
-              detailsSubStep === 'items' ? 'Itens do Serviço' : 'Medidas'
+                detailsSubStep === 'items' ? 'Itens do Serviço' : 'Medidas'
             }
           </p>
         </div>
- 
+
       </div>
 
       {detailsSubStep === 'quiz' && (
         <div className="space-y-4">
           <h3 className="text-lg font-medium mb-4">Responda as perguntas abaixo</h3>
-          
+
           {questionsData.length > 0 ? (
             <>
               <div className="flex justify-between items-center mb-2">
@@ -913,13 +913,13 @@ const ServiceDetailsStep: React.FC<{
                   Pergunta {currentQuestionIndex + 1} de {questionsData.length}
                 </p>
               </div>
-              <Progress 
+              <Progress
                 value={((currentQuestionIndex + 1) / questionsData.length) * 100}
                 className="h-1 mb-4"
               />
-              
-              <Carousel 
-                className="w-full" 
+
+              <Carousel
+                className="w-full"
                 setApi={setCarouselApi}
                 opts={{
                   align: "start",
@@ -934,8 +934,8 @@ const ServiceDetailsStep: React.FC<{
                           <CardTitle>{question.question}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <RadioGroup 
-                            value={answers[question.id] || ''} 
+                          <RadioGroup
+                            value={answers[question.id] || ''}
                             onValueChange={(value) => handleAnswerChange(question.id, value)}
                           >
                             {question.options.map((option) => (
@@ -951,17 +951,17 @@ const ServiceDetailsStep: React.FC<{
                   ))}
                 </CarouselContent>
               </Carousel>
-              
+
               <div className="flex justify-between mt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={prevQuestion} 
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={prevQuestion}
                   disabled={currentQuestionIndex === 0}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" /> Pergunta Anterior
                 </Button>
-                <Button 
+                <Button
                   type="button"
                   onClick={nextQuestion}
                   disabled={currentQuestionIndex === questionsData.length - 1}
@@ -982,14 +982,14 @@ const ServiceDetailsStep: React.FC<{
               )}
             </div>
           )}
-          
+
           <div className="flex justify-between pt-6 border-t mt-6">
             <Button type="button" variant="outline" onClick={prevDetailsSubStep}>
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
             </Button>
             {requiredSteps.indexOf('quiz') < requiredSteps.length - 1 && (
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 onClick={nextDetailsSubStep}
                 disabled={!allQuestionsAnswered && questionsData.length > 0}
               >
@@ -1003,7 +1003,7 @@ const ServiceDetailsStep: React.FC<{
       {detailsSubStep === 'items' && (
         <div className="space-y-4">
           <h3 className="text-lg font-medium mb-4">Informe as quantidades necessárias</h3>
-          
+
           <div className="space-y-4">
             {items
               .filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter' && item.type !== 'max_square_meter' && item.type !== 'max_linear_meter')
@@ -1014,9 +1014,9 @@ const ServiceDetailsStep: React.FC<{
                     <p className="text-sm text-gray-500">Quantidade</p>
                   </div>
                   <div className="w-24">
-                    <Input 
-                      type="number" 
-                      min="0" 
+                    <Input
+                      type="number"
+                      min="0"
                       step="1"
                       value={itemQuantities[item.id] || ''}
                       onChange={(e) => handleItemQuantityChange(item.id, parseFloat(e.target.value) || 0)}
@@ -1025,23 +1025,23 @@ const ServiceDetailsStep: React.FC<{
                 </div>
               ))}
           </div>
-          
+
           {items.filter(item => item.type !== 'square_meter' && item.type !== 'linear_meter' && item.type !== 'max_square_meter' && item.type !== 'max_linear_meter').length === 0 && (
             <p className="text-center py-4">Não há itens que precisam de quantidade manual neste serviço.</p>
           )}
-          
+
           <div className="flex justify-between pt-6 border-t mt-6">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={prevDetailsSubStep}
             >
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
             </Button>
-            
+
             {requiredSteps.indexOf('items') < requiredSteps.length - 1 && (
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 onClick={nextDetailsSubStep}
               >
                 Próximo Sub-passo <ChevronRight className="ml-2 h-4 w-4" />
@@ -1059,53 +1059,53 @@ const ServiceDetailsStep: React.FC<{
               <Plus className="h-4 w-4 mr-1" /> Adicionar
             </Button>
           </div>
-          
+
           {measurements.length > 0 ? (
             <div className="space-y-6">
               {measurements.map((measurement, index) => (
                 <Card key={measurement.id} className="relative">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     className="absolute top-2 right-2"
                     onClick={() => removeMeasurement(index)}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
-                  
+
                   <CardContent className="pt-6">
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label>Nome do cômodo/área ou objeto (opcional)</Label>
-                        <Input 
-                          value={measurement.roomName || ''} 
+                        <Input
+                          value={measurement.roomName || ''}
                           onChange={(e) => updateMeasurement(index, 'roomName', e.target.value)}
                           placeholder="Ex: Sala, Quarto, Cozinha"
                         />
                       </div>
-                      
+
                       {hasArea && (
                         <div className="space-y-2">
                           <Label>Área (m²)</Label>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Largura (m)</Label>
-                              <Input 
-                                type="number" 
-                                step="0.01" 
+                              <Input
+                                type="number"
+                                step="0.01"
                                 min="0"
-                                value={measurement.width || ''} 
+                                value={measurement.width || ''}
                                 onChange={(e) => updateMeasurement(index, 'width', parseFloat(e.target.value) || 0)}
                               />
                             </div>
                             <div className="space-y-2">
                               <Label>Comprimento (m)</Label>
-                              <Input 
-                                type="number" 
-                                step="0.01" 
+                              <Input
+                                type="number"
+                                step="0.01"
                                 min="0"
-                                value={measurement.length || ''} 
+                                value={measurement.length || ''}
                                 onChange={(e) => updateMeasurement(index, 'length', parseFloat(e.target.value) || 0)}
                               />
                             </div>
@@ -1135,11 +1135,11 @@ const ServiceDetailsStep: React.FC<{
           ) : (
             <p className="text-center py-8">Adicione uma medida clicando no botão acima.</p>
           )}
-          
+
           <div className="flex justify-between pt-6 border-t mt-6">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={prevDetailsSubStep}
             >
               <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
@@ -1150,8 +1150,8 @@ const ServiceDetailsStep: React.FC<{
 
       <div className="flex justify-between pt-4 border-t">
         {(detailsSubStep !== 'quiz' || requiredSteps.indexOf('quiz') === requiredSteps.length - 1) && (
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="ml-auto"
             disabled={detailsSubStep === 'quiz' && !allQuestionsAnswered && questionsData.length > 0}
           >
@@ -1172,37 +1172,37 @@ const ReviewStep: React.FC<{
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [questionsData, setQuestionsData] = useState<ServiceQuestion[]>([]);
-  
+
   // Fetch questions when component mounts
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
         if (!formData.serviceId) return;
-        
+
         const serviceQuestions = formData.serviceId ? await getQuestions(formData.serviceId) : [];
         const subServiceQuestions = formData.subServiceId ? await getQuestions(undefined, formData.subServiceId) : [];
         const specialtyQuestions = formData.specialtyId ? await getQuestions(undefined, undefined, formData.specialtyId) : [];
-        
+
         setQuestionsData([...serviceQuestions, ...subServiceQuestions, ...specialtyQuestions]);
       } catch (error) {
         console.error('Error fetching questions:', error);
       }
     };
-    
+
     fetchQuestions();
   }, [formData.serviceId, formData.subServiceId, formData.specialtyId]);
-  
+
   // Process questions and answers data to make it easier to display
   const processQuestionAnswers = () => {
     if (!formData.answers) return;
-    
-    const questionMap: {[questionId: string]: { question: string, answer: string }} = {};
-    
+
+    const questionMap: { [questionId: string]: { question: string, answer: string } } = {};
+
     // Build the processed data structure
     questionsData.forEach(question => {
       const selectedOptionId = formData.answers?.[question.id];
       if (!selectedOptionId) return;
-      
+
       const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
       if (selectedOption) {
         questionMap[question.id] = {
@@ -1211,10 +1211,10 @@ const ReviewStep: React.FC<{
         };
       }
     });
-    
+
     return questionMap;
   };
-  
+
   // Process the question answers when the component mounts or when relevant data changes
   useEffect(() => {
     if (questionsData.length > 0 && formData.answers) {
@@ -1227,17 +1227,17 @@ const ReviewStep: React.FC<{
       }
     }
   }, [questionsData, formData, formData.answers]);
-  
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
       console.log("Submitting quote with user:", user?.id);
       console.log("Is anonymous:", !user);
-      
+
       // Format dates for Supabase (convert Date objects to ISO strings)
       const serviceDateFormatted = formData.serviceDate ? formData.serviceDate.toISOString() : null;
       const serviceEndDateFormatted = formData.serviceEndDate ? formData.serviceEndDate.toISOString() : null;
-      
+
       // Montar metadados dos itens para cálculo correto
       const _itemTypes: Record<string, string> = {};
       const _itemReferenceValues: Record<string, number> = {};
@@ -1273,9 +1273,9 @@ const ReviewStep: React.FC<{
         is_anonymous: !user,
         status: 'pending'
       };
-      
+
       console.log("Quote data:", quoteData);
-      
+
       // Store detailed quote information for provider matching
       const quoteDetails: QuoteDetails = {
         serviceId: formData.serviceId!,
@@ -1303,10 +1303,11 @@ const ReviewStep: React.FC<{
         serviceDate: formData.serviceDate,
         serviceEndDate: formData.serviceEndDate,
         serviceTimePreference: formData.serviceTimePreference,
+        questions: formData.questions, // Added questions to quoteDetails
         _itemTypes,
         _itemReferenceValues
       };
-      
+
       // Store the complete quote details in session storage
       const storedSuccessfully = storeQuoteData(quoteDetails);
       if (!storedSuccessfully) {
@@ -1314,7 +1315,7 @@ const ReviewStep: React.FC<{
         toast.error("Erro ao armazenar os dados do orçamento");
         return;
       }
-      
+
       // Try to use submit_quote RPC function if available
       try {
         const { data: quoteResult, error: quoteError } = await supabase
@@ -1336,19 +1337,19 @@ const ReviewStep: React.FC<{
             p_service_end_date: serviceEndDateFormatted,
             p_service_time_preference: formData.serviceTimePreference
           });
-        
+
         if (quoteError) {
           console.error('Error using RPC function:', quoteError);
           throw quoteError;
         }
-        
+
         console.log("Quote created via RPC:", quoteResult);
         const quoteId = quoteResult;
         // Atualiza o id real em quoteDetails
         quoteDetails.id = quoteId;
         // Insert answers if any
         await handleAdditionalData(quoteId);
-        
+
         toast.success('Orçamento solicitado com sucesso!');
         handleRedirect(quoteDetails);
         onSubmit();
@@ -1357,31 +1358,31 @@ const ReviewStep: React.FC<{
         console.log("RPC function not available or failed, trying direct insert");
         console.error(rpcError);
       }
-      
+
       // Fallback to direct insert if RPC fails
       const { data: quoteResult, error: quoteError } = await supabase
         .from('quotes')
         .insert(quoteData)
         .select('id')
         .single();
-      
+
       if (quoteError) {
         console.error('Error creating quote:', quoteError);
         toast.error(`Erro ao criar orçamento: ${quoteError.message}`);
         return;
       }
-      
+
       const quoteId = quoteResult.id;
       console.log("Quote created via direct insert:", quoteId);
       // Atualiza o id real em quoteDetails
       quoteDetails.id = quoteId;
       // Insert additional data
       await handleAdditionalData(quoteId);
-      
+
       toast.success('Orçamento solicitado com sucesso!');
       handleRedirect(quoteDetails);
       onSubmit();
-      
+
     } catch (error) {
       console.error('Error submitting quote:', error);
       toast.error('Erro ao enviar orçamento');
@@ -1389,7 +1390,7 @@ const ReviewStep: React.FC<{
       setIsSubmitting(false);
     }
   };
-  
+
   const handleAdditionalData = async (quoteId) => {
     // Insert answers if any
     if (formData.answers && Object.keys(formData.answers).length > 0) {
@@ -1398,12 +1399,12 @@ const ReviewStep: React.FC<{
         question_id: questionId,
         option_id: optionId
       }));
-      
+
       try {
         const { error: answersError } = await supabase
           .from('quote_answers')
           .insert(answersData);
-        
+
         if (answersError) {
           console.error('Error creating quote answers:', answersError);
         }
@@ -1411,7 +1412,7 @@ const ReviewStep: React.FC<{
         console.error('Exception creating answers:', error);
       }
     }
-    
+
     // Insert items if any
     if (formData.itemQuantities && Object.keys(formData.itemQuantities).length > 0) {
       const itemsData = Object.entries(formData.itemQuantities)
@@ -1421,13 +1422,13 @@ const ReviewStep: React.FC<{
           item_id: itemId,
           quantity
         }));
-      
+
       if (itemsData.length > 0) {
         try {
           const { error: itemsError } = await supabase
             .from('quote_items')
             .insert(itemsData);
-          
+
           if (itemsError) {
             console.error('Error creating quote items:', itemsError);
           }
@@ -1436,7 +1437,7 @@ const ReviewStep: React.FC<{
         }
       }
     }
-    
+
     // Insert measurements if any
     if (formData.measurements && formData.measurements.length > 0) {
       const measurementsData = formData.measurements.map(m => ({
@@ -1447,12 +1448,12 @@ const ReviewStep: React.FC<{
         height: m.height || null,
         area: m.width * m.length
       }));
-      
+
       try {
         const { error: measurementsError } = await supabase
           .from('quote_measurements')
           .insert(measurementsData);
-        
+
         if (measurementsError) {
           console.error('Error creating quote measurements:', measurementsError);
         }
@@ -1461,16 +1462,16 @@ const ReviewStep: React.FC<{
       }
     }
   };
-  
+
   const handleRedirect = (quoteDetails: QuoteDetails) => {
     // Redireciona para providers found page passando o orçamento real
     navigate('/prestadoresencontrados', { state: { quoteDetails } });
   };
-  
+
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-medium">Revise os dados do seu orçamento</h3>
-      
+
       {/* Use the QuoteDetailsSummary component to show all the quote details */}
       <QuoteDetailsSummary formData={{
         ...formData,
@@ -1479,13 +1480,13 @@ const ReviewStep: React.FC<{
           measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' : m.measurementType === 'max_linear_meter' ? 'linear_meter' : m.measurementType
         }))
       }} />
-      
+
       <div className="pt-4 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
           <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
         </Button>
-        <Button 
-          onClick={handleSubmit} 
+        <Button
+          onClick={handleSubmit}
           disabled={isSubmitting}
           className="relative"
         >
@@ -1504,26 +1505,26 @@ const ReviewStep: React.FC<{
 const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
-  
+
   const updateFormData = (data: Partial<FormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
   };
-  
+
   const nextStep = () => {
     setCurrentStep(prev => prev + 1);
     window.scrollTo(0, 0);
   };
-  
+
   const prevStep = () => {
     setCurrentStep(prev => prev - 1);
     window.scrollTo(0, 0);
   };
-  
+
   const renderStep = () => {
     switch (currentStep) {
       case 0:
         return (
-          <ServiceStep 
+          <ServiceStep
             onNext={nextStep}
             formData={formData}
             updateFormData={updateFormData}
@@ -1532,7 +1533,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
         );
       case 1:
         return (
-          <ServiceDetailsStep 
+          <ServiceDetailsStep
             onNext={nextStep}
             onBack={prevStep}
             formData={formData}
@@ -1541,7 +1542,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
         );
       case 2:
         return (
-          <AddressStep 
+          <AddressStep
             onNext={nextStep}
             onBack={prevStep}
             formData={formData}
@@ -1550,7 +1551,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
         );
       case 3:
         return (
-          <ReviewStep 
+          <ReviewStep
             onSubmit={nextStep}
             onBack={prevStep}
             formData={formData}
@@ -1560,7 +1561,7 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
         return <div>Finalizado</div>;
     }
   };
-  
+
 
   return (
     <div>
@@ -1570,17 +1571,17 @@ const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) =>
             Passo {currentStep + 1} de 3
           </span>
           <span className="text-sm font-medium">
-            {currentStep === 0 ? 'Dados do Serviço' : 
-             currentStep === 1 ? 'Detalhes do Serviço' :
-             currentStep === 2 ? 'Endereço' : 'Revisão'}
+            {currentStep === 0 ? 'Dados do Serviço' :
+              currentStep === 1 ? 'Detalhes do Serviço' :
+                currentStep === 2 ? 'Endereço' : 'Revisão'}
           </span>
         </div>
-        <Progress 
-          value={((currentStep + 1) / 3) * 100} 
+        <Progress
+          value={((currentStep + 1) / 3) * 100}
           className="h-2"
         />
       </div>
-      
+
       {renderStep()}
     </div>
   );
