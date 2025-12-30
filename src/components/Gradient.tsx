@@ -10,23 +10,16 @@ export default function BackgroundGradientAnimationDemo() {
        {/*  <p className="bg-clip-text text-transparent drop-shadow-2xl bg-gradient-to-b from-white/80 to-white/20">
           O jeito mais fácil de contratar serviços
         </p> */}
-        <div   id="motionvideo" className="relative w-full h-full flex items-center justify-center">
+        <div    className="relative w-full h-full flex items-center justify-center">
           <video
-          
             src={motion3passos}
             autoPlay
             loop
             muted
             playsInline
-            className="w-[80%] h-[100%] object-cover"
+            id="motionvideo"
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              mixBlendMode: "color-burn",
-              pointerEvents: "none"
-            }}
-          />
+          <div/>
         </div>
       </div>
     </BackgroundGradientAnimation>

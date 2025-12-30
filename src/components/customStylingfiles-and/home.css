@@ -11,7 +11,5 @@
 }
 
 #motionvideo{
-    backdrop-filter: chroma(#16FF0A);
-    mix-blend-mode: plus-lighter;
-    opacity: .10;
+    mix-blend-mode:difference;
 }

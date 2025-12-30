@@ -49,7 +49,6 @@ const Index: React.FC = () => {
       
       <main>
         <Hero />
-
         <Features />
         <BackgroundGradientAnimationDemo />
        
