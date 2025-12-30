@@ -16,6 +16,8 @@ export interface UserProfile {
   subscribed?: boolean;
   subscription_tier?: 'free' | 'basic' | 'premium';
   subscription_end?: string | null;
+  cpf?: string;
+  cnpj?: string;
 }
 
 export interface Service {

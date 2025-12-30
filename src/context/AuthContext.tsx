@@ -19,6 +19,8 @@ type AuthContextType = {
     role: UserRole;
     name: string;
     phone?: string;
+    cpf?: string;
+    cnpj?: string;
   }) => Promise<any>;
   signIn: (
     email: string,
@@ -55,19 +57,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sessionUser.id,
         sessionUser.email || undefined
       );
-      
+
       if (profileData) {
         setUser(profileData);
         return;
       }
-      
+
       // Criar um perfil padrão se não encontrado
       const newProfile = await ProfileService.createDefaultProfile(
         sessionUser.id,
         sessionUser.email || '',
         UserRole.CLIENT
       );
-      
+
       if (newProfile) {
         setUser(newProfile);
       } else {
@@ -101,14 +103,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Função para lidar com mudanças de estado de autenticação
     const handleAuthChange = async (event: string, newSession: Session | null) => {
       setSession(newSession);
-      
+
       if (!newSession) {
         setUser(null);
         setSubscription(null);
         setLoading(false);
         return;
       }
-      
+
       // Usar setTimeout para evitar recursão
       setTimeout(async () => {
         if (newSession.user) {
@@ -117,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }, 0);
     };
-    
+
     // Configurar o listener de autenticação
     const { data: authListener } = supabase.auth.onAuthStateChange(handleAuthChange);
 
@@ -125,24 +127,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const checkCurrentSession = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
-        
+
         if (error) {
           setLoading(false);
           return;
         }
-        
+
         setSession(data.session);
-        
+
         if (data.session?.user) {
           await fetchUserProfile(data.session.user);
         }
-        
+
         setLoading(false);
       } catch (error) {
         setLoading(false);
       }
     };
-    
+
     checkCurrentSession();
 
     return () => {
@@ -157,8 +159,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: UserRole;
     name: string;
     phone?: string;
+    cpf?: string;
+    cnpj?: string;
   }) {
-    const { email, password, role, name, phone } = userData;
+    const { email, password, role, name, phone, cpf, cnpj } = userData;
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -169,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: name,
             role: role,
             phone: phone || '',
+            cpf: cpf || '',
+            cnpj: cnpj || '',
           },
         },
       });
@@ -238,11 +244,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const result = await ProfileService.updateProfile(user.id, data);
-      
+
       if (!result.error) {
         setUser((prev) => (prev ? { ...prev, ...data } : null));
       }
-      
+
       return result;
     } catch (error) {
       return { error: error as Error, data: null };
@@ -254,14 +260,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!session?.user?.id) {
       return;
     }
-    
+
     try {
       const refreshedProfile = await ProfileService.getUserProfile(
         session.user.id,
         session.user.email || undefined,
         true
       );
-      
+
       if (refreshedProfile) {
         setUser(refreshedProfile);
       } else {
@@ -270,7 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           session.user.email || '',
           UserRole.CLIENT
         );
-        
+
         if (newProfile) {
           setUser(newProfile);
         }
@@ -285,7 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) {
       return { error: new Error('No user logged in'), data: null };
     }
-    
+
     return await ProfileService.makeAdmin(user.id, userId);
   }
 
@@ -295,9 +301,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setSubscriptionLoading(true);
-      
+
       const { data, error } = await supabase.functions.invoke('check-subscription');
-      
+
       if (error) {
         setSubscription({
           subscribed: false,
@@ -306,7 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         return;
       }
-      
+
       if (data) {
         setSubscription({
           subscribed: data.subscribed,

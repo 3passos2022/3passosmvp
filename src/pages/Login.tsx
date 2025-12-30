@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { UserRole } from '@/lib/types';
 import { User as UserIcon, Briefcase } from 'lucide-react';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
+import { formatCPF, formatCNPJ, validateCPF, validateCNPJ } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -56,6 +57,40 @@ const signupSchema = z.object({
   role: z.enum([UserRole.CLIENT, UserRole.PROVIDER], {
     message: "Selecione o tipo de conta",
   }),
+  cpf: z.string().optional(),
+  cnpj: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.role === UserRole.CLIENT) {
+    if (!data.cpf) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CPF é obrigatório para clientes",
+        path: ["cpf"],
+      });
+    } else if (!validateCPF(data.cpf)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CPF inválido",
+        path: ["cpf"],
+      });
+    }
+  }
+
+  if (data.role === UserRole.PROVIDER) {
+    if (!data.cnpj) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CNPJ é obrigatório para prestadores",
+        path: ["cnpj"],
+      });
+    } else if (!validateCNPJ(data.cnpj)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CNPJ inválido",
+        path: ["cnpj"],
+      });
+    }
+  }
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -70,7 +105,7 @@ const Login: React.FC = () => {
 
   // Obter caminho de redirecionamento
   const from = location.state?.from || "/";
-  
+
   useEffect(() => {
     if (user && session) {
       // Verificar se há um redirecionamento pós-login no sessionStorage
@@ -80,15 +115,15 @@ const Login: React.FC = () => {
       if (redirectAfterLogin) {
         // Limpar o redirecionamento da sessionStorage
         sessionStorage.removeItem('redirectAfterLogin');
-        
+
         // Verificar se há um ID de prestador selecionado
         if (selectedProviderId) {
           // Redirecionar com o estado do provedor
-          navigate(redirectAfterLogin, { 
-            state: { 
+          navigate(redirectAfterLogin, {
+            state: {
               selectedProviderId,
-              fromLogin: true 
-            } 
+              fromLogin: true
+            }
           });
           // Não limpar o selectedProviderId aqui, deixar para o componente de destino
         } else {
@@ -118,8 +153,12 @@ const Login: React.FC = () => {
       phone: "",
       password: "",
       role: UserRole.CLIENT,
+      cpf: "",
+      cnpj: "",
     },
   });
+
+  const selectedRole = signupForm.watch("role");
 
   const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
@@ -129,7 +168,7 @@ const Login: React.FC = () => {
         toast.error(`Erro ao fazer login: ${error.message}`);
       } else {
         toast.success("Login realizado com sucesso!");
-        
+
         // Não é necessário redirecionar aqui, o useEffect cuidará disso
       }
     } catch (error) {
@@ -148,6 +187,8 @@ const Login: React.FC = () => {
         name: formData.name,
         phone: formData.phone,
         role: formData.role,
+        cpf: formData.role === UserRole.CLIENT ? formData.cpf : undefined,
+        cnpj: formData.role === UserRole.PROVIDER ? formData.cnpj : undefined,
       });
 
       if (error) {
@@ -156,7 +197,7 @@ const Login: React.FC = () => {
         toast.success(
           "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
         );
-        
+
         setActiveTab("login");
         loginForm.setValue("email", formData.email);
         signupForm.reset();
@@ -184,7 +225,7 @@ const Login: React.FC = () => {
         >
           <div className="text-center mb-8">
             <Link to="/" className="inline-block">
-                 <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
+              <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
             </Link>
           </div>
 
@@ -336,6 +377,52 @@ const Login: React.FC = () => {
                           </FormItem>
                         )}
                       />
+
+                      {selectedRole === UserRole.CLIENT && (
+                        <FormField
+                          control={signupForm.control}
+                          name="cpf"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>CPF</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="000.000.000-00"
+                                  {...field}
+                                  onChange={(e) => {
+                                    field.onChange(formatCPF(e.target.value));
+                                  }}
+                                  maxLength={14}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {selectedRole === UserRole.PROVIDER && (
+                        <FormField
+                          control={signupForm.control}
+                          name="cnpj"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>CNPJ</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="00.000.000/0000-00"
+                                  {...field}
+                                  onChange={(e) => {
+                                    field.onChange(formatCNPJ(e.target.value));
+                                  }}
+                                  maxLength={18}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
 
                       <FormField
                         control={signupForm.control}
