@@ -2,6 +2,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Index from './pages/Index';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
 import Services from './pages/Services';
@@ -36,6 +38,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/services" element={<Services />} />
             <Route path="/services/:serviceId" element={<Services />} />
             <Route path="/request-quote" element={<RequestQuote />} />

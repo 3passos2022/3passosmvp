@@ -732,12 +732,14 @@ const ProviderServices = () => {
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <div className="w-32">
+                                  <div className="relative w-32">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
                                     <Input
+                                      className="pl-9"
                                       type="text"
                                       value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : item.pricePerUnit}
                                       onChange={(e) => handleLocalPriceChange(item.id, e.target.value)}
-                                      placeholder="R$ 0,00"
+                                      placeholder="0,00"
                                     />
                                   </div>
                                   <span className="text-sm text-gray-500">
@@ -783,12 +785,14 @@ const ProviderServices = () => {
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <div className="w-32">
+                                  <div className="relative w-32">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
                                     <Input
+                                      className="pl-9"
                                       type="text"
                                       value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : item.pricePerUnit}
                                       onChange={(e) => handleLocalPriceChange(item.id, e.target.value)}
-                                      placeholder="R$ 0,00"
+                                      placeholder="0,00"
                                     />
                                   </div>
                                   <span className="text-sm text-gray-500">
@@ -834,12 +838,14 @@ const ProviderServices = () => {
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <div className="w-32">
+                                  <div className="relative w-32">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
                                     <Input
+                                      className="pl-9"
                                       type="text"
                                       value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : item.pricePerUnit}
                                       onChange={(e) => handleLocalPriceChange(item.id, e.target.value)}
-                                      placeholder="R$ 0,00"
+                                      placeholder="0,00"
                                     />
                                   </div>
                                   <span className="text-sm text-gray-500">
