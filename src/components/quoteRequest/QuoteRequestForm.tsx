@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -1504,7 +1504,19 @@ const ReviewStep: React.FC<{
 
 const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({ services = [] }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<FormData>({});
+  const [searchParams] = useSearchParams();
+
+  const [formData, setFormData] = useState<FormData>(() => {
+    const serviceId = searchParams.get('serviceId') || undefined;
+    const subServiceId = searchParams.get('subServiceId') || undefined;
+    const specialtyId = searchParams.get('specialtyId') || undefined;
+
+    return {
+      serviceId,
+      subServiceId,
+      specialtyId
+    };
+  });
 
   const updateFormData = (data: Partial<FormData>) => {
     setFormData(prev => ({ ...prev, ...data }));

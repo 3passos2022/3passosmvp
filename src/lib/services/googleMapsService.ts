@@ -19,7 +19,7 @@ export const geocodeAddress = async (address: string): Promise<GeocodingResult |
     }
 
     const geocoder = new window.google.maps.Geocoder();
-    
+
     return new Promise((resolve, reject) => {
       geocoder.geocode({ address }, (results, status) => {
         if (status === 'OK' && results && results[0]) {
@@ -43,20 +43,20 @@ export const geocodeAddress = async (address: string): Promise<GeocodingResult |
   }
 };
 
-// Função de fallback para geocodificar usando uma API pública
-const geocodeFallback = async (address: string): Promise<GeocodingResult | null> => {
+// Função auxiliar para buscar no Nominatim
+const searchNominatim = async (query: string): Promise<GeocodingResult | null> => {
   try {
-    // Usar uma API de geocodificação gratuita como alternativa
-    // Neste exemplo, estamos usando a API de geocodificação do OpenStreetMap Nominatim
-    const encodedAddress = encodeURIComponent(address);
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1&addressdetails=1`);
-    
-    if (!response.ok) {
-      throw new Error(`Falha na geocodificação alternativa: ${response.statusText}`);
-    }
-    
+    const encodedAddress = encodeURIComponent(query);
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1&addressdetails=1`, {
+      headers: {
+        'Accept-Language': 'pt-BR'
+      }
+    });
+
+    if (!response.ok) return null;
+
     const data = await response.json();
-    
+
     if (data && data.length > 0) {
       return {
         lat: parseFloat(data[0].lat),
@@ -64,8 +64,47 @@ const geocodeFallback = async (address: string): Promise<GeocodingResult | null>
         formattedAddress: data[0].display_name
       };
     }
-    
-    console.error('Nenhum resultado encontrado na geocodificação alternativa');
+    return null;
+  } catch (error) {
+    console.error('Erro na requisição Nominatim:', error);
+    return null;
+  }
+};
+
+// Função de fallback para geocodificar usando uma API pública
+const geocodeFallback = async (address: string): Promise<GeocodingResult | null> => {
+  try {
+    // 1. Tentar endereço completo
+    let result = await searchNominatim(address);
+    if (result) return result;
+
+    // Se falhar, tentar extrair partes do endereço (assumindo formato: Rua, Numero, Bairro, Cidade, Estado, CEP)
+    const parts = address.split(',').map(p => p.trim());
+
+    // 2. Tentar Rua, Cidade, Estado (sem número, bairro e CEP que podem confundir)
+    if (parts.length >= 5) {
+      const street = parts[0];
+      const city = parts[parts.length - 3];
+      const state = parts[parts.length - 2];
+      const simplifiedAddress = `${street}, ${city}, ${state}`;
+
+      console.log('Tentando geocodificação simplificada:', simplifiedAddress);
+      result = await searchNominatim(simplifiedAddress);
+      if (result) return result;
+    }
+
+    // 3. Tentar apenas Cidade e Estado (fallback final para garantir alguma localização)
+    if (parts.length >= 3) {
+      const city = parts[parts.length - 3];
+      const state = parts[parts.length - 2];
+      const cityState = `${city}, ${state}`;
+
+      console.log('Tentando apenas cidade/estado:', cityState);
+      result = await searchNominatim(cityState);
+      if (result) return result;
+    }
+
+    console.error('Nenhum resultado encontrado na geocodificação alternativa após várias tentativas');
     return null;
   } catch (error) {
     console.error('Erro na geocodificação alternativa:', error);
@@ -90,7 +129,7 @@ export const calculateDistance = (
 
     const point1 = new window.google.maps.LatLng(lat1, lng1);
     const point2 = new window.google.maps.LatLng(lat2, lng2);
-    
+
     // Calcula a distância em metros e converte para km
     const distanceInMeters = window.google.maps.geometry.spherical.computeDistanceBetween(point1, point2);
     return distanceInMeters / 1000;
@@ -106,11 +145,11 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   const R = 6371; // Raio médio da Terra em km
   const dLat = degreesToRadians(lat2 - lat1);
   const dLng = degreesToRadians(lng2 - lng1);
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(degreesToRadians(lat1)) * Math.cos(degreesToRadians(lat2)) * 
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(degreesToRadians(lat1)) * Math.cos(degreesToRadians(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
   return distance;
 };
@@ -140,18 +179,18 @@ export const useGoogleMaps = (apiKey: string): boolean => {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry`;
     script.async = true;
     script.defer = true;
-    
+
     script.onload = () => {
       console.log('Google Maps API carregada com sucesso');
       setIsLoaded(true);
     };
-    
+
     script.onerror = () => {
       console.error('Erro ao carregar a API do Google Maps');
     };
-    
+
     document.head.appendChild(script);
-    
+
     return () => {
       // Cleanup não remove o script para evitar recarregamento desnecessário
     };

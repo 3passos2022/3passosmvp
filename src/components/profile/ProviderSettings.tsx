@@ -74,7 +74,7 @@ const ProviderSettings: React.FC = () => {
   useEffect(() => {
     async function loadSettings() {
       if (!user) return;
-      
+
       setLoading(true);
       try {
         const { data, error } = await supabase
@@ -82,9 +82,9 @@ const ProviderSettings: React.FC = () => {
           .select('*')
           .eq('provider_id', user.id)
           .maybeSingle();
-        
+
         if (error) throw error;
-        
+
         if (data) {
           setSettings(data);
           setValue('bio', data.bio || '');
@@ -104,7 +104,7 @@ const ProviderSettings: React.FC = () => {
         setLoading(false);
       }
     }
-    
+
     loadSettings();
   }, [user, setValue]);
 
@@ -113,9 +113,9 @@ const ProviderSettings: React.FC = () => {
       setGeocoding(true);
       const fullAddress = `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city}, ${formData.state}, ${formData.zipCode}`;
       console.log('Tentando geocodificar endereço:', fullAddress);
-      
+
       const location = await geocodeAddress(fullAddress);
-      
+
       if (!location) {
         toast.error('Não foi possível geocodificar o endereço. O endereço será salvo sem coordenadas.');
         // Retornar objeto vazio para continuar o salvamento sem as coordenadas
@@ -146,20 +146,20 @@ const ProviderSettings: React.FC = () => {
     try {
       setSearchingCep(true);
       const address = await fetchAddressByCep(zipCode);
-      
+
       if (address) {
         setValue('street', address.logradouro || '');
         setValue('neighborhood', address.bairro || '');
         setValue('city', address.localidade || '');
         setValue('state', address.uf || '');
-        
+
         if (address.complemento) {
           setValue('complement', address.complemento);
         }
-        
+
         // Manter o foco no campo número após preencher o endereço
         document.getElementById('number')?.focus();
-        
+
         toast.success('Endereço encontrado!');
       } else {
         toast.error('CEP não encontrado');
@@ -174,12 +174,12 @@ const ProviderSettings: React.FC = () => {
 
   const onSubmit = async (data: z.infer<typeof settingsSchema>) => {
     if (!user) return;
-    
+
     setSaving(true);
     try {
       // Geocodificar o endereço para obter latitude e longitude
       const coordinates = await handleGeocodeAddress(data);
-      
+
       const settingsData = {
         provider_id: user.id,
         bio: data.bio,
@@ -194,24 +194,37 @@ const ProviderSettings: React.FC = () => {
         latitude: coordinates?.latitude,
         longitude: coordinates?.longitude,
       };
-      
+
+      let resultData;
+
       if (settings.id) {
         // Update existing settings
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('provider_settings')
           .update(settingsData)
-          .eq('id', settings.id);
-        
+          .eq('id', settings.id)
+          .select()
+          .single();
+
         if (error) throw error;
+        resultData = data;
       } else {
         // Insert new settings
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('provider_settings')
-          .insert(settingsData);
-        
+          .insert(settingsData)
+          .select()
+          .single();
+
         if (error) throw error;
+        resultData = data;
       }
-      
+
+      // Atualizar o estado local com os dados salvos (incluindo o ID gerado)
+      if (resultData) {
+        setSettings(resultData);
+      }
+
       toast.success('Configurações salvas com sucesso');
     } catch (error) {
       console.error('Error saving provider settings:', error);
@@ -235,9 +248,9 @@ const ProviderSettings: React.FC = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="bio">Bio</Label>
-              <Textarea 
-                id="bio" 
-                placeholder="Descreva sua experiência profissional, especialidades e diferenciais..." 
+              <Textarea
+                id="bio"
+                placeholder="Descreva sua experiência profissional, especialidades e diferenciais..."
                 className="h-32"
                 {...register('bio')}
               />
@@ -248,52 +261,52 @@ const ProviderSettings: React.FC = () => {
                 Esta informação será exibida para os clientes que solicitarem orçamentos.
               </p>
             </div>
-            
+
             <Separator className="my-4" />
-            
+
             <div className="space-y-4">
               <h3 className="text-md font-medium">Raio de Atendimento</h3>
               <Label>Raio de Atendimento: {serviceRadiusKm} km</Label>
-              <Slider 
-                min={0} 
-                max={500} 
+              <Slider
+                min={0}
+                max={500}
                 step={5}
-                value={[serviceRadiusKm]} 
+                value={[serviceRadiusKm]}
                 onValueChange={(value) => setValue('serviceRadiusKm', value[0])}
               />
-              
+
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>0 km</span>
                 <span>250 km</span>
                 <span>500 km</span>
               </div>
-              
+
               <p className="text-xs text-gray-500">
-                {serviceRadiusKm === 0 
-                  ? 'Nenhum limite de distância definido (todo o Brasil)' 
+                {serviceRadiusKm === 0
+                  ? 'Nenhum limite de distância definido (todo o Brasil)'
                   : `Você receberá orçamentos de clientes em um raio de ${serviceRadiusKm} km`}
               </p>
             </div>
-            
+
             <Separator className="my-4" />
-            
+
             <div>
               <h3 className="text-md font-medium mb-4">Endereço</h3>
               <p className="text-xs text-gray-500 mb-4">
                 Seu endereço será utilizado para calcular a distância até os clientes, mas não será exibido publicamente.
               </p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="zipCode">CEP</Label>
                   <div className="flex gap-2">
-                    <Input 
-                      id="zipCode" 
-                      placeholder="CEP" 
+                    <Input
+                      id="zipCode"
+                      placeholder="CEP"
                       {...register('zipCode')}
                     />
-                    <Button 
-                      type="button" 
+                    <Button
+                      type="button"
                       onClick={handleSearchCep}
                       disabled={searchingCep}
                       className="whitespace-nowrap"
@@ -313,72 +326,72 @@ const ProviderSettings: React.FC = () => {
                     <p className="text-sm text-red-500">{errors.zipCode.message}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="street">Rua</Label>
-                  <Input 
-                    id="street" 
-                    placeholder="Rua/Avenida" 
+                  <Input
+                    id="street"
+                    placeholder="Rua/Avenida"
                     {...register('street')}
                   />
                   {errors.street && (
                     <p className="text-sm text-red-500">{errors.street.message}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="number">Número</Label>
-                  <Input 
-                    id="number" 
-                    placeholder="Número" 
+                  <Input
+                    id="number"
+                    placeholder="Número"
                     {...register('number')}
                   />
                   {errors.number && (
                     <p className="text-sm text-red-500">{errors.number.message}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="complement">Complemento</Label>
-                  <Input 
-                    id="complement" 
-                    placeholder="Complemento (opcional)" 
+                  <Input
+                    id="complement"
+                    placeholder="Complemento (opcional)"
                     {...register('complement')}
                   />
                   {errors.complement && (
                     <p className="text-sm text-red-500">{errors.complement.message}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="neighborhood">Bairro</Label>
-                  <Input 
-                    id="neighborhood" 
-                    placeholder="Bairro" 
+                  <Input
+                    id="neighborhood"
+                    placeholder="Bairro"
                     {...register('neighborhood')}
                   />
                   {errors.neighborhood && (
                     <p className="text-sm text-red-500">{errors.neighborhood.message}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="city">Cidade</Label>
-                  <Input 
-                    id="city" 
-                    placeholder="Cidade" 
+                  <Input
+                    id="city"
+                    placeholder="Cidade"
                     {...register('city')}
                   />
                   {errors.city && (
                     <p className="text-sm text-red-500">{errors.city.message}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="state">Estado</Label>
-                  <Input 
-                    id="state" 
-                    placeholder="Estado" 
+                  <Input
+                    id="state"
+                    placeholder="Estado"
                     {...register('state')}
                   />
                   {errors.state && (
@@ -387,10 +400,10 @@ const ProviderSettings: React.FC = () => {
                 </div>
               </div>
             </div>
-            
-            <Button 
-              type="submit" 
-              disabled={saving || geocoding} 
+
+            <Button
+              type="submit"
+              disabled={saving || geocoding}
               className="w-full md:w-auto"
             >
               {saving || geocoding ? (
