@@ -14,7 +14,7 @@ interface ProviderDetailsModalProps {
   onClose: () => void;
   provider: ProviderDetails | null;
   quoteDetails: QuoteDetails;
-  onSendQuote: (providerId: string) => void;
+  onSendQuote: (providerId: string, allowContact: boolean) => void;
 }
 
 export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
@@ -28,6 +28,7 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [allowContact, setAllowContact] = useState(false);
 
   if (!provider) return null;
 
@@ -37,6 +38,8 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
       currency: 'BRL'
     }).format(price);
   };
+  // ... (keep existing helper functions)
+
 
   const formatDistance = (distance: number | null) => {
     if (distance === null) return 'Distância não calculada';
@@ -322,23 +325,38 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
             </TabsContent>
           </Tabs>
 
-          {/* Botão de ação */}
-          <div className="flex justify-between pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowReviewModal(true)}
-              className="flex items-center gap-2"
-            >
-              Revisar minha solicitação
-            </Button>
-            <Button
-              onClick={() => onSendQuote(provider.provider.userId)}
-              disabled={!provider.isWithinRadius}
-              className="flex items-center gap-2"
-            >
-              <Send className="h-4 w-4" />
-              {provider.isWithinRadius ? 'Enviar Solicitação' : 'Fora da Área de Cobertura'}
-            </Button>
+          {/* Botão de ação e Checkbox de Consentimento */}
+          <div className="pt-4 border-t">
+            <div className="flex items-start space-x-2 mb-4">
+              <input
+                type="checkbox"
+                id="allowContact"
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                checked={allowContact}
+                onChange={(e) => setAllowContact(e.target.checked)}
+              />
+              <label htmlFor="allowContact" className="text-sm text-gray-600 leading-tight cursor-pointer select-none">
+                Autorizo o prestador a entrar em contato comigo pelo telefone/WhatsApp cadastrado para agilizar o orçamento.
+              </label>
+            </div>
+
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={() => setShowReviewModal(true)}
+                className="flex items-center gap-2"
+              >
+                Revisar minha solicitação
+              </Button>
+              <Button
+                onClick={() => onSendQuote(provider.provider.userId, allowContact)}
+                disabled={!provider.isWithinRadius}
+                className="flex items-center gap-2"
+              >
+                <Send className="h-4 w-4" />
+                {provider.isWithinRadius ? 'Enviar Solicitação' : 'Fora da Área de Cobertura'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -370,7 +388,9 @@ export const ProviderDetailsModal: React.FC<ProviderDetailsModalProps> = ({
                 width: m.width,
                 length: m.length,
                 height: m.height,
-                measurementType: m.measurementType
+                measurementType: m.measurementType === 'max_square_meter' ? 'square_meter' :
+                  (m.measurementType === 'max_linear_meter' ? 'linear_meter' :
+                    m.measurementType)
               })),
               serviceDate: quoteDetails.serviceDate,
               serviceEndDate: quoteDetails.serviceEndDate,

@@ -1,4 +1,5 @@
 import { QuoteMeasurement } from '@/lib/types';
+export type { QuoteMeasurement };
 
 export interface PriceDetail {
   itemId: string;

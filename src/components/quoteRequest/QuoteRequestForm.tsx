@@ -275,6 +275,7 @@ const ServiceStep: React.FC<{
   updateFormData: (data: Partial<FormData>) => void;
   services?: Service[];
 }> = ({ onNext, formData, updateFormData, services = [] }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(!services || services.length === 0);
   const [selectedService, setSelectedService] = useState<string>(formData.serviceId || '');
   const [selectedSubService, setSelectedSubService] = useState<string>(formData.subServiceId || '');
@@ -379,6 +380,14 @@ const ServiceStep: React.FC<{
   if (loading) {
     return <div className="text-center py-8">Carregando serviços...</div>;
   }
+
+  // Effect to pre-fill user name if logged in
+  // Effect to pre-fill user name if logged in
+  useEffect(() => {
+    if (user && user.name && !formData.fullName) {
+      updateFormData({ fullName: user.name });
+    }
+  }, [user, formData.fullName, updateFormData]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,8 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { UserRole } from '@/lib/types';
-import { User as UserIcon, Briefcase } from 'lucide-react';
-import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
+import { User as UserIcon, Briefcase, ArrowRight, CheckCircle2, ShieldCheck, Mail } from 'lucide-react';
+import logoMenu from './../img/Logos/LogotipoHorizontal-08 20White.png';
 import { formatCPF, formatCNPJ, validateCPF, validateCNPJ } from '@/lib/utils';
 import EmailConfirmationModal from '@/components/auth/EmailConfirmationModal';
 
@@ -112,8 +112,6 @@ const signupSchema = z.object({
   }
 });
 
-
-
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
 
@@ -126,35 +124,27 @@ const Login: React.FC = () => {
   const [showEmailConfirmationModal, setShowEmailConfirmationModal] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState("");
 
-  // Obter caminho de redirecionamento
   const from = location.state?.from || "/";
 
   useEffect(() => {
     if (user && session) {
-      // Verificar se há um redirecionamento pós-login no sessionStorage
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       const selectedProviderId = sessionStorage.getItem('selectedProviderId');
 
       if (redirectAfterLogin) {
-        // Limpar o redirecionamento da sessionStorage
         sessionStorage.removeItem('redirectAfterLogin');
 
-        // Verificar se há um ID de prestador selecionado
         if (selectedProviderId) {
-          // Redirecionar com o estado do provedor
           navigate(redirectAfterLogin, {
             state: {
               selectedProviderId,
               fromLogin: true
             }
           });
-          // Não limpar o selectedProviderId aqui, deixar para o componente de destino
         } else {
-          // Simples redirecionamento sem estado
           navigate(redirectAfterLogin);
         }
       } else {
-        // Redirecionamento padrão
         navigate(from);
       }
     }
@@ -193,8 +183,6 @@ const Login: React.FC = () => {
         toast.error(`Erro ao fazer login: ${error.message}`);
       } else {
         toast.success("Login realizado com sucesso!");
-
-        // Não é necessário redirecionar aqui, o useEffect cuidará disso
       }
     } catch (error) {
       toast.error("Erro inesperado ao fazer login");
@@ -219,9 +207,6 @@ const Login: React.FC = () => {
       if (error) {
         toast.error(`Erro ao criar conta: ${error.message}`);
       } else {
-        // toast.success("Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.");
-
-        // Show modal instead of toast + immediate switch
         setConfirmationEmail(formData.email);
         setShowEmailConfirmationModal(true);
         signupForm.reset();
@@ -233,51 +218,83 @@ const Login: React.FC = () => {
     }
   };
 
-  // Redirecionar se já estiver logado
   if (!loading && user && session) {
     return null;
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-md w-full"
-        >
-          <div className="text-center mb-8">
-            <Link to="/" className="inline-block">
-              <img src={logoMenu} id="logoMenu" alt="Logo" className="h-8" />
-            </Link>
+    <div className="w-full lg:grid lg:grid-cols-2 min-h-screen">
+      {/* Esquerda - Branding (Desktop) */}
+      <div className="hidden lg:flex flex-col justify-between bg-zinc-900 p-12 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1581094794329-cd1096a7a5e6?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center opacity-30"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/50 to-transparent"></div>
+
+        <div className="z-10">
+          <Link to="/" className="flex items-center gap-2 font-bold text-xl">
+            <img src={logoMenu} alt="Logo" />
+          </Link>
+        </div>
+
+        <div className="z-10 max-w-lg">
+          <h1 className="text-4xl font-bold mb-6 leading-tight">
+            Conectando você aos melhores profissionais do mercado.
+          </h1>
+          <p className="text-lg text-zinc-300 mb-8">
+            Simples, rápido e seguro. A plataforma ideal para quem busca serviços de qualidade e para quem quer crescer profissionalmente.
+          </p>
+          <div className="flex gap-4">
+            <div className="flex items-center gap-2 text-zinc-300">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              <span>Verificação rigorosa</span>
+            </div>
+            <div className="flex items-center gap-2 text-zinc-300">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              <span>Pagamento seguro</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="z-10 text-zinc-400 text-sm">
+          &copy; 2024 3Passos. Todos os direitos reservados.
+        </div>
+      </div>
+
+      {/* Direita - Formulário */}
+      <div className="flex items-center justify-center py-12 px-4 sm:px-8 lg:p-12 bg-background">
+        <div className="mx-auto w-full max-w-[450px] space-y-6">
+          <div className="flex flex-col space-y-2 text-center lg:text-left">
+            <div className="lg:hidden mx-auto mb-4">
+              <Link to="/">
+                <img src={logoMenu} alt="Logo" className="h-10" />
+              </Link>
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              {activeTab === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {activeTab === 'login'
+                ? 'Entre com suas credenciais para acessar sua conta'
+                : 'Preencha os dados abaixo para começar gratuitamente'}
+            </p>
           </div>
 
-          <Tabs
-            defaultValue="login"
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+          <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+              <TabsTrigger value="signup">Cadastrar</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Entrar</CardTitle>
-                  <CardDescription>
-                    Entre com sua conta para acessar o sistema
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+            <AnimatePresence mode="wait">
+              <TabsContent value="login" asChild>
+                <motion.div
+                  key="login"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                >
                   <Form {...loginForm}>
-                    <form
-                      onSubmit={loginForm.handleSubmit(handleLoginSubmit)}
-                      className="space-y-4"
-                    >
+                    <form onSubmit={loginForm.handleSubmit(handleLoginSubmit)} className="space-y-4">
                       <FormField
                         control={loginForm.control}
                         name="email"
@@ -285,96 +302,88 @@ const Login: React.FC = () => {
                           <FormItem>
                             <FormLabel>E-mail</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="seu@email.com"
-                                type="email"
-                                {...field}
-                              />
+                              <Input placeholder="seu@email.com" type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-
                       <FormField
                         control={loginForm.control}
                         name="password"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Senha</FormLabel>
+                            <div className="flex items-center justify-between">
+                              <FormLabel>Senha</FormLabel>
+                              <Link
+                                to="/forgot-password"
+                                className="text-sm font-medium text-primary hover:underline"
+                              >
+                                Esqueceu?
+                              </Link>
+                            </div>
                             <FormControl>
-                              <Input
-                                placeholder="Sua senha"
-                                type="password"
-                                {...field}
-                              />
+                              <Input placeholder="******" type="password" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-
-                      <div className="flex justify-end">
-                        <Link
-                          to="/forgot-password"
-                          className="text-sm text-primary hover:underline"
-                        >
-                          Esqueci minha senha
-                        </Link>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Entrando..." : "Entrar"}
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin h-4 w-4 border-2 border-white rounded-full border-t-transparent"></div>
+                            Entrando...
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2">
+                            Entrar <ArrowRight className="h-4 w-4" />
+                          </div>
+                        )}
                       </Button>
                     </form>
                   </Form>
-                </CardContent>
-                <CardFooter className="flex justify-center">
-                  <Button
-                    variant="link"
-                    onClick={() => setActiveTab("signup")}
-                    className="text-sm"
-                  >
-                    Não tem uma conta? Crie agora
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
+                </motion.div>
+              </TabsContent>
 
-            <TabsContent value="signup">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Criar Conta</CardTitle>
-                  <CardDescription>
-                    Preencha os dados para criar sua conta
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+              <TabsContent value="signup" asChild>
+                <motion.div
+                  key="signup"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
                   <Form {...signupForm}>
-                    <form
-                      onSubmit={signupForm.handleSubmit(handleSignupSubmit)}
-                      className="space-y-4"
-                    >
-                      <FormField
-                        control={signupForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Seu nome completo"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <form onSubmit={signupForm.handleSubmit(handleSignupSubmit)} className="space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <FormField
+                          control={signupForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nome Completo</FormLabel>
+                              <FormControl>
+                                <Input placeholder="João Silva" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Telefone</FormLabel>
+                              <FormControl>
+                                <Input placeholder="(11) 99999-9999" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
                       <FormField
                         control={signupForm.control}
@@ -383,11 +392,7 @@ const Login: React.FC = () => {
                           <FormItem>
                             <FormLabel>E-mail</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="seu@email.com"
-                                type="email"
-                                {...field}
-                              />
+                              <Input placeholder="seu@email.com" type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -396,15 +401,37 @@ const Login: React.FC = () => {
 
                       <FormField
                         control={signupForm.control}
-                        name="phone"
+                        name="role"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone</FormLabel>
+                          <FormItem className="space-y-3">
+                            <FormLabel>Eu sou...</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="(00) 00000-0000"
-                                {...field}
-                              />
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="grid grid-cols-2 gap-4"
+                              >
+                                <FormItem>
+                                  <FormControl>
+                                    <RadioGroupItem value={UserRole.CLIENT} className="peer sr-only" />
+                                  </FormControl>
+                                  <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all h-full">
+                                    <UserIcon className="mb-3 h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                                    <span className="font-semibold">Cliente</span>
+                                    <span className="text-xs text-center text-muted-foreground mt-1">Quero contratar serviços</span>
+                                  </FormLabel>
+                                </FormItem>
+                                <FormItem>
+                                  <FormControl>
+                                    <RadioGroupItem value={UserRole.PROVIDER} className="peer sr-only" />
+                                  </FormControl>
+                                  <FormLabel className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all h-full">
+                                    <Briefcase className="mb-3 h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                                    <span className="font-semibold">Prestador</span>
+                                    <span className="text-xs text-center text-muted-foreground mt-1">Quero oferecer serviços</span>
+                                  </FormLabel>
+                                </FormItem>
+                              </RadioGroup>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -422,9 +449,7 @@ const Login: React.FC = () => {
                                 <Input
                                   placeholder="000.000.000-00"
                                   {...field}
-                                  onChange={(e) => {
-                                    field.onChange(formatCPF(e.target.value));
-                                  }}
+                                  onChange={(e) => field.onChange(formatCPF(e.target.value))}
                                   maxLength={14}
                                 />
                               </FormControl>
@@ -435,12 +460,12 @@ const Login: React.FC = () => {
                       )}
 
                       {selectedRole === UserRole.PROVIDER && (
-                        <>
+                        <div className="bg-muted/40 p-4 rounded-lg space-y-4 border border-border/50">
                           <FormField
                             control={signupForm.control}
                             name="isIndividualProvider"
                             render={({ field }) => (
-                              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 mb-4">
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                 <FormControl>
                                   <Checkbox
                                     checked={field.value}
@@ -448,12 +473,12 @@ const Login: React.FC = () => {
                                   />
                                 </FormControl>
                                 <div className="space-y-1 leading-none">
-                                  <FormLabel>
-                                    Sou um profissional autônomo (CPF)
+                                  <FormLabel className="text-sm font-medium">
+                                    Sou profissional autônomo
                                   </FormLabel>
-                                  <CardDescription>
-                                    Selecione se você não possui CNPJ e deseja se cadastrar com seu CPF.
-                                  </CardDescription>
+                                  <p className="text-xs text-muted-foreground">
+                                    Não possuo CNPJ, usarei meu CPF
+                                  </p>
                                 </div>
                               </FormItem>
                             )}
@@ -465,15 +490,14 @@ const Login: React.FC = () => {
                               name="cpf"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>CPF</FormLabel>
+                                  <FormLabel>CPF do Profissional</FormLabel>
                                   <FormControl>
                                     <Input
                                       placeholder="000.000.000-00"
                                       {...field}
-                                      onChange={(e) => {
-                                        field.onChange(formatCPF(e.target.value));
-                                      }}
+                                      onChange={(e) => field.onChange(formatCPF(e.target.value))}
                                       maxLength={14}
+                                      className="bg-background"
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -486,15 +510,14 @@ const Login: React.FC = () => {
                               name="cnpj"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>CNPJ</FormLabel>
+                                  <FormLabel>CNPJ da Empresa</FormLabel>
                                   <FormControl>
                                     <Input
                                       placeholder="00.000.000/0000-00"
                                       {...field}
-                                      onChange={(e) => {
-                                        field.onChange(formatCNPJ(e.target.value));
-                                      }}
+                                      onChange={(e) => field.onChange(formatCNPJ(e.target.value))}
                                       maxLength={18}
+                                      className="bg-background"
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -502,7 +525,7 @@ const Login: React.FC = () => {
                               )}
                             />
                           )}
-                        </>
+                        </div>
                       )}
 
                       <FormField
@@ -512,89 +535,44 @@ const Login: React.FC = () => {
                           <FormItem>
                             <FormLabel>Senha</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="Sua senha"
-                                type="password"
-                                {...field}
-                              />
+                              <Input placeholder="Crie uma senha forte" type="password" {...field} />
                             </FormControl>
+                            <p className="text-xs text-muted-foreground">
+                              Mínimo 8 caracteres, maiúscula, número e símbolo.
+                            </p>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
-                      <FormField
-                        control={signupForm.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem className="space-y-2">
-                            <FormLabel>Tipo de Conta</FormLabel>
-                            <FormControl>
-                              <RadioGroup
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                                className="grid grid-cols-2 gap-4"
-                              >
-                                <div>
-                                  <RadioGroupItem
-                                    value={UserRole.CLIENT}
-                                    id="client"
-                                    className="peer sr-only"
-                                  />
-                                  <Label
-                                    htmlFor="client"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                                  >
-                                    <UserIcon className="mb-2 h-6 w-6" />
-                                    Cliente
-                                  </Label>
-                                </div>
-                                <div>
-                                  <RadioGroupItem
-                                    value={UserRole.PROVIDER}
-                                    id="provider"
-                                    className="peer sr-only"
-                                  />
-                                  <Label
-                                    htmlFor="provider"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted hover:text-muted-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                                  >
-                                    <Briefcase className="mb-2 h-6 w-6" />
-                                    Prestador
-                                  </Label>
-                                </div>
-                              </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Criando conta..." : "Criar Conta"}
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin h-4 w-4 border-2 border-white rounded-full border-t-transparent"></div>
+                            Criando conta...
+                          </div>
+                        ) : "Criar Conta e Começar"}
                       </Button>
                     </form>
                   </Form>
-                </CardContent>
-                <CardFooter className="flex justify-center">
-                  <Button
-                    variant="link"
-                    onClick={() => setActiveTab("login")}
-                    className="text-sm"
-                  >
-                    Já tem uma conta? Entre agora
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
+                </motion.div>
+              </TabsContent>
+            </AnimatePresence>
           </Tabs>
-        </motion.div>
-      </main>
 
+          <p className="text-center text-sm text-muted-foreground px-8">
+            Ao clicar em continuar, você concorda com nossos{" "}
+            <Link to="/terms" className="underline underline-offset-4 hover:text-primary">
+              Termos de Serviço
+            </Link>{" "}
+            e{" "}
+            <Link to="/privacy" className="underline underline-offset-4 hover:text-primary">
+              Política de Privacidade
+            </Link>
+            .
+          </p>
+        </div>
+      </div>
       <EmailConfirmationModal
         isOpen={showEmailConfirmationModal}
         onClose={() => {

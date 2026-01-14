@@ -34,7 +34,7 @@ const ProvidersFound: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { featureLimits, loading: loadingFeatures } = useFeatureFlags();
-  
+
   const [providers, setProviders] = useState<ProviderMatch[]>([]);
   const [filteredProviders, setFilteredProviders] = useState<ProviderMatch[]>([]);
   const [displayedProviders, setDisplayedProviders] = useState<ProviderMatch[]>([]);
@@ -45,14 +45,14 @@ const ProvidersFound: React.FC = () => {
   const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
   const [currentFilter, setCurrentFilter] = useState<FilterOption>('relevance');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
   // Obter o limite de prestadores visíveis baseado na assinatura
   const providersLimit = featureLimits?.visible_providers_limit?.limit ?? 3;
   const isUnlimited = providersLimit === null;
-  
+
   const googleMapsApiKey = ENV.GOOGLE_MAPS_API_KEY;
   const isMapsLoaded = useGoogleMaps(googleMapsApiKey);
-  
+
   useEffect(() => {
     const fetchQuoteDetails = async () => {
       setIsLoading(true);
@@ -101,65 +101,65 @@ const ProvidersFound: React.FC = () => {
     };
     fetchQuoteDetails();
   }, [location, navigate, toast]);
-  
+
   // Efeito para verificar se o usuário retornou do login com um ID de provedor selecionado
   useEffect(() => {
     // Verificar o estado da location para ver se veio do login
     const fromLogin = location.state?.fromLogin;
     const providerIdFromState = location.state?.selectedProviderId;
-    
+
     // Verificar se há um ID de provedor na sessionStorage se não veio do login
     const storedProviderId = sessionStorage.getItem('selectedProviderId');
-    
+
     // Priorizar o ID que vem do estado (login) se existir
     const providerId = providerIdFromState || storedProviderId;
-    
+
     if (providerId && (fromLogin || user)) {
       console.log('Provider ID found after login or in storage:', providerId);
       setSelectedProviderId(providerId);
-      
+
       // Limpar o selectedProviderId do sessionStorage
       sessionStorage.removeItem('selectedProviderId');
-      
+
       // Limpar o estado da location para evitar reaberturas indesejadas
       if (location.state && 'selectedProviderId' in location.state) {
         navigate(location.pathname, { replace: true });
       }
     }
   }, [location, user, navigate]);
-  
+
   useEffect(() => {
     const fetchProviders = async () => {
       if (!quoteDetails) {
         console.log('Waiting for quote details');
         return;
       }
-      
+
       setIsLoading(true);
       setErrorMessage(null);
       console.log('Searching providers for quote:', quoteDetails);
-      
+
       try {
         console.log('Starting provider search with quote details');
         console.log(`Service: ${quoteDetails.serviceName} (${quoteDetails.serviceId})`);
         console.log(`Subservice: ${quoteDetails.subServiceName || 'None'} (${quoteDetails.subServiceId || 'None'})`);
         console.log(`Specialty: ${quoteDetails.specialtyName || 'None'} (${quoteDetails.specialtyId || 'None'})`);
-        
+
         // Validate quote data before searching
         if (!quoteDetails.serviceId) {
           throw new Error('Service ID not provided');
         }
-        
+
         if (!quoteDetails.address || !quoteDetails.address.city) {
           console.warn('Address information incomplete, this may affect provider matching');
         }
-        
+
         // Search for all available providers with improved error handling
         try {
           console.log('Calling findMatchingProviders with quote details');
           const matchingProviders = await findMatchingProviders(quoteDetails);
           console.log('Providers found:', matchingProviders?.length || 0);
-          
+
           if (!matchingProviders || matchingProviders.length === 0) {
             console.warn('No providers found for the given criteria');
             sonnerToast.warning('Nenhum prestador encontrado', {
@@ -172,15 +172,15 @@ const ProvidersFound: React.FC = () => {
               console.log(`[${index + 1}] ${provider.provider.name}: price=${provider.totalPrice}, distance=${provider.distance}, within radius=${provider.isWithinRadius}`);
             });
           }
-          
+
           // Store all providers
           setProviders(matchingProviders || []);
-          
+
           // Apply initial filter to all providers (even if empty)
           handleFilterChange('relevance', matchingProviders || []);
         } catch (providerError: any) {
           console.error('Specific error when searching providers:', providerError);
-          
+
           // Additional logging for debugging
           if (providerError.code) {
             console.error('Error code:', providerError.code);
@@ -188,15 +188,15 @@ const ProvidersFound: React.FC = () => {
           if (providerError.details) {
             console.error('Error details:', providerError.details);
           }
-          
+
           throw new Error(`Failed to find providers: ${providerError.message}`);
         }
       } catch (error: any) {
         console.error('Error searching for providers:', error);
-        
+
         // Show specific error message
         setErrorMessage("Não foi possível encontrar prestadores. Por favor, verifique sua conexão e tente novamente.");
-        
+
         toast({
           title: "Erro ao buscar prestadores",
           description: error.message || "Não foi possível encontrar prestadores para seu orçamento.",
@@ -206,10 +206,10 @@ const ProvidersFound: React.FC = () => {
         setIsLoading(false);
       }
     };
-    
+
     fetchProviders();
   }, [quoteDetails, toast]);
-  
+
   useEffect(() => {
     // Aplicar o limite de prestadores exibidos com base no plano de assinatura
     if (!isUnlimited && providersLimit !== null && filteredProviders.length > providersLimit) {
@@ -218,17 +218,17 @@ const ProvidersFound: React.FC = () => {
       setDisplayedProviders(filteredProviders);
     }
   }, [filteredProviders, providersLimit, isUnlimited]);
-  
+
   const handleFilterChange = (filter: FilterOption, providersToFilter = providers) => {
     setCurrentFilter(filter);
-    
+
     if (!providersToFilter.length) {
       setFilteredProviders([]);
       return;
     }
-    
+
     let sorted = [...providersToFilter];
-    
+
     switch (filter) {
       case 'distance':
         sorted = sorted.sort((a, b) => {
@@ -253,27 +253,27 @@ const ProvidersFound: React.FC = () => {
         sorted = sorted.sort((a, b) => {
           if (a.isWithinRadius && !b.isWithinRadius) return -1;
           if (!a.isWithinRadius && b.isWithinRadius) return 1;
-          
+
           // Sort by relevance score if present
           const relevanceA = a.provider.relevanceScore || 0;
           const relevanceB = b.provider.relevanceScore || 0;
           if (relevanceA !== relevanceB) {
             return relevanceB - relevanceA;  // Higher score first
           }
-          
+
           if (a.distance !== null && b.distance !== null) {
             return a.distance - b.distance;
           }
-          
+
           return 0;
         });
         break;
     }
-    
+
     console.log(`Applied filter '${filter}', showing ${sorted.length} providers`);
     setFilteredProviders(sorted);
   };
-  
+
   const handleViewDetails = (providerId: string) => {
     if (!providerId) {
       console.error('ID do prestador não fornecido');
@@ -281,7 +281,7 @@ const ProvidersFound: React.FC = () => {
     }
     setSelectedProviderId(providerId);
   };
-  
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedProviderId(null);
@@ -295,20 +295,20 @@ const ProvidersFound: React.FC = () => {
       } catch (storageError) {
         console.error('Erro ao armazenar orçamento:', storageError);
       }
-      
+
       sessionStorage.setItem('redirectAfterLogin', '/prestadoresencontrados');
-      
+
       if (selectedProviderId) {
         sessionStorage.setItem('selectedProviderId', selectedProviderId);
       }
     }
     navigate('/login');
   };
-  
+
   useEffect(() => {
     const fetchProviderDetails = async () => {
       if (!selectedProviderId || !quoteDetails) return;
-      
+
       try {
         const details = await getProviderDetails(selectedProviderId, quoteDetails);
         if (details) {
@@ -319,7 +319,7 @@ const ProvidersFound: React.FC = () => {
             details.isWithinRadius = originalProvider.isWithinRadius;
             details.priceDetails = originalProvider.priceDetails;
           }
-          
+
           setSelectedProvider(details);
           setIsModalOpen(true);
         } else {
@@ -334,12 +334,12 @@ const ProvidersFound: React.FC = () => {
         });
       }
     };
-    
+
     fetchProviderDetails();
   }, [selectedProviderId, providers, quoteDetails, toast]);
-  
+
   // Função para enviar orçamento ao prestador
-  const handleSendQuote = async (providerId: string) => {
+  const handleSendQuote = async (providerId: string, allowContact: boolean) => {
     if (!user) {
       handleLoginRedirect();
       return;
@@ -369,7 +369,8 @@ const ProvidersFound: React.FC = () => {
           quote_id: quoteDetails.id,
           provider_id: providerId,
           status: 'pending',
-          total_price: selectedProvider?.totalPrice || null
+          total_price: selectedProvider?.totalPrice || null,
+          allow_contact: allowContact
         });
       if (error) throw error;
       markQuoteSentToProvider(providerId);
@@ -388,7 +389,7 @@ const ProvidersFound: React.FC = () => {
       });
     }
   };
-  
+
   const renderNoProvidersMessage = () => {
     if (errorMessage) {
       return (
@@ -398,7 +399,7 @@ const ProvidersFound: React.FC = () => {
         </div>
       );
     }
-    
+
     if (providers.length === 0) {
       return (
         <div className="text-center py-10">
@@ -410,9 +411,9 @@ const ProvidersFound: React.FC = () => {
         </div>
       );
     }
-    
+
     const inRadiusProviders = providers.filter(p => p.isWithinRadius);
-    
+
     if (inRadiusProviders.length === 0 && providers.length > 0) {
       return (
         <div className="text-center py-6 mb-4 bg-amber-50 rounded-lg">
@@ -423,10 +424,10 @@ const ProvidersFound: React.FC = () => {
         </div>
       );
     }
-    
+
     return null;
   };
-  
+
   // Renderizar a mensagem de limite de prestadores
   const renderLimitMessage = () => {
     if (!isUnlimited && providersLimit !== null && filteredProviders.length > providersLimit) {
@@ -445,11 +446,11 @@ const ProvidersFound: React.FC = () => {
     }
     return null;
   };
-  
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      
+
       <main className="flex-1 container mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -457,7 +458,7 @@ const ProvidersFound: React.FC = () => {
           transition={{ duration: 0.5 }}
         >
           <h1 className="text-2xl font-bold mb-2">Prestadores Encontrados</h1>
-          
+
           {isLoading || loadingFeatures ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
@@ -466,31 +467,31 @@ const ProvidersFound: React.FC = () => {
           ) : (
             <>
               {renderNoProvidersMessage()}
-              
+
               {filteredProviders.length > 0 && (
                 <>
-                  <ProviderFilters 
-                    onFilterChange={(filter) => handleFilterChange(filter)} 
-                    currentFilter={currentFilter} 
+                  <ProviderFilters
+                    onFilterChange={(filter) => handleFilterChange(filter)}
+                    currentFilter={currentFilter}
                   />
-                  
+
                   {renderLimitMessage()}
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {displayedProviders.map((provider) => (
-                      <ProviderCard 
-                        key={provider.provider.userId} 
-                        provider={provider} 
-                        onViewDetails={handleViewDetails} 
+                      <ProviderCard
+                        key={provider.provider.userId}
+                        provider={provider}
+                        onViewDetails={handleViewDetails}
                         quoteId={quoteDetails?.id}
                       />
                     ))}
                   </div>
-                  
+
                   {!isUnlimited && providersLimit !== null && filteredProviders.length > providersLimit && (
                     <div className="mt-8 text-center">
-                      <Button 
-                        onClick={() => navigate('/subscription')} 
+                      <Button
+                        onClick={() => navigate('/subscription')}
                         className="px-8"
                       >
                         <Lock className="h-4 w-4 mr-2" />
@@ -500,12 +501,12 @@ const ProvidersFound: React.FC = () => {
                   )}
                 </>
               )}
-              
+
               {selectedProvider && quoteDetails && (
-                <ProviderDetailsModal 
-                  provider={selectedProvider} 
-                  isOpen={isModalOpen} 
-                  onClose={handleCloseModal} 
+                <ProviderDetailsModal
+                  provider={selectedProvider}
+                  isOpen={isModalOpen}
+                  onClose={handleCloseModal}
                   quoteDetails={{
                     ...quoteDetails,
                     clientId: user?.id || undefined
@@ -517,7 +518,7 @@ const ProvidersFound: React.FC = () => {
           )}
         </motion.div>
       </main>
-      
+
       <Footer />
     </div>
   );

@@ -97,6 +97,7 @@ const RequestedQuotes: React.FC = () => {
           status,
           created_at,
           total_price,
+          allow_contact,
           quotes!quote_id (
             id,
             description,
@@ -148,9 +149,15 @@ const RequestedQuotes: React.FC = () => {
               .single();
 
             if (!clientError && clientData) {
-              clientName = clientData.name || 'Nome não informado';
-              clientPhone = clientData.phone || '';
-              clientEmail = quoteProvider.quotes.client_id || '';
+              if (quoteProvider.allow_contact) {
+                clientName = clientData.name || 'Nome não informado';
+                clientPhone = clientData.phone || '';
+                clientEmail = quoteProvider.quotes.client_id || '';
+              } else {
+                clientName = 'Cliente (Contato protegido)';
+                clientPhone = 'Confidencial';
+                clientEmail = 'Confidencial';
+              }
             }
           }
 
