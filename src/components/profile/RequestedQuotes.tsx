@@ -12,12 +12,10 @@ import LoadingSpinner from '@/components/ui/loading-spinner';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogClose
 } from '@/components/ui/dialog';
+import QuoteDetailsSummary from '@/components/quoteRequest/QuoteDetailsSummary';
 
 interface RequestedQuote {
   id: string;
@@ -39,9 +37,23 @@ interface RequestedQuote {
     state: string;
     zip_code: string;
     created_at: string;
+    service_date?: string;
+    service_end_date?: string;
+    service_time_preference?: string;
     clientName?: string;
     clientEmail?: string;
     clientPhone?: string;
+    items?: Record<string, number>;
+    itemNames?: Record<string, string>;
+    questions?: Record<string, { question: string, answer: string }>;
+    measurements?: {
+      id: string;
+      roomName: string;
+      width: number;
+      length: number;
+      height?: number;
+      measurementType?: 'square_meter' | 'linear_meter';
+    }[];
   };
 }
 
@@ -62,10 +74,10 @@ const RequestedQuotes: React.FC = () => {
 
   const fetchQuotes = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
-      // Buscar quote_providers com informações dos orçamentos
+      // Buscar quote_providers com informações dos orçamentos e dados relacionados
       const { data: quoteProviders, error: quoteProvidersError } = await supabase
         .from('quote_providers')
         .select(`
@@ -87,9 +99,23 @@ const RequestedQuotes: React.FC = () => {
             created_at,
             client_id,
             status,
+            service_date,
+            service_end_date,
+            service_time_preference,
             services:service_id (name),
             sub_services:sub_service_id (name),
-            specialties:specialty_id (name)
+            specialties:specialty_id (name),
+            quote_items (
+              quantity,
+              service_items (id, name)
+            ),
+            quote_measurements (
+              id, room_name, width, length, height
+            ),
+            quote_answers (
+              service_questions (id, question),
+              question_options (option_text)
+            )
           )
         `)
         .eq('provider_id', user.id)
@@ -117,8 +143,43 @@ const RequestedQuotes: React.FC = () => {
             }
           }
 
+          // Processar itens
+          const items: Record<string, number> = {};
+          const itemNames: Record<string, string> = {};
+          if (quoteProvider.quotes?.quote_items) {
+            quoteProvider.quotes.quote_items.forEach((item: any) => {
+              if (item.service_items) {
+                const itemId = item.service_items.id;
+                items[itemId] = item.quantity;
+                itemNames[itemId] = item.service_items.name;
+              }
+            });
+          }
+
+          // Processar medições
+          const measurements = quoteProvider.quotes?.quote_measurements?.map((m: any) => ({
+            id: m.id,
+            roomName: m.room_name || 'Ambiente',
+            width: m.width,
+            length: m.length,
+            height: m.height,
+            measurementType: 'square_meter' as 'square_meter' | 'linear_meter' // Defaulting, logic could be refined
+          })) || [];
+
+          // Processar perguntas e respostas
+          const questions: Record<string, { question: string, answer: string }> = {};
+          if (quoteProvider.quotes?.quote_answers) {
+            quoteProvider.quotes.quote_answers.forEach((ans: any) => {
+              if (ans.service_questions && ans.question_options) {
+                questions[ans.service_questions.id] = {
+                  question: ans.service_questions.question,
+                  answer: ans.question_options.option_text
+                };
+              }
+            });
+          }
+
           // Verificar se existe avaliação para este orçamento
-          // Se existe avaliação, o status deve ser 'completed'
           let finalStatus = quoteProvider.status;
           if (quoteProvider.status === 'accepted') {
             const { data: rating, error: ratingError } = await supabase
@@ -153,9 +214,16 @@ const RequestedQuotes: React.FC = () => {
               state: quoteProvider.quotes?.state || '',
               zip_code: quoteProvider.quotes?.zip_code || '',
               created_at: quoteProvider.quotes?.created_at || '',
+              service_date: quoteProvider.quotes?.service_date,
+              service_end_date: quoteProvider.quotes?.service_end_date,
+              service_time_preference: quoteProvider.quotes?.service_time_preference,
               clientName,
               clientEmail,
               clientPhone,
+              items,
+              itemNames,
+              questions,
+              measurements
             }
           };
         })
@@ -169,9 +237,6 @@ const RequestedQuotes: React.FC = () => {
         filteredQuotes = quotesWithClientInfo.filter(quote => quote.status === tab);
       }
 
-      console.log(`Aba atual: ${tab}, Total orçamentos: ${quotesWithClientInfo.length}, Filtrados: ${filteredQuotes.length}`);
-      console.log('Status dos orçamentos:', quotesWithClientInfo.map(q => q.status));
-      
       setQuotes(filteredQuotes);
     } catch (error) {
       console.error('Erro ao buscar orçamentos solicitados:', error);
@@ -185,11 +250,11 @@ const RequestedQuotes: React.FC = () => {
     setActionLoading(quoteProviderId);
     try {
       console.log(`Atualizando orçamento ${quoteProviderId} para ${action}`);
-      
+
       const { error } = await supabase
         .from('quote_providers')
-        .update({ 
-          status: action 
+        .update({
+          status: action
         })
         .eq('id', quoteProviderId)
         .eq('provider_id', user?.id);
@@ -200,10 +265,10 @@ const RequestedQuotes: React.FC = () => {
       }
 
       // Atualiza o estado local imediatamente
-      setQuotes(prevQuotes => 
-        prevQuotes.map(quote => 
-          quote.id === quoteProviderId 
-            ? { ...quote, status: action } 
+      setQuotes(prevQuotes =>
+        prevQuotes.map(quote =>
+          quote.id === quoteProviderId
+            ? { ...quote, status: action }
             : quote
         )
       );
@@ -212,10 +277,9 @@ const RequestedQuotes: React.FC = () => {
       if (tab !== 'all' && tab !== action) {
         setQuotes(prevQuotes => prevQuotes.filter(quote => quote.id !== quoteProviderId));
       }
-      
+
       toast.success(`Orçamento ${action === 'accepted' ? 'aceito' : 'rejeitado'} com sucesso!`);
-      
-      // Recarrega todos os orçamentos após uma pequena pausa para dar tempo ao banco de dados sincronizar
+
       setTimeout(() => {
         fetchQuotes();
       }, 500);
@@ -297,7 +361,7 @@ const RequestedQuotes: React.FC = () => {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={() => handleViewDetails(quoteProvider)}
                         >
@@ -306,10 +370,11 @@ const RequestedQuotes: React.FC = () => {
 
                         {quoteProvider.status === 'pending' && (
                           <>
-                            <Button 
+                            <Button
                               variant="outline"
                               disabled={!!actionLoading}
                               onClick={() => handleAction(quoteProvider.id, 'rejected')}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
                             >
                               {actionLoading === quoteProvider.id ? (
                                 <LoadingSpinner />
@@ -319,6 +384,7 @@ const RequestedQuotes: React.FC = () => {
                             <Button
                               disabled={!!actionLoading}
                               onClick={() => handleAction(quoteProvider.id, 'accepted')}
+                              className="bg-green-600 hover:bg-green-700"
                             >
                               {actionLoading === quoteProvider.id ? (
                                 <LoadingSpinner />
@@ -338,82 +404,39 @@ const RequestedQuotes: React.FC = () => {
       </Tabs>
 
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           {selectedQuote && (
             <>
               <DialogHeader>
                 <DialogTitle>Detalhes do Orçamento</DialogTitle>
-                <DialogDescription>
-                  Solicitado em {formatDate(selectedQuote.created_at)}
-                </DialogDescription>
               </DialogHeader>
-              
-              <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Informações do Serviço</h3>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Serviço</p>
-                        <p>{selectedQuote.quote.service}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Subserviço</p>
-                        <p>{selectedQuote.quote.subService}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Especialidade</p>
-                        <p>{selectedQuote.quote.specialty}</p>
-                      </div>
-                      {selectedQuote.quote.description && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Descrição</p>
-                          <p>{selectedQuote.quote.description}</p>
-                        </div>
-                      )}
-                      {selectedQuote.total_price && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Valor Estimado</p>
-                          <p className="font-medium">R$ {selectedQuote.total_price.toFixed(2)}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Informações do Cliente</h3>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Nome</p>
-                        <p>{selectedQuote.quote.clientName}</p>
-                      </div>
-                      {selectedQuote.quote.clientEmail && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Email</p>
-                          <p>{selectedQuote.quote.clientEmail}</p>
-                        </div>
-                      )}
-                      {selectedQuote.quote.clientPhone && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Telefone</p>
-                          <p>{selectedQuote.quote.clientPhone}</p>
-                        </div>
-                      )}
-                    </div>
 
-                    <h3 className="text-lg font-semibold mb-2 mt-4">Endereço</h3>
-                    <div className="space-y-2">
-                      <p>
-                        {selectedQuote.quote.street}, {selectedQuote.quote.number}
-                        {selectedQuote.quote.complement && `, ${selectedQuote.quote.complement}`}
-                      </p>
-                      <p>
-                        {selectedQuote.quote.neighborhood}, {selectedQuote.quote.city} - {selectedQuote.quote.state}
-                      </p>
-                      <p>CEP: {selectedQuote.quote.zip_code}</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="mt-4">
+                <QuoteDetailsSummary
+                  formData={{
+                    fullName: selectedQuote.quote.clientName,
+                    serviceName: selectedQuote.quote.service,
+                    subServiceName: selectedQuote.quote.subService,
+                    specialtyName: selectedQuote.quote.specialty,
+                    description: selectedQuote.quote.description,
+                    street: selectedQuote.quote.street,
+                    number: selectedQuote.quote.number,
+                    complement: selectedQuote.quote.complement,
+                    neighborhood: selectedQuote.quote.neighborhood,
+                    city: selectedQuote.quote.city,
+                    state: selectedQuote.quote.state,
+                    zipCode: selectedQuote.quote.zip_code,
+                    answers: {}, // Unused in component but required by type? No, questions is the main one
+                    questions: selectedQuote.quote.questions,
+                    itemQuantities: selectedQuote.quote.items,
+                    itemNames: selectedQuote.quote.itemNames,
+                    measurements: selectedQuote.quote.measurements,
+                    serviceDate: selectedQuote.quote.service_date ? new Date(selectedQuote.quote.service_date) : undefined,
+                    serviceEndDate: selectedQuote.quote.service_end_date ? new Date(selectedQuote.quote.service_end_date) : undefined,
+                    serviceTimePreference: selectedQuote.quote.service_time_preference
+                  }}
+                  totalPrice={selectedQuote.total_price}
+                />
               </div>
             </>
           )}
