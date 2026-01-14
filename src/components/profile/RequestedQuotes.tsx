@@ -15,6 +15,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from 'lucide-react';
 import QuoteDetailsSummary from '@/components/quoteRequest/QuoteDetailsSummary';
 
 interface RequestedQuote {
@@ -65,6 +76,7 @@ const RequestedQuotes: React.FC = () => {
   const [tab, setTab] = useState('pending');
   const [selectedQuote, setSelectedQuote] = useState<RequestedQuote | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -77,7 +89,6 @@ const RequestedQuotes: React.FC = () => {
 
     setLoading(true);
     try {
-      // Buscar quote_providers com informações dos orçamentos e dados relacionados
       const { data: quoteProviders, error: quoteProvidersError } = await supabase
         .from('quote_providers')
         .select(`
@@ -143,7 +154,6 @@ const RequestedQuotes: React.FC = () => {
             }
           }
 
-          // Processar itens
           const items: Record<string, number> = {};
           const itemNames: Record<string, string> = {};
           if (quoteProvider.quotes?.quote_items) {
@@ -156,17 +166,15 @@ const RequestedQuotes: React.FC = () => {
             });
           }
 
-          // Processar medições
           const measurements = quoteProvider.quotes?.quote_measurements?.map((m: any) => ({
             id: m.id,
             roomName: m.room_name || 'Ambiente',
             width: m.width,
             length: m.length,
             height: m.height,
-            measurementType: 'square_meter' as 'square_meter' | 'linear_meter' // Defaulting, logic could be refined
+            measurementType: 'square_meter' as 'square_meter' | 'linear_meter'
           })) || [];
 
-          // Processar perguntas e respostas
           const questions: Record<string, { question: string, answer: string }> = {};
           if (quoteProvider.quotes?.quote_answers) {
             quoteProvider.quotes.quote_answers.forEach((ans: any) => {
@@ -179,7 +187,6 @@ const RequestedQuotes: React.FC = () => {
             });
           }
 
-          // Verificar se existe avaliação para este orçamento
           let finalStatus = quoteProvider.status;
           if (quoteProvider.status === 'accepted') {
             const { data: rating, error: ratingError } = await supabase
@@ -229,7 +236,6 @@ const RequestedQuotes: React.FC = () => {
         })
       );
 
-      // Filtrar os orçamentos de acordo com a aba selecionada
       let filteredQuotes;
       if (tab === 'all') {
         filteredQuotes = quotesWithClientInfo;
@@ -249,22 +255,14 @@ const RequestedQuotes: React.FC = () => {
   const handleAction = async (quoteProviderId: string, action: 'accepted' | 'rejected') => {
     setActionLoading(quoteProviderId);
     try {
-      console.log(`Atualizando orçamento ${quoteProviderId} para ${action}`);
-
       const { error } = await supabase
         .from('quote_providers')
-        .update({
-          status: action
-        })
+        .update({ status: action })
         .eq('id', quoteProviderId)
         .eq('provider_id', user?.id);
 
-      if (error) {
-        console.error('Erro ao atualizar orçamento:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      // Atualiza o estado local imediatamente
       setQuotes(prevQuotes =>
         prevQuotes.map(quote =>
           quote.id === quoteProviderId
@@ -273,21 +271,45 @@ const RequestedQuotes: React.FC = () => {
         )
       );
 
-      // Se estamos em uma aba específica, e o status mudou, esse item deve ser removido da lista atual
       if (tab !== 'all' && tab !== action) {
         setQuotes(prevQuotes => prevQuotes.filter(quote => quote.id !== quoteProviderId));
       }
 
       toast.success(`Orçamento ${action === 'accepted' ? 'aceito' : 'rejeitado'} com sucesso!`);
-
-      setTimeout(() => {
-        fetchQuotes();
-      }, 500);
+      setTimeout(() => fetchQuotes(), 500);
     } catch (error: any) {
       console.error('Erro ao processar orçamento:', error);
-      toast.error(`Erro ao ${action === 'accepted' ? 'aceitar' : 'rejeitar'} orçamento. Tente novamente.`);
+      toast.error('Erro ao atualizar orçamento. Tente novamente.');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!quoteToDelete) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('quote_providers')
+        .delete()
+        .eq('id', quoteToDelete)
+        .eq('provider_id', user?.id)
+        .select();
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast.error('Não foi possível excluir. Verifique suas permissões.');
+        return;
+      }
+
+      setQuotes(prev => prev.filter(q => q.id !== quoteToDelete));
+      toast.success('Orçamento excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir orçamento:', error);
+      toast.error('Erro ao excluir orçamento');
+    } finally {
+      setQuoteToDelete(null);
     }
   };
 
@@ -352,46 +374,48 @@ const RequestedQuotes: React.FC = () => {
                         <p className="text-sm">
                           {quoteProvider.quote.neighborhood}, {quoteProvider.quote.city}
                         </p>
-                        {quoteProvider.quote.description && (
-                          <p className="text-sm line-clamp-2">{quoteProvider.quote.description}</p>
-                        )}
                         <p className="text-xs text-muted-foreground">
                           Solicitado em {formatDate(quoteProvider.created_at)}
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleViewDetails(quoteProvider)}
-                        >
-                          Ver Detalhes
-                        </Button>
+                      <div className="flex flex-col gap-2 items-end">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleViewDetails(quoteProvider)}
+                          >
+                            Ver Detalhes
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setQuoteToDelete(quoteProvider.id)}
+                            title="Excluir orçamento"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </div>
 
                         {quoteProvider.status === 'pending' && (
-                          <>
+                          <div className="flex gap-2 mt-2">
                             <Button
                               variant="outline"
                               disabled={!!actionLoading}
                               onClick={() => handleAction(quoteProvider.id, 'rejected')}
                               className="text-red-500 hover:text-red-600 hover:bg-red-50"
                             >
-                              {actionLoading === quoteProvider.id ? (
-                                <LoadingSpinner />
-                              ) : null}
-                              Rejeitar
+                              {actionLoading === quoteProvider.id ? <LoadingSpinner /> : 'Rejeitar'}
                             </Button>
                             <Button
                               disabled={!!actionLoading}
                               onClick={() => handleAction(quoteProvider.id, 'accepted')}
                               className="bg-green-600 hover:bg-green-700"
                             >
-                              {actionLoading === quoteProvider.id ? (
-                                <LoadingSpinner />
-                              ) : null}
-                              Aceitar
+                              {actionLoading === quoteProvider.id ? <LoadingSpinner /> : 'Aceitar'}
                             </Button>
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -410,7 +434,6 @@ const RequestedQuotes: React.FC = () => {
               <DialogHeader>
                 <DialogTitle>Detalhes do Orçamento</DialogTitle>
               </DialogHeader>
-
               <div className="mt-4">
                 <QuoteDetailsSummary
                   formData={{
@@ -426,7 +449,6 @@ const RequestedQuotes: React.FC = () => {
                     city: selectedQuote.quote.city,
                     state: selectedQuote.quote.state,
                     zipCode: selectedQuote.quote.zip_code,
-                    answers: {}, // Unused in component but required by type? No, questions is the main one
                     questions: selectedQuote.quote.questions,
                     itemQuantities: selectedQuote.quote.items,
                     itemNames: selectedQuote.quote.itemNames,
@@ -442,6 +464,23 @@ const RequestedQuotes: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!quoteToDelete} onOpenChange={() => setQuoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir orçamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este orçamento da sua lista? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

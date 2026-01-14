@@ -11,6 +11,17 @@ import QuoteDetails from './QuoteDetails';
 import ProviderRatingModal from './ProviderRatingModal';
 import ServiceVerificationModal from './ServiceVerificationModal';
 import { toast } from 'sonner';
+import { Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const QuotesList: React.FC = () => {
   const { user } = useAuth();
@@ -26,6 +37,7 @@ const QuotesList: React.FC = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [isProcessingVerification, setIsProcessingVerification] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
 
   // Shared state for the active action (rating or verification)
   const [activeQuoteId, setActiveQuoteId] = useState<string>('');
@@ -70,6 +82,7 @@ const QuotesList: React.FC = () => {
           )
         `)
         .eq('client_id', user.id)
+        .eq('client_deleted', false)
         .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;
@@ -155,6 +168,28 @@ const QuotesList: React.FC = () => {
 
   const handleRatingSubmitted = () => {
     fetchQuotes(); // Refresh the quotes list
+  };
+
+  const handleDeleteQuote = async () => {
+    if (!quoteToDelete) return;
+
+    try {
+      // Soft Delete: Apenas marca como deletado para o cliente
+      const { error } = await supabase
+        .from('quotes')
+        .update({ client_deleted: true })
+        .eq('id', quoteToDelete);
+
+      if (error) throw error;
+
+      toast.success('Orçamento excluído com sucesso.');
+      setQuotes(prev => prev.filter(q => q.id !== quoteToDelete));
+    } catch (error) {
+      console.error('Erro ao excluir orçamento:', error);
+      toast.error('Não foi possível excluir o orçamento.');
+    } finally {
+      setQuoteToDelete(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -253,7 +288,19 @@ const QuotesList: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="flex flex-col space-y-4">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setQuoteToDelete(quote.id)}
+                            title="Excluir orçamento"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </div>
+
                         <div className="space-y-2">
                           <h4 className="text-sm font-medium">Prestadores:</h4>
                           {quote.providers.length === 0 ? (
@@ -325,6 +372,24 @@ const QuotesList: React.FC = () => {
         providerName={activeProviderName}
         onRatingSubmitted={handleRatingSubmitted}
       />
+
+      <AlertDialog open={!!quoteToDelete} onOpenChange={() => setQuoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir orçamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este orçamento permanentemente?
+              Todas as candidaturas de prestadores vinculadas serão removidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteQuote} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
