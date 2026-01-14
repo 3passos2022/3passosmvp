@@ -9,6 +9,8 @@ import { formatDate } from '@/lib/utils';
 import { QuoteWithProviders } from '@/lib/types/providerMatch';
 import QuoteDetails from './QuoteDetails';
 import ProviderRatingModal from './ProviderRatingModal';
+import ServiceVerificationModal from './ServiceVerificationModal';
+import { toast } from 'sonner';
 
 const QuotesList: React.FC = () => {
   const { user } = useAuth();
@@ -18,11 +20,17 @@ const QuotesList: React.FC = () => {
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithProviders | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
   const [selectedProviderName, setSelectedProviderName] = useState<string>('');
+
+  // Modal states
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [ratingQuoteId, setRatingQuoteId] = useState<string>('');
-  const [ratingProviderId, setRatingProviderId] = useState<string>('');
-  const [ratingProviderName, setRatingProviderName] = useState<string>('');
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [isProcessingVerification, setIsProcessingVerification] = useState(false);
+
+  // Shared state for the active action (rating or verification)
+  const [activeQuoteId, setActiveQuoteId] = useState<string>('');
+  const [activeProviderId, setActiveProviderId] = useState<string>('');
+  const [activeProviderName, setActiveProviderName] = useState<string>('');
 
   useEffect(() => {
     if (user) {
@@ -32,7 +40,7 @@ const QuotesList: React.FC = () => {
 
   const fetchQuotes = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const { data: quotesData, error: quotesError } = await supabase
@@ -94,7 +102,7 @@ const QuotesList: React.FC = () => {
       } else {
         filteredQuotes = quotesWithProviders.filter(quote => quote.status === tab);
       }
-      
+
       setQuotes(filteredQuotes);
     } catch (error) {
       console.error('Erro ao buscar orçamentos:', error);
@@ -110,11 +118,39 @@ const QuotesList: React.FC = () => {
     setShowDetailsModal(true);
   };
 
-  const openRatingModal = (quoteId: string, providerId: string, providerName: string) => {
-    setRatingQuoteId(quoteId);
-    setRatingProviderId(providerId);
-    setRatingProviderName(providerName);
+  const startCompletionFlow = (quoteId: string, providerId: string, providerName: string) => {
+    setActiveQuoteId(quoteId);
+    setActiveProviderId(providerId);
+    setActiveProviderName(providerName);
+    setShowVerificationModal(true);
+  };
+
+  const handleVerificationConfirm = () => {
+    setShowVerificationModal(false);
     setShowRatingModal(true);
+  };
+
+  const handleVerificationDeny = async () => {
+    setIsProcessingVerification(true);
+    try {
+      // Remover o vínculo (deletar da tabela quote_providers)
+      const { error } = await supabase
+        .from('quote_providers')
+        .delete()
+        .eq('quote_id', activeQuoteId)
+        .eq('provider_id', activeProviderId);
+
+      if (error) throw error;
+
+      toast.success('Vínculo com o prestador removido com sucesso.');
+      setShowVerificationModal(false);
+      fetchQuotes(); // Atualiza a lista
+    } catch (error) {
+      console.error('Erro ao remover vínculo:', error);
+      toast.error('Erro ao remover o vínculo com o prestador.');
+    } finally {
+      setIsProcessingVerification(false);
+    }
   };
 
   const handleRatingSubmitted = () => {
@@ -155,13 +191,13 @@ const QuotesList: React.FC = () => {
   // Helper function to format service date display
   const formatServiceDate = (date: string | null, endDate: string | null) => {
     if (!date) return 'Data não definida';
-    
+
     const formattedStart = formatDate(date);
     if (endDate && date !== endDate) {
       const formattedEnd = formatDate(endDate);
       return `${formattedStart} até ${formattedEnd}`;
     }
-    
+
     return formattedStart;
   };
 
@@ -228,9 +264,9 @@ const QuotesList: React.FC = () => {
                                 <div key={provider.id} className="flex items-center justify-between gap-4">
                                   <span className="text-sm">{provider.providerName}</span>
                                   {quote.status === 'pending' && provider.status === 'accepted' && (
-                                    <Button 
+                                    <Button
                                       size="sm"
-                                      onClick={() => openRatingModal(quote.id, provider.providerId, provider.providerName)}
+                                      onClick={() => startCompletionFlow(quote.id, provider.providerId, provider.providerName)}
                                     >
                                       Finalizar
                                     </Button>
@@ -238,11 +274,11 @@ const QuotesList: React.FC = () => {
                                   {provider.status !== 'pending' && (
                                     <Badge variant="outline" className={
                                       provider.status === 'completed' ? "bg-green-50 text-green-700" :
-                                      provider.status === 'accepted' ? "bg-blue-50 text-blue-700" :
-                                      "bg-red-50 text-red-700"
+                                        provider.status === 'accepted' ? "bg-blue-50 text-blue-700" :
+                                          "bg-red-50 text-red-700"
                                     }>
                                       {provider.status === 'completed' ? 'Concluído' :
-                                       provider.status === 'accepted' ? 'Aceito' : 'Rejeitado'}
+                                        provider.status === 'accepted' ? 'Aceito' : 'Rejeitado'}
                                     </Badge>
                                   )}
                                 </div>
@@ -272,12 +308,21 @@ const QuotesList: React.FC = () => {
         />
       )}
 
+      <ServiceVerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onConfirm={handleVerificationConfirm}
+        onDeny={handleVerificationDeny}
+        providerName={activeProviderName}
+        isProcessing={isProcessingVerification}
+      />
+
       <ProviderRatingModal
         isOpen={showRatingModal}
         onClose={() => setShowRatingModal(false)}
-        quoteId={ratingQuoteId}
-        providerId={ratingProviderId}
-        providerName={ratingProviderName}
+        quoteId={activeQuoteId}
+        providerId={activeProviderId}
+        providerName={activeProviderName}
         onRatingSubmitted={handleRatingSubmitted}
       />
     </div>
