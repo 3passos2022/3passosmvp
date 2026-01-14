@@ -31,6 +31,7 @@ import { UserRole } from '@/lib/types';
 import { User as UserIcon, Briefcase } from 'lucide-react';
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png'
 import { formatCPF, formatCNPJ, validateCPF, validateCNPJ } from '@/lib/utils';
+import EmailConfirmationModal from '@/components/auth/EmailConfirmationModal';
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -102,6 +103,8 @@ const Login: React.FC = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showEmailConfirmationModal, setShowEmailConfirmationModal] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
 
   // Obter caminho de redirecionamento
   const from = location.state?.from || "/";
@@ -194,12 +197,11 @@ const Login: React.FC = () => {
       if (error) {
         toast.error(`Erro ao criar conta: ${error.message}`);
       } else {
-        toast.success(
-          "Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro."
-        );
+        // toast.success("Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro.");
 
-        setActiveTab("login");
-        loginForm.setValue("email", formData.email);
+        // Show modal instead of toast + immediate switch
+        setConfirmationEmail(formData.email);
+        setShowEmailConfirmationModal(true);
         signupForm.reset();
       }
     } catch (error) {
@@ -522,6 +524,16 @@ const Login: React.FC = () => {
           </Tabs>
         </motion.div>
       </main>
+
+      <EmailConfirmationModal
+        isOpen={showEmailConfirmationModal}
+        onClose={() => {
+          setShowEmailConfirmationModal(false);
+          setActiveTab("login");
+          loginForm.setValue("email", confirmationEmail);
+        }}
+        email={confirmationEmail}
+      />
     </div>
   );
 };
