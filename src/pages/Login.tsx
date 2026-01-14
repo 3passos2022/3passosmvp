@@ -24,6 +24,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -60,6 +61,7 @@ const signupSchema = z.object({
   }),
   cpf: z.string().optional(),
   cnpj: z.string().optional(),
+  isIndividualProvider: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.role === UserRole.CLIENT) {
     if (!data.cpf) {
@@ -78,21 +80,39 @@ const signupSchema = z.object({
   }
 
   if (data.role === UserRole.PROVIDER) {
-    if (!data.cnpj) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "CNPJ é obrigatório para prestadores",
-        path: ["cnpj"],
-      });
-    } else if (!validateCNPJ(data.cnpj)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "CNPJ inválido",
-        path: ["cnpj"],
-      });
+    if (data.isIndividualProvider) {
+      if (!data.cpf) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "CPF é obrigatório para prestadores autônomos",
+          path: ["cpf"],
+        });
+      } else if (!validateCPF(data.cpf)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "CPF inválido",
+          path: ["cpf"],
+        });
+      }
+    } else {
+      if (!data.cnpj) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "CNPJ é obrigatório para empresas",
+          path: ["cnpj"],
+        });
+      } else if (!validateCNPJ(data.cnpj)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "CNPJ inválido",
+          path: ["cnpj"],
+        });
+      }
     }
   }
 });
+
+
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
@@ -158,10 +178,12 @@ const Login: React.FC = () => {
       role: UserRole.CLIENT,
       cpf: "",
       cnpj: "",
+      isIndividualProvider: false,
     },
   });
 
   const selectedRole = signupForm.watch("role");
+  const isIndividualProvider = signupForm.watch("isIndividualProvider");
 
   const handleLoginSubmit = async (formData: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
@@ -190,8 +212,8 @@ const Login: React.FC = () => {
         name: formData.name,
         phone: formData.phone,
         role: formData.role,
-        cpf: formData.role === UserRole.CLIENT ? formData.cpf : undefined,
-        cnpj: formData.role === UserRole.PROVIDER ? formData.cnpj : undefined,
+        cpf: (formData.role === UserRole.CLIENT || (formData.role === UserRole.PROVIDER && formData.isIndividualProvider)) ? formData.cpf : undefined,
+        cnpj: (formData.role === UserRole.PROVIDER && !formData.isIndividualProvider) ? formData.cnpj : undefined,
       });
 
       if (error) {
@@ -413,26 +435,74 @@ const Login: React.FC = () => {
                       )}
 
                       {selectedRole === UserRole.PROVIDER && (
-                        <FormField
-                          control={signupForm.control}
-                          name="cnpj"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>CNPJ</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="00.000.000/0000-00"
-                                  {...field}
-                                  onChange={(e) => {
-                                    field.onChange(formatCNPJ(e.target.value));
-                                  }}
-                                  maxLength={18}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
+                        <>
+                          <FormField
+                            control={signupForm.control}
+                            name="isIndividualProvider"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 mb-4">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                  <FormLabel>
+                                    Sou um profissional autônomo (CPF)
+                                  </FormLabel>
+                                  <CardDescription>
+                                    Selecione se você não possui CNPJ e deseja se cadastrar com seu CPF.
+                                  </CardDescription>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+
+                          {isIndividualProvider ? (
+                            <FormField
+                              control={signupForm.control}
+                              name="cpf"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>CPF</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="000.000.000-00"
+                                      {...field}
+                                      onChange={(e) => {
+                                        field.onChange(formatCPF(e.target.value));
+                                      }}
+                                      maxLength={14}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          ) : (
+                            <FormField
+                              control={signupForm.control}
+                              name="cnpj"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>CNPJ</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="00.000.000/0000-00"
+                                      {...field}
+                                      onChange={(e) => {
+                                        field.onChange(formatCNPJ(e.target.value));
+                                      }}
+                                      maxLength={18}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           )}
-                        />
+                        </>
                       )}
 
                       <FormField
