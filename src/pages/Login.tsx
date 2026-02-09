@@ -116,7 +116,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
 
 const Login: React.FC = () => {
-  const { user, session, loading, signIn, signUp } = useAuth();
+  const { user, session, loading, signIn, signUp, isRecoveringPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
@@ -127,7 +127,7 @@ const Login: React.FC = () => {
   const from = location.state?.from || "/";
 
   useEffect(() => {
-    if (user && session) {
+    if (user && session && !isRecoveringPassword) {
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       const selectedProviderId = sessionStorage.getItem('selectedProviderId');
 
@@ -148,7 +148,7 @@ const Login: React.FC = () => {
         navigate(from);
       }
     }
-  }, [user, session, navigate, from]);
+  }, [user, session, navigate, from, isRecoveringPassword]);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),

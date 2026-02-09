@@ -34,6 +34,7 @@ type AuthContextType = {
   makeAdmin: (userId: string) => Promise<{ error: Error | null; data: any }>;
   refreshSubscription: () => Promise<void>;
   hasRole: (role: UserRole | string) => boolean;
+  isRecoveringPassword: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
   // Function to check user role
   const checkUserRole = (role: UserRole | string) => {
@@ -104,10 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleAuthChange = async (event: string, newSession: Session | null) => {
       setSession(newSession);
 
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveringPassword(true);
+      }
+
       if (!newSession) {
         setUser(null);
         setSubscription(null);
         setLoading(false);
+        setIsRecoveringPassword(false);
         return;
       }
 
@@ -292,6 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: new Error('No user logged in'), data: null };
     }
 
+    // @ts-ignore - ProfileService might need to be updated but we use this as is for now
     return await ProfileService.makeAdmin(user.id, userId);
   }
 
@@ -361,7 +369,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshSubscription,
     subscriptionLoading,
     checkUserRole,
-    hasRole: checkUserRole
+    hasRole: checkUserRole,
+    isRecoveringPassword
   };
 
   return (

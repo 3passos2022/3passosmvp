@@ -17,25 +17,25 @@ import { toast } from "sonner";
 import logoMenu from './../img/Logos/LogotipoHorizontalPreto.png';
 
 const ResetPassword: React.FC = () => {
-    const { resetPassword, session } = useAuth();
+    const { resetPassword, session, loading: authLoading, isRecoveringPassword } = useAuth();
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Verificar se há uma sessão (o link de reset loga o usuário automaticamente)
+    // Verificar se há uma sessão ou se estamos no fluxo de recuperação
     useEffect(() => {
-        // Se não houver sessão, o usuário pode ter acessado a página diretamente ou o link expirou
-        // Mas vamos dar um tempo para a sessão carregar
-        const timer = setTimeout(() => {
-            if (!session) {
-                // toast.error("Link inválido ou expirado. Por favor, solicite uma nova redefinição.");
-                // navigate('/forgot-password');
-            }
-        }, 2000);
+        if (!authLoading && !session && !isRecoveringPassword) {
+            const timer = setTimeout(() => {
+                if (!session && !isRecoveringPassword) {
+                    toast.error("Link inválido ou expirado. Por favor, solicite uma nova redefinição.");
+                    navigate('/forgot-password');
+                }
+            }, 3000); // Dar um tempo maior para o Supabase processar o hash/code na URL
 
-        return () => clearTimeout(timer);
-    }, [session, navigate]);
+            return () => clearTimeout(timer);
+        }
+    }, [session, isRecoveringPassword, authLoading, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
